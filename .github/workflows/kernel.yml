@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: A325X xxKSU + SUSFS kernel${{ inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.release && ' + release' || '' }}
+run-name: A325X xxKSU + SUSFS kernel${{ inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.release && ' + release' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch) is downloaded fresh during the run.
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       self_hosted:
-        description: 'Build on my own PC (self-hosted runner). Untick = GitHub runner'
+        description: 'Prefer my own PC (self-hosted). If it is busy, a GitHub runner is used when that finishes sooner. Untick = GitHub runner'
         type: boolean
         default: true
       perf_tuning:
@@ -21,20 +21,38 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
-concurrency:
-  group: a325x-kernel-${{ inputs.self_hosted && 'pc' || 'gh' }}
-  cancel-in-progress: false
 
 env:
-  SELF_HOSTED: ${{ inputs.self_hosted }}
   PERF_TUNING: ${{ inputs.perf_tuning }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
+  pick:
+    name: Pick runner
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.pick.outputs.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          sparse-checkout: scripts/pick_runner.py
+          sparse-checkout-cone-mode: false
+      - name: Choose self-hosted PC or GitHub runner
+        id: pick
+        env:
+          WANT_SELF_HOSTED: ${{ inputs.self_hosted }}
+        run: python3 scripts/pick_runner.py
+
   build:
     name: Build xxKSU + SUSFS kernel
-    runs-on: ${{ inputs.self_hosted && 'self-hosted' || 'ubuntu-latest' }}
+    needs: pick
+    runs-on: ${{ needs.pick.outputs.runner }}
+    env:
+      SELF_HOSTED: ${{ needs.pick.outputs.runner == 'self-hosted' }}
     timeout-minutes: 180
     outputs:
       zip_name: ${{ steps.package.outputs.zip_name }}
@@ -55,7 +73,7 @@ jobs:
             # Keep the kernel download between runs on the PC (saves ~1 GB per run).
             cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-bakasu"
             mkdir -p "$cache"
-            kernel_dir="$cache/kernel-tree"
+            kernel_dir="$cache/kernel-tree-${GITHUB_REF_NAME//\//-}"
           else
             kernel_dir="$work/kernel"
           fi
@@ -205,14 +223,15 @@ jobs:
       contents: write
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      BRANCH: ${{ github.ref_name }}
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout main
+      - name: Checkout ${{ github.ref_name }}
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.DEFAULT_BRANCH }}
+          ref: ${{ github.ref_name }}
           fetch-depth: 1
 
       - name: Download release files
@@ -225,9 +244,13 @@ jobs:
         run: |
           set -euo pipefail
           ls -l release
-          tag="build-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          # main: build-YYYYMMDD-N. Other branches: <branch>-YYYYMMDD-N (pre-release),
+          # so every branch has its own release history and "what's new".
+          if [[ "$BRANCH" == "$DEFAULT_BRANCH" ]]; then prefix=build; else prefix=${BRANCH//\//-}; fi
+          tag="$prefix-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
           echo "TAG=$tag" >> "$GITHUB_ENV"
-          prev=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // ""')
+          prev=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 100 --json tagName \
+            --jq "[.[].tagName | select(test(\"^$prefix-[0-9]{8}-[0-9]+\$\"))][0] // \"\"")
           if [[ -n "$prev" ]] && gh release download "$prev" --repo "$GITHUB_REPOSITORY" --pattern sources.json --dir prev 2>/dev/null; then
             echo "Previous release: $prev"
             prev_json=prev/sources.json
@@ -244,7 +267,8 @@ jobs:
           name=$(basename "$zip" .zip)
           gh release create "$TAG" "$zip" release/build-info.txt release/sources.json release/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "$name" --notes-file notes.md
+            --title "$name" --notes-file notes.md \
+            $([[ "$BRANCH" == "$DEFAULT_BRANCH" ]] || echo --prerelease)
 
       - name: Update README sources table
         run: |
@@ -252,11 +276,11 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           for attempt in 1 2 3; do
-            git fetch -q origin "$DEFAULT_BRANCH" && git reset -q --hard FETCH_HEAD
+            git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
             python3 scripts/release_notes.py readme release/sources.json README.md "$TAG"
             if git diff --quiet; then echo 'README already up to date.'; exit 0; fi
             git commit -q -am "README: sources for release $TAG"
-            git push -q origin "HEAD:$DEFAULT_BRANCH" && exit 0
+            git push -q origin "HEAD:$BRANCH" && exit 0
             sleep 5
           done
           echo '::error::Could not push the README update.'; exit 1

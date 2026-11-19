@@ -45,7 +45,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 1. Open the repo on GitHub and go to the **Actions** tab.
 2. Pick **Build Kernel** on the left, then press **Run workflow**.
 3. Choose the options and press the green **Run workflow** button:
-   - **Build on my own PC (self-hosted runner)**: ticked by default. Untick to use a free GitHub runner instead.
+   - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
    - **Performance tuning**: unticked by default.
    - **Publish a GitHub Release**: unticked by default. When ticked, the run also creates a release (ZIP, `build-info.txt`, `sources.json`, `SHA256SUMS.txt`), lists what is new in each source since the previous release, and updates the "Sources used" table above.
 4. When the run is green, open it and download from **Artifacts**:
