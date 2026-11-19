@@ -47,7 +47,7 @@ export KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-builder}
 export KBUILD_BUILD_VERSION=${KBUILD_BUILD_VERSION:-1}
 KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-$(git -C "$KERNEL_DIR" show -s --format=%cD HEAD)}
 export KBUILD_BUILD_TIMESTAMP
-export KCFLAGS=${KCFLAGS:--Wno-error -Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=visibility -Wno-error=fortify-source -Wno-error=pointer-to-int-cast -Wno-error=typedef-redefinition -Wno-error=strict-prototypes -Wno-error=implicit-function-declaration}
+export KCFLAGS=${KCFLAGS:--Wno-error -Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=visibility -Wno-error=fortify-source -Wno-error=pointer-to-int-cast -Wno-error=typedef-redefinition -Wno-error=strict-prototypes -Wno-error=implicit-function-declaration -Wno-unused-but-set-variable -Wno-unused-but-set-parameter -Wno-null-pointer-subtraction -Wno-bitwise-instead-of-logical}
 
 mkdir -p "$OUT_DIR"
 OUT_DIR=$(cd -- "$OUT_DIR" && pwd)
@@ -78,7 +78,7 @@ for frag in "${fragments[@]}"; do
 done
 ((missing == 0)) || { echo "Some config options were dropped by olddefconfig." >&2; exit 1; }
 
-make "${MAKE_ARGS[@]}" O="$OUT_DIR" -j"$JOBS"
+make "${MAKE_ARGS[@]}" O="$OUT_DIR" -j"$JOBS" ${KEEP_GOING:+-k}
 test -s "$OUT_DIR/vmlinux"
 test -s "$OUT_DIR/arch/arm64/boot/Image"
 "$READELF" -h "$OUT_DIR/vmlinux" | grep -q AArch64

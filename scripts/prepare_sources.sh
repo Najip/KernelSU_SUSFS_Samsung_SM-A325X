@@ -68,6 +68,14 @@ ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
 
 applied=()
+log "Applying build fixes for the kernel tree"
+for p in "$ROOT"/patches/fixes/*.patch; do
+  [[ -e "$p" ]] || continue
+  echo "  $(basename "$p")"
+  patch -p1 -F2 -N --no-backup-if-mismatch -s -i "$p"
+  applied+=("fixes/$(basename "$p")")
+done
+
 log "Applying SUSFS (JackA1ltman)"
 python3 "$ROOT/scripts/apply_susfs.py" "$KERNEL_DIR" "$susfs_patch"
 applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12}")
