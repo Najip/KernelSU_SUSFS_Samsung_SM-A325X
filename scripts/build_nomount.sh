@@ -3,6 +3,8 @@
 #
 # Expects the same environment as a kernel build (KERNEL_DIR is created here),
 # plus NOMOUNT_REF (dev or master) and KSU_HOOK / PERF_TUNING.
+# NOMOUNT_REUSE_BUILD=true reuses a kernel compiled in this job;
+# NOMOUNT_KIT=<folder> uses a kernel kit instead of compiling the kernel.
 # The last argument is the folder the ZIP and nomount-4.14.ko are copied to.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -17,7 +19,14 @@ KVER=4.14
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 export BUILD_WORK=$work
-if [[ "${NOMOUNT_REUSE_BUILD:-false}" == true ]]; then
+if [[ -n "${NOMOUNT_KIT:-}" ]]; then
+  # Kernel tree already prepared at the same commits; the kernel itself is not
+  # compiled. The kit (.config, Module.symvers, kernel.release) comes from the
+  # full build of that kernel, so the module matches it exactly.
+  : "${KERNEL_DIR:?}" "${OUT_DIR:?}" "${INFO_DIR:?}" "${TOOLCHAIN:?}"
+  export KERNEL_KIT=$NOMOUNT_KIT
+  mkdir -p "$OUT_DIR"
+elif [[ "${NOMOUNT_REUSE_BUILD:-false}" == true ]]; then
   # Reuse the kernel this job just compiled (same KERNEL_DIR, OUT_DIR,
   # INFO_DIR, TOOLCHAIN). Only the module is compiled; the kernel is
   # already up to date, so make has almost nothing left to do.

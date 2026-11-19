@@ -3,7 +3,10 @@
 
   promoted_source.py find
     Finds the most recent successful "Build Kernel" run with commit mode
-    Latest on $BRANCH whose kernel ZIP has not expired yet. Writes
+    Latest and the default kernel options (hook branch_link, no tuning,
+    NoMount not built in, not a NoMount-only run) on $BRANCH whose files
+    have not expired yet. Runner, release type and whether the NoMount LKM
+    was built do not matter. Writes
     source_run, source_url and source_sha to $GITHUB_OUTPUT.
 
   promoted_source.py download <run id> <artifacts folder>
@@ -58,6 +61,9 @@ def find():
         title = run.get("display_title", "")
         # run-name contains "(Latest)" for commit mode Latest.
         if "(Latest)" not in title:
+            continue
+        if "[branch_link]" not in title or "(tuning)" in title or "integrate" in title or "LKM only" in title:
+            print(f"Skipping run {run['id']} ({title}): not the default options.")
             continue
         arts = api(f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100").get("artifacts", [])
         live = [a["name"] for a in arts if not a.get("expired")]
@@ -145,8 +151,17 @@ def inspect(folder):
         out[branch_out] = item.get("branch") or ""
     hook = info_value(info, "xxKSU hook style") or "manual"
     tuning = info_value(info, "Performance tuning") or "false"
+    nm_line = info_value(info, "NoMount")
+    if hook != "branch_link" or tuning != "false" or nm_line.startswith("built into"):
+        fail(f"The Latest run does not use the default options (hook {hook}, tuning {tuning}, NoMount {nm_line or 'LKM'}).")
     has_ko = any(p.suffix == ".ko" for p in nomount)
-    has_nm_zip = any(p.name.startswith("NoMount-") and p.suffix == ".zip" for p in nomount)
+    nm_zips = [p.name for p in nomount if p.name.startswith("NoMount-") and p.suffix == ".zip"]
+    has_nm_zip = bool(nm_zips)
+    nm_branch = ""
+    if has_ko and nm_zips:
+        import re
+        m = re.match(r"NoMount-[^-]+-(dev|master)-lkm-", nm_zips[0])
+        nm_branch = m.group(1) if m else ""
     out.update({
         "zip_name": zip_path.stem,
         "hook": hook,
@@ -154,6 +169,7 @@ def inspect(folder):
         "kernel_release": info_value(info, "Kernel release"),
         "build_sha": (src.get("build_repo") or {}).get("commit", ""),
         "has_nomount": str(has_ko and has_nm_zip).lower(),
+        "nomount_branch": nm_branch,
     })
     emit(out)
 

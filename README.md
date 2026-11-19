@@ -1,6 +1,6 @@
 # KernelSU_SUSFS_Samsung_SM-A325X
 
-Android kernel for Samsung Galaxy A32 4G (SM-A325x, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and the NoMount LKM. Target: SM-A325F on LumiROM 9 (Android 16).
+Android kernel for Samsung Galaxy A32 4G (SM-A325x, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount (as a separate LKM or built into the kernel). Target: SM-A325F on LumiROM 9 (Android 17).
 
 This repo stores no kernel source. The GitHub Actions workflows download every source fresh, patch it and build a flashable ZIP.
 
@@ -31,8 +31,8 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 ## What the kernel contains
 
-- Kernel: mzggr0914's SLM-based Linux 4.14.357-openela tree (`4.14.357-openela-vigus-slmkernel-a32`). It carries the BPF backports and the fake `5.10` version for `netbpfload`, so Android 15 and 16 ROMs such as LumiROM 9 boot.
-- The tree's own BakaSU and in-tree NoMount are removed at build time and replaced by xxKSU and the NoMount LKM. The conversion is the same as the booting [Najip/android_kernel_a325F_bakasu `xxksu`](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu) branch, stored here as `patches/base/0001-mzggr-common-to-xxksu-susfs.patch`.
+- Kernel: mzggr0914's SLM-based Linux 4.14.357-openela tree (`4.14.357-openela-vigus-slmkernel-a32`). It carries the BPF backports and the fake `5.10` version for `netbpfload`, so newer ROMs such as LumiROM 9 (Android 17) boot.
+- The tree's own BakaSU and in-tree NoMount are removed at build time and replaced by xxKSU and upstream NoMount (a separate LKM by default, or built in with the `integrate` option). The conversion is the same as the booting [Najip/android_kernel_a325F_bakasu `xxksu`](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu) branch, stored here as `patches/base/0001-mzggr-common-to-xxksu-susfs.patch`.
 - xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default is `branch_link`. No LSM hooking in any style.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
@@ -49,11 +49,15 @@ Upstream repos and branches are set in `scripts/sources.conf`.
    - **xxKSU hook style**: `branch_link` by default, then `manual`, then `syscall_table`. See [Hook styles](#hook-styles).
    - **Performance tuning**: unticked by default.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
-   - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both also build the matching NoMount `dev` module and attach it to the same release page.
+   - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both attach the NoMount module built in the same run (see below).
+   - **NoMount**: `lkm` by default, a separate module (`NoMount-....zip` and `nomount-4.14.ko`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.
+   - **NoMount branch**: `dev` by default, or `master`. Used for both `lkm` and `integrate`.
+   - **NoMount only**: unticked by default. Tick it to build only the NoMount module, no kernel ZIP (see [NoMount without a kernel compile](#nomount-without-a-kernel-compile)).
    - **Build hook benchmark**: unticked by default. Tick it only when you want the `hook-bench` tool; the kernel does not need it.
 4. When the run is green, open it and download from **Artifacts**:
    - `A325X-xxKSU-SUSFS-....zip`: the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
    - `build-info.txt`: what was built (also inside the ZIP).
+   - `NoMount-....zip` and `nomount-4.14.ko`: with NoMount `lkm`. The ZIP is flashed as a module in the KernelSU manager.
    - `hook-bench`: the benchmark tool and its script, only when **Build hook benchmark** was ticked (see below).
 
 No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.
@@ -89,18 +93,29 @@ Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of
 |---|---|---|
 | `Latest` (default) | The newest commit of each source. | Trying out new upstream changes. |
 | `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. A full `Release` only works in this mode. |
-| `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest `Latest` build and want to mark it as good. |
+| `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
+
+Which `Latest` runs `Promoted` accepts: hook style `branch_link`, **Performance tuning** unticked, NoMount `lkm` or `no` (not `integrate`), and not a **NoMount only** run. The runner (your PC or GitHub), the release type and the benchmark tick do not matter. Runs with other options are skipped.
 
 How `Promoted` gets the NoMount module:
 
-- If that `Latest` run was a `CI` run, it has no NoMount module, so `Promoted` builds one for exactly that kernel (same commits, same build-repo commit, hook style and tuning) and checks that the kernel release matches.
-- If that `Latest` run was a `Pre-release`, its kernel ZIP and NoMount module are both reused, nothing is rebuilt.
+- If that `Latest` run already has the NoMount module from the chosen **NoMount branch**, it is reused. Nothing is built.
+- If it has none (NoMount `no`) or one from the other branch, `Promoted` builds the module from that run's saved kernel kit, without compiling the kernel. Older runs from before the kit existed fall back to compiling the kernel once, only to match the module.
+- With NoMount `no`, the promoted build has no module. `integrate` is not allowed with `Promoted`.
 
 With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The hook style and tuning options are ignored in `Promoted`; they come from the `Latest` run.
 
 A full `Release` with `Latest` or `Promoted` stops with the message "Release must use Verified". Use `Pre-release` for those, or switch to `Verified`.
 
-When you pick `Pre-release` or `Release`, the same run also builds the NoMount `dev` module against exactly those commits and attaches its ZIP and `nomount-4.14.ko` to the release page. The README sources table is updated only by a full `Release`.
+With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14.ko` built in the same run to the release page. The README sources table is updated only by a full `Release`.
+
+## NoMount without a kernel compile
+
+A module only needs three files from the kernel it is built for: `.config`, `Module.symvers` (this kernel has `CONFIG_MODVERSIONS=y`, so the module must carry the symbol versions of the real kernel) and the kernel release string. Every full kernel build saves these as a `kernel-kit-...` artifact (kept 30 days). Module signing is off in this kernel, so nothing else is needed.
+
+To build a module with a kit, the run downloads and patches the same sources, copies the kit's `.config`, runs `make modules_prepare` (a minute or two instead of a full compile), adds the kit's `Module.symvers` and builds only NoMount. It checks that the `.config` and the kernel release match the kit, and that the module's `vermagic` matches.
+
+This is used by `Promoted` and by **NoMount only**. For **NoMount only**, the kit is looked up by the exact kernel: the same kernel, xxKSU and SUSFS commits, hook style, tuning, and the same build-repo patches, configs and build scripts. If no kit matches (for example a new upstream commit since the last full build), the kernel is compiled once in that run to match the module, and no kernel ZIP is made. **NoMount only** needs NoMount `lkm` and release type `CI`, and does not work with `Promoted`.
 
 ## NoMount LKM
 
@@ -161,7 +176,9 @@ After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Pow
 | `configs/verified.json` | Commits pinned by the last successful `Promoted` build |
 | `scripts/resolve_commits.py` | Picks the commits for Latest, Verified and Promoted |
 | `scripts/promoted_source.py` | Finds and collects the `Latest` run that `Promoted` takes its files from |
-| `scripts/build_nomount.sh` | Builds the NoMount module that a release attaches |
+| `scripts/build_nomount.sh` | Builds the NoMount module (after a kernel compile, or from a kernel kit) |
+| `scripts/kernel_kit.py` | Kernel kit key, lookup and download |
+| `configs/nomount-integrate.config` | Turns on NoMount built into the kernel (`integrate`) |
 | `tools/hook-bench.c`, `tools/hook-bench.sh` | Benchmark for comparing hook styles |
 | `configs/` | Config fragments merged after the tree's own fragments |
 | `anykernel/anykernel.sh` | AnyKernel3 settings (device `a32`, `boot` partition) |
