@@ -17,12 +17,19 @@ KVER=4.14
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 export BUILD_WORK=$work
-export KERNEL_DIR=$work/kernel
-export OUT_DIR=$work/out
-export INFO_DIR=$work/info
-export TOOLCHAIN=${TOOLCHAIN:-$work/toolchain}
-
-bash "$ROOT/scripts/prepare_sources.sh"
+if [[ "${NOMOUNT_REUSE_BUILD:-false}" == true ]]; then
+  # Reuse the kernel this job just compiled (same KERNEL_DIR, OUT_DIR,
+  # INFO_DIR, TOOLCHAIN). Only the module is compiled; the kernel is
+  # already up to date, so make has almost nothing left to do.
+  : "${KERNEL_DIR:?}" "${OUT_DIR:?}" "${INFO_DIR:?}" "${TOOLCHAIN:?}"
+  [[ -s "$OUT_DIR/vmlinux" ]] || { echo "No compiled kernel in $OUT_DIR" >&2; exit 1; }
+else
+  export KERNEL_DIR=$work/kernel
+  export OUT_DIR=$work/out
+  export INFO_DIR=$work/info
+  export TOOLCHAIN=${TOOLCHAIN:-$work/toolchain}
+  bash "$ROOT/scripts/prepare_sources.sh"
+fi
 bash "$ROOT/scripts/fetch_aosp_clang.sh" "$TOOLCHAIN"
 
 log=$work/build.log
