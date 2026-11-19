@@ -33,7 +33,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 - Kernel: mzggr0914's SLM-based Linux 4.14.357-openela tree (`4.14.357-openela-vigus-slmkernel-a32`). It carries the BPF backports and the fake `5.10` version for `netbpfload`, so Android 15 and 16 ROMs such as LumiROM 9 boot.
 - The tree's own BakaSU and in-tree NoMount are removed at build time and replaced by xxKSU and the NoMount LKM. The conversion is the same as the booting [Najip/android_kernel_a325F_bakasu `xxksu`](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu) branch, stored here as `patches/base/0001-mzggr-common-to-xxksu-susfs.patch`.
-- xxKSU in manual-hook mode (no LSM, syscall-table or branch-link hooking).
+- xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default `manual` is the one that has been tested on the phone. No LSM hooking in any style.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
 - Network fix (UDP-only GSO for IPv4 and IPv6). Always applied.
@@ -46,13 +46,38 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 2. Pick **Build Kernel** on the left, then press **Run workflow**.
 3. Choose the options and press the green **Run workflow** button:
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
+   - **xxKSU hook style**: `manual` by default. `syscall_table` and `branch_link` are for comparing speed, see [Hook styles](#hook-styles).
    - **Performance tuning**: unticked by default.
    - **Publish a GitHub Release**: unticked by default. When ticked, the run also creates a release (ZIP, `build-info.txt`, `sources.json`, `SHA256SUMS.txt`), lists what is new in each source since the previous release, and updates the "Sources used" table above.
 4. When the run is green, open it and download from **Artifacts**:
    - `A325X-xxKSU-SUSFS-....zip`: the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
    - `build-info.txt`: what was built (also inside the ZIP).
+   - `hook-bench`: the benchmark tool and its script (see below).
 
 No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.
+
+## Hook styles
+
+xxKSU needs to see a few syscalls: `execve`/`execveat` (for `su` and `ksud`), `faccessat` and `newfstatat` (so apps can find `su`), `reboot` (manager and SUSFS commands), and `newfstat`/`read` during boot (to add its lines to `init.rc`). There are three ways to catch them on this non-GKI 4.14 kernel:
+
+| Style | ZIP name ends in | How it works |
+|---|---|---|
+| `manual` (default) | nothing | The kernel source calls xxKSU directly inside `fs/exec.c`, `fs/open.c`, `fs/stat.c` and `kernel/reboot.c`. Fixed at compile time. This is the style that has been tested on the phone. |
+| `syscall_table` | `-sct` | xxKSU replaces those entries in `sys_call_table` with small wrappers at boot. The `newfstat`/`read` ones are put back once `init.rc` is done. |
+| `branch_link` | `-bl` | Starts like `syscall_table`, then shortly after `init.rc` is handled rewrites the `bl` (call) instructions inside `sys_faccessat`, `sys_newfstatat` and `sys_execve` to jump straight to xxKSU, and removes each table hook that worked. If one cannot be patched, its table hook stays. |
+
+For `syscall_table` and `branch_link`, `patches/hooks/0001-hookless-skip-parent-hooks.patch` switches off the kernel's own calls for those syscalls, so nothing runs twice. The security hooks (setuid, rename, setxattr, setprocattr, file permission) stay manual in all three styles, and SUSFS is the same in all three.
+
+The same NoMount module works with all three styles. NoMount does not hook syscalls, and the kernel version string is the same.
+
+### Comparing them
+
+1. Build the kernel once per style (same tuning setting each time), and download the `hook-bench` artifact from any of the runs.
+2. Copy `hook-bench` and `hook-bench.sh` to the same folder on the phone, for example `/sdcard/Download`.
+3. Flash one kernel, reboot, wait 2-3 minutes, then in Termux run `sh /sdcard/Download/hook-bench.sh`. With root it also runs the test as root and shows from `dmesg` which style is active (for `branch_link` it shows which patches worked).
+4. Repeat for the other styles. Results are saved in `/sdcard/hook-bench/`.
+
+The script times `faccessat` and `newfstatat` on `/system/bin/su` and `/system/bin/sh`, `fstat`, `read`, and `fork + execve`, and prints nanoseconds per call (median and best of 7 rounds). Lower is faster. `fstat` and `read` only act as a baseline, since they are no longer hooked after boot in any style. The differences are expected to be small, so run each test 2-3 times with the phone cool and idle, and compare medians.
 
 ## NoMount LKM
 
@@ -108,5 +133,8 @@ After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Pow
 | `patches/susfs/` | Small additions on top of JackA1ltman's SUSFS core files |
 | `patches/kernelsu/` | Small xxKSU changes for SUSFS |
 | `patches/kernel/` | Network fix and optional tuning |
+| `patches/hooks/` | Turns off the kernel's own xxKSU calls for the `syscall_table` and `branch_link` styles |
+| `configs/hooks/` | One config fragment per hook style |
+| `tools/hook-bench.c`, `tools/hook-bench.sh` | Benchmark for comparing hook styles |
 | `configs/` | Config fragments merged after the tree's own fragments |
 | `anykernel/anykernel.sh` | AnyKernel3 settings (device `a32`, `boot` partition) |

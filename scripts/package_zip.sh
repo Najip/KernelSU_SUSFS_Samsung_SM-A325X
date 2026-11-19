@@ -3,13 +3,14 @@
 #
 #   KERNEL_DIR, OUT_DIR, INFO_DIR  same as the other scripts (required)
 #   PACKAGE_DIR  where the ZIP and txt files go (required)
-#   PERF_TUNING  only used for the file name / build info
+#   PERF_TUNING, KSU_HOOK  only used for the file name / build info
 # Prints nothing special; writes $PACKAGE_DIR/zip-name.txt with the ZIP name.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/scripts/sources.conf"
 : "${KERNEL_DIR:?}" "${OUT_DIR:?}" "${INFO_DIR:?}" "${PACKAGE_DIR:?}"
 PERF_TUNING=${PERF_TUNING:-false}
+KSU_HOOK=${KSU_HOOK:-manual}
 IMAGE="$OUT_DIR/arch/arm64/boot/Image"
 test -s "$IMAGE"
 
@@ -30,7 +31,11 @@ repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
 date=$(date -u +%Y%m%d)
 suffix=
-[[ "$PERF_TUNING" == true ]] && suffix=-tuning
+case "$KSU_HOOK" in
+  syscall_table) suffix=-sct ;;
+  branch_link) suffix=-bl ;;
+esac
+[[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
 name="A325X-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
 
 sed -i "s|^kernel\.string=.*|kernel.string=A325X ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
@@ -48,6 +53,7 @@ gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
   echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
   echo "AnyKernel3: $AK3_REPO @ $AK3_COMMIT"
   echo "Network fix (UDP GSO): applied"
+  echo "xxKSU hook style: $KSU_HOOK"
   echo "Performance tuning: $PERF_TUNING"
   echo "Patches applied:"
   sed 's/^/  - /' "$INFO_DIR/applied-patches.txt"

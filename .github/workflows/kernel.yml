@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: A325X xxKSU + SUSFS kernel${{ inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.release && ' + release' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: A325X xxKSU + SUSFS kernel${{ inputs.ksu_hook != 'manual' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.release && ' + release' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch) is downloaded fresh during the run.
@@ -10,6 +10,14 @@ on:
         description: 'Prefer my own PC (self-hosted). If it is busy, a GitHub runner is used when that finishes sooner. Untick = GitHub runner'
         type: boolean
         default: true
+      ksu_hook:
+        description: 'xxKSU hook style. manual = kernel calls xxKSU directly (current, boots). syscall_table / branch_link = xxKSU hooks the syscalls itself (for comparison)'
+        type: choice
+        options:
+          - manual
+          - syscall_table
+          - branch_link
+        default: manual
       perf_tuning:
         description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel). The network fix is always applied'
         type: boolean
@@ -26,6 +34,7 @@ permissions:
 
 env:
   PERF_TUNING: ${{ inputs.perf_tuning }}
+  KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -164,6 +173,16 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Build hook benchmark
+        run: |
+          set -euo pipefail
+          mkdir -p "$BUILD_WORK/bench"
+          "$TOOLCHAIN/bin/clang" --target=aarch64-linux-gnu -O2 -static -nostdlib -ffreestanding \
+            -fno-stack-protector -fno-builtin -fno-pic -fuse-ld=lld -Wl,--build-id=none -Wl,-z,norelro \
+            -o "$BUILD_WORK/bench/hook-bench" tools/hook-bench.c
+          cp tools/hook-bench.sh "$BUILD_WORK/bench/"
+          echo "BENCH_DIR=$BUILD_WORK/bench" >> "$GITHUB_ENV"
+
       - name: Upload flashable ZIP
         uses: actions/upload-artifact@v7
         with:
@@ -177,6 +196,13 @@ jobs:
         with:
           path: ${{ env.PACKAGE_DIR }}/build-info.txt
           archive: false
+          retention-days: 30
+
+      - name: Upload hook benchmark
+        uses: actions/upload-artifact@v7
+        with:
+          name: hook-bench
+          path: ${{ env.BENCH_DIR }}
           retention-days: 30
 
       - name: Keep files for the release job
