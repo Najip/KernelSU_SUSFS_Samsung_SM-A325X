@@ -37,7 +37,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
 - Network fix (UDP-only GSO for IPv4 and IPv6). Always applied.
-- Optional performance tuning (only when ticked): fast-charge thermal limit fix, zram default `zstd`, GPU frequency meter, USB autosuspend off, BBR TCP and fq_codel by default. No GPU overclock or extra undervolt.
+- Optional performance tuning (only when ticked), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
 - Toolchain: AOSP Clang 14 with ld.lld and GNU as. No LTO.
 
 ## How to build
