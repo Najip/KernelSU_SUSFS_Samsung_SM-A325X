@@ -68,6 +68,11 @@ jobs:
         env:
           WANT_SELF_HOSTED: ${{ inputs.self_hosted }}
         run: python3 scripts/pick_runner.py
+      - name: Check the release is allowed
+        if: inputs.release_type == 'Release' && inputs.commit_mode != 'Verified'
+        run: |
+          echo "::error::Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
+          exit 1
       - name: Resolve source commits
         id: commits
         env:
@@ -205,6 +210,21 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Set up Zig (release only)
+        if: inputs.release_type != 'CI'
+        uses: jetsung/setup-zig@v0.0.4
+        with:
+          version: master
+
+      - name: Build the matching NoMount dev module (release only)
+        if: inputs.release_type != 'CI'
+        run: |
+          set -euo pipefail
+          # Same runner, same compiled kernel, same commits, hook style and tuning.
+          NOMOUNT_REF=dev NOMOUNT_REUSE_BUILD=true \
+            bash scripts/build_nomount.sh "$PACKAGE_DIR/nomount" 2>&1 | tee -a "$BUILD_LOG"
+          ls -l "$PACKAGE_DIR/nomount"
+
       - name: Build hook benchmark
         run: |
           set -euo pipefail
@@ -247,6 +267,7 @@ jobs:
             ${{ env.PACKAGE_DIR }}/build-info.txt
             ${{ env.PACKAGE_DIR }}/sources.json
             ${{ env.PACKAGE_DIR }}/SHA256SUMS.txt
+            ${{ env.PACKAGE_DIR }}/nomount/
           retention-days: 3
 
       - name: Upload logs for troubleshooting
@@ -307,31 +328,14 @@ jobs:
           name: release-files
           path: release
 
-      - name: Install build dependencies
+      - name: Put the NoMount files next to the kernel ZIP
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends bc binutils-aarch64-linux-gnu bison pahole build-essential ca-certificates cpio curl file flex git libelf-dev libssl-dev libncurses-dev lz4 patch python3 unzip xz-utils zip zlib1g-dev zstd util-linux
-
-      - name: Set up Zig
-        uses: jetsung/setup-zig@v0.0.4
-        with:
-          version: master
-
-      - name: Build the matching NoMount dev module
-        run: |
-          set -euo pipefail
-          # Same commits, hook style and tuning as the kernel in this release.
-          export KERNEL_REF='${{ needs.pick.outputs.kernel_ref }}'
-          export KSU_REF='${{ needs.pick.outputs.ksu_ref }}'
-          export SUSFS_REF='${{ needs.pick.outputs.susfs_ref }}'
-          export KERNEL_BRANCH='${{ needs.pick.outputs.kernel_branch }}'
-          export KSU_BRANCH='${{ needs.pick.outputs.ksu_branch }}'
-          export SUSFS_BRANCH='${{ needs.pick.outputs.susfs_branch }}'
-          export KSU_HOOK='${{ inputs.ksu_hook }}'
-          export PERF_TUNING='${{ inputs.perf_tuning }}'
-          export NOMOUNT_REF=dev
-          bash scripts/build_nomount.sh release
+          ls -lR release
+          shopt -s nullglob
+          files=(release/nomount/*)
+          ((${#files[@]})) || { echo "::error::The NoMount module was not built in the build job."; exit 1; }
+          mv release/nomount/* release/ && rmdir release/nomount
 
       - name: Write release notes
         run: |
