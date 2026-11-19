@@ -50,10 +50,11 @@ Upstream repos and branches are set in `scripts/sources.conf`.
    - **Performance tuning**: unticked by default.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both also build the matching NoMount `dev` module and attach it to the same release page.
+   - **Build hook benchmark**: unticked by default. Tick it only when you want the `hook-bench` tool; the kernel does not need it.
 4. When the run is green, open it and download from **Artifacts**:
    - `A325X-xxKSU-SUSFS-....zip`: the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
    - `build-info.txt`: what was built (also inside the ZIP).
-   - `hook-bench`: the benchmark tool and its script (see below).
+   - `hook-bench`: the benchmark tool and its script, only when **Build hook benchmark** was ticked (see below).
 
 No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.
 
@@ -73,7 +74,7 @@ The same NoMount module works with all three styles. NoMount does not hook sysca
 
 ### Comparing them
 
-1. Build the kernel once per style (same tuning setting each time), and download the `hook-bench` artifact from any of the runs.
+1. Build the kernel once per style (same tuning setting each time), and tick **Build hook benchmark** in one of the runs and download its `hook-bench` artifact.
 2. Copy `hook-bench` and `hook-bench.sh` to the same folder on the phone, for example `/sdcard/Download`.
 3. Flash one kernel, reboot, wait 2-3 minutes, then in Termux run `sh /sdcard/Download/hook-bench.sh`. With root it also runs the test as root and shows from `dmesg` which style is active (for `branch_link` it shows which patches worked).
 4. Repeat for the other styles. Results are saved in `/sdcard/hook-bench/`.
@@ -88,7 +89,14 @@ Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of
 |---|---|---|
 | `Latest` (default) | The newest commit of each source. | Trying out new upstream changes. |
 | `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. A full `Release` only works in this mode. |
-| `Promoted` | The newest commits, same as `Latest`. If the build succeeds, those commits are saved and become the new `Verified` pins. | After you have tested a build and want to mark it as good. |
+| `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest `Latest` build and want to mark it as good. |
+
+How `Promoted` gets the NoMount module:
+
+- If that `Latest` run was a `CI` run, it has no NoMount module, so `Promoted` builds one for exactly that kernel (same commits, same build-repo commit, hook style and tuning) and checks that the kernel release matches.
+- If that `Latest` run was a `Pre-release`, its kernel ZIP and NoMount module are both reused, nothing is rebuilt.
+
+With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The hook style and tuning options are ignored in `Promoted`; they come from the `Latest` run.
 
 A full `Release` with `Latest` or `Promoted` stops with the message "Release must use Verified". Use `Pre-release` for those, or switch to `Verified`.
 
@@ -152,6 +160,7 @@ After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Pow
 | `configs/hooks/` | One config fragment per hook style |
 | `configs/verified.json` | Commits pinned by the last successful `Promoted` build |
 | `scripts/resolve_commits.py` | Picks the commits for Latest, Verified and Promoted |
+| `scripts/promoted_source.py` | Finds and collects the `Latest` run that `Promoted` takes its files from |
 | `scripts/build_nomount.sh` | Builds the NoMount module that a release attaches |
 | `tools/hook-bench.c`, `tools/hook-bench.sh` | Benchmark for comparing hook styles |
 | `configs/` | Config fragments merged after the tree's own fragments |

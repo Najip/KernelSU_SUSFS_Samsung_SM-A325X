@@ -135,6 +135,9 @@ def promote(sources_path, verified_path):
     run_id = os.environ.get("GITHUB_RUN_ID", "")
     if server and repo and run_id:
         data["run"] = f"{server}/{repo}/actions/runs/{run_id}"
+    # Promoted pins the commits of an earlier Latest run; point at that run.
+    if os.environ.get("SOURCE_RUN_URL"):
+        data["run"] = os.environ["SOURCE_RUN_URL"]
     for key, repo_var, ref_var, _, _ in SOURCES:
         item = src.get(key)
         if not isinstance(item, dict):
@@ -142,7 +145,7 @@ def promote(sources_path, verified_path):
         commit = (item.get("commit") or "").strip()
         if not is_sha(commit):
             fail(f"Refusing to pin an empty commit for {key}")
-        branch = item.get("ref") or conf[ref_var]
+        branch = item.get("branch") or item.get("ref") or conf[ref_var]
         if is_sha(branch):
             branch = conf[ref_var]
         entry = {"repo": item.get("repo") or conf[repo_var], "branch": branch, "commit": commit}
@@ -155,7 +158,7 @@ def promote(sources_path, verified_path):
             continue
         commit = (item.get("commit") or "").strip()
         if is_sha(commit):
-            data[key] = {"repo": item.get("repo", ""), "branch": item.get("ref", ""), "commit": commit}
+            data[key] = {"repo": item.get("repo", ""), "branch": item.get("branch") or item.get("ref", ""), "commit": commit}
     Path(verified_path).write_text(json.dumps(data, indent=2) + "\n")
     print(json.dumps(data, indent=2))
 
