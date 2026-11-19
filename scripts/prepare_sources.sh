@@ -127,7 +127,7 @@ fi
 susfs_version=$(sed -n 's/^#define SUSFS_VERSION "\([^"]*\)".*/\1/p' include/linux/susfs.h | head -n1)
 kernel_version=$(make -s kernelversion 2>/dev/null || true)
 # When a ref is a pinned commit, record the branch it came from instead.
-branch_of() { [[ -n "${2:-}" && "$1" != "$2" ]] && printf '%s' "$2" || printf '%s' "$1"; }
+branch_of() { [[ -n "${2:-}" ]] && printf '%s' "$2" || printf '%s' "$1"; }
 kernel_branch=$(branch_of "$KERNEL_REF" "${KERNEL_BRANCH:-}")
 ksu_branch=$(branch_of "$KSU_REF" "${KSU_BRANCH:-}")
 susfs_branch=$(branch_of "$SUSFS_REF" "${SUSFS_BRANCH:-}")

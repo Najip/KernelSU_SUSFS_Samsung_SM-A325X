@@ -356,9 +356,11 @@ jobs:
       - name: Publish release
         run: |
           set -euo pipefail
-          zip=$(ls release/*.zip)
+          zip=$(ls release/A325X-*.zip)
           name=$(basename "$zip" .zip)
           shopt -s nullglob
+          ko=(release/*.ko)
+          ((${#ko[@]})) || { echo "::error::The NoMount module (.ko) was not built."; ls -l release; exit 1; }
           assets=(release/*.zip release/*.ko release/build-info.txt release/sources.json release/SHA256SUMS.txt)
           ((${#assets[@]})) || { echo '::error::No files to attach to the release.'; exit 1; }
           gh release create "$TAG" "${assets[@]}" \
