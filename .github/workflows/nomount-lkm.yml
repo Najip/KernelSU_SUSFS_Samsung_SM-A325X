@@ -1,5 +1,5 @@
 name: NoMount LKM
-run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.perf_tuning && ' for tuning kernel' || '' }}
+run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.perf_tuning && ' for tuning kernel' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Builds nomount-4.14.ko and the flashable NoMount module ZIP (flash it in the
 # KernelSU manager). The kernel is compiled in the same run with the same
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       self_hosted:
-        description: 'Build on my own PC (self-hosted runner). Untick = GitHub runner'
+        description: 'Prefer my own PC (self-hosted). If it is busy, a GitHub runner is used when that finishes sooner. Untick = GitHub runner'
         type: boolean
         default: false
       nomount_ref:
@@ -26,22 +26,40 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
-concurrency:
-  group: nomount-lkm-${{ inputs.self_hosted && 'pc' || 'gh' }}
-  cancel-in-progress: false
 
 env:
-  SELF_HOSTED: ${{ inputs.self_hosted }}
   PERF_TUNING: ${{ inputs.perf_tuning }}
   NOMOUNT_REF: ${{ inputs.nomount_ref }}
   GH_TOKEN: ${{ github.token }}
   KVER: '4.14'
 
 jobs:
+  pick:
+    name: Pick runner
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.pick.outputs.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          sparse-checkout: scripts/pick_runner.py
+          sparse-checkout-cone-mode: false
+      - name: Choose self-hosted PC or GitHub runner
+        id: pick
+        env:
+          WANT_SELF_HOSTED: ${{ inputs.self_hosted }}
+        run: python3 scripts/pick_runner.py
+
   build:
     name: Build nomount-4.14.ko and module ZIP
-    runs-on: ${{ inputs.self_hosted && 'self-hosted' || 'ubuntu-latest' }}
+    needs: pick
+    runs-on: ${{ needs.pick.outputs.runner }}
+    env:
+      SELF_HOSTED: ${{ needs.pick.outputs.runner == 'self-hosted' }}
     timeout-minutes: 180
     defaults:
       run:
@@ -59,7 +77,7 @@ jobs:
           if [[ "$SELF_HOSTED" == true ]]; then
             cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-bakasu"
             mkdir -p "$cache"
-            kernel_dir="$cache/nomount-kernel-tree"
+            kernel_dir="$cache/nomount-kernel-tree-${GITHUB_REF_NAME//\//-}"
           else
             kernel_dir="$work/kernel"
           fi
