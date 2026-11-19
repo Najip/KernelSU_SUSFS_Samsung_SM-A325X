@@ -9,6 +9,8 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck source=sources.conf
 . "$ROOT/scripts/sources.conf"
 dest=${1:?give the output folder}
+mkdir -p "$dest"
+dest=$(cd -- "$dest" && pwd)   # absolute: the script changes folders later
 : "${NOMOUNT_REF:?NOMOUNT_REF is required}"
 KVER=4.14
 
@@ -118,6 +120,6 @@ unzip -l "$artifacts/$name.zip" | grep -q 'bin/lkmloader-arm64'
 unzip -l "$artifacts/$name.zip" | grep -q 'module.prop'
 
 mkdir -p "$dest"
-cp -v --remove-destination "$artifacts/$name.zip" "$artifacts/nomount-$KVER.ko" "$dest/"
+cp -v "$artifacts/$name.zip" "$artifacts/nomount-$KVER.ko" "$dest/"
 [[ -s "$dest/$name.zip" && -s "$dest/nomount-$KVER.ko" ]] || { echo "Copy into $dest failed" >&2; ls -l "$dest"; exit 1; }
 echo "NoMount module: $dest/$name.zip"
