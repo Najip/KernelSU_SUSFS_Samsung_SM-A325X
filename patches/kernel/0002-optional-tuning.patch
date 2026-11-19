@@ -1,0 +1,131 @@
+diff --git a/drivers/battery/common/sec_event_sysfs.c b/drivers/battery/common/sec_event_sysfs.c
+index fe907d4a00c4..ab4fd510c42a 100644
+--- a/drivers/battery/common/sec_event_sysfs.c
++++ b/drivers/battery/common/sec_event_sysfs.c
+@@ -256,6 +256,11 @@ ssize_t sysfs_event_store_attrs(
+ 					"%s: skip same siop level: %d\n", __func__, x);
+ 				return count;
+ 			} else if (x >= 0 && x <= 100 && battery->pdata->temp_check_type) {
++				/* Keep fast charging with the screen on: ignore the framework's mild
++				 * (screen-on/skin comfort) levels, still honor its emergency steps
++				 * (<= 10). Battery/charger temperature limits are unchanged. */
++				if (x > 10 && x < 100)
++					x = 100;
+ 				battery->siop_level = x;
+ 				if (battery->siop_level == 0)
+ 					sec_bat_set_current_event(battery, SEC_BAT_CURRENT_EVENT_SIOP_LIMIT,
+diff --git a/drivers/block/zram/zram_drv.c b/drivers/block/zram/zram_drv.c
+index 77c31f212fc8..1acf049bf19d 100644
+--- a/drivers/block/zram/zram_drv.c
++++ b/drivers/block/zram/zram_drv.c
+@@ -66,7 +66,7 @@ static DEFINE_MUTEX(zram_index_mutex);
+ 
+ static int zram_major;
+ static struct zram *zram_devices;
+-static const char *default_compressor = "lzo-rle";
++static const char *default_compressor = "zstd";
+ 
+ /* Module params (documentation at end) */
+ static unsigned int num_devices = 1;
+diff --git a/drivers/misc/mediatek/gpu/ged/src/ged_ski.c b/drivers/misc/mediatek/gpu/ged/src/ged_ski.c
+index e0909b050a63..6525620d0c2f 100644
+--- a/drivers/misc/mediatek/gpu/ged/src/ged_ski.c
++++ b/drivers/misc/mediatek/gpu/ged/src/ged_ski.c
+@@ -11,6 +11,8 @@
+  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+  */
+ 
++#include <linux/mutex.h>
++#include <linux/regulator/consumer.h>
+ #include <mt-plat/mtk_gpu_utility.h>
+ #include <mtk_gpufreq.h>
+ #include "ged_ski.h"
+@@ -225,6 +227,54 @@ ssize_t gpu_tmu_show(struct kobject *kobj,
+ 
+ static KOBJ_ATTR_RO(gpu_tmu);
+ 
++/* Real clocks from the on-chip frequency meter (kHz) and CPU rail
++ * voltages read back from the PMIC (mV).  Field names kept as in the
++ * first build: "big" is ABIST 21 (ARMPLL_L, little cluster) and
++ * "little" is ABIST 22 (ARMPLL, big cluster).  vproc11 feeds the big
++ * cluster, vproc12 the little cluster and CCI.
++ */
++extern unsigned int mt_get_ckgen_freq(unsigned int ID);
++extern unsigned int mt_get_abist_freq(unsigned int ID);
++static DEFINE_MUTEX(gpu_fmeter_lock);
++static struct regulator *fm_vproc11, *fm_vproc12;
++
++static unsigned int fm_rail_mv(struct regulator **reg, const char *name)
++{
++	int uv;
++
++	if (IS_ERR_OR_NULL(*reg))
++		*reg = regulator_get_optional(NULL, name);
++	if (IS_ERR_OR_NULL(*reg))
++		return 0;
++	uv = regulator_get_voltage(*reg);
++	return uv > 0 ? uv / 1000 : 0;
++}
++
++ssize_t gpu_fmeter_show(struct kobject *kobj,
++		struct kobj_attribute *attr, char *buf)
++{
++	unsigned int gpu = 0, mfgpll = 0, big, little, cci, v11, v12;
++
++	mutex_lock(&gpu_fmeter_lock);
++	if (mt_gpufreq_get_cur_volt()) {
++		gpu = mt_get_ckgen_freq(5);
++		mfgpll = mt_get_abist_freq(25);
++	}
++	big = mt_get_abist_freq(21);
++	little = mt_get_abist_freq(22);
++	cci = mt_get_abist_freq(49);
++	v11 = fm_rail_mv(&fm_vproc11, "vproc11");
++	v12 = fm_rail_mv(&fm_vproc12, "vproc12");
++	mutex_unlock(&gpu_fmeter_lock);
++
++	return scnprintf(buf, PAGE_SIZE,
++		"gpu %u mfgpll %u big %u little %u cci %u vproc11 %u vproc12 %u\n",
++		gpu, mfgpll, big, little, cci, v11, v12);
++}
++
++static struct kobj_attribute kobj_attr_gpu_fmeter =
++	__ATTR(gpu_fmeter, 0444, gpu_fmeter_show, NULL);
++
+ GED_ERROR ged_ski_init(void)
+ {
+ 	int ret = GED_OK;
+@@ -290,6 +340,12 @@ GED_ERROR ged_ski_init(void)
+ 		GED_LOGE("ged: failed to create gpu_tmu!\n");
+ 		goto EXIT;
+ 	}
++	ret = ged_sysfs_create_file(gpu_kobj, &kobj_attr_gpu_fmeter);
++	if (ret) {
++		ret = GED_ERROR_OOM;
++		GED_LOGE("ged: failed to create gpu_fmeter!\n");
++		goto EXIT;
++	}
+ 
+ 	return ret;
+ 
+@@ -309,6 +365,7 @@ void ged_ski_exit(void)
+ 	ged_sysfs_remove_file(gpu_kobj, &kobj_attr_gpu_min_clock);
+ 	ged_sysfs_remove_file(gpu_kobj, &kobj_attr_gpu_model);
+ 	ged_sysfs_remove_file(gpu_kobj, &kobj_attr_gpu_tmu);
++	ged_sysfs_remove_file(gpu_kobj, &kobj_attr_gpu_fmeter);
+ 	kobject_put(gpu_kobj);
+ 	gpu_kobj = NULL;
+ }
+diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
+index 7a4e3da549fe..78823ba1eb14 100644
+--- a/drivers/usb/core/usb.c
++++ b/drivers/usb/core/usb.c
+@@ -65,7 +65,7 @@ int usb_disabled(void)
+ EXPORT_SYMBOL_GPL(usb_disabled);
+ 
+ #ifdef	CONFIG_PM
+-static int usb_autosuspend_delay = 2;		/* Default delay value,
++static int usb_autosuspend_delay = -1;		/* Default delay value,
+ 						 * in seconds */
+ module_param_named(autosuspend, usb_autosuspend_delay, int, 0644);
+ MODULE_PARM_DESC(autosuspend, "default autosuspend delay");
