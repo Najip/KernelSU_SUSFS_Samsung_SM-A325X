@@ -376,7 +376,7 @@ jobs:
 
   promote:
     name: Save verified commits
-    needs: [build, nomount]
+    needs: build
     if: inputs.commit_mode == 'Promoted'
     runs-on: ubuntu-latest
     permissions:
