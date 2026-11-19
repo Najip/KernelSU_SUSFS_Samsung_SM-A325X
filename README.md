@@ -9,11 +9,11 @@ This repo stores no kernel source. The GitHub Actions workflows download every s
 The table below is refreshed automatically each time a release is published.
 
 <!-- SOURCES:START -->
-Initial sources (before the first release):
+Last release: [build-20261119-8](../../releases/tag/build-20261119-8)
 
 | Part | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|
-| Kernel | [mertsan2007/android_kernel_samsung_mt6768-k414](https://github.com/mertsan2007/android_kernel_samsung_mt6768-k414) | `upstream`, Linux 4.14.200 (Samsung A325FXXSCDYB2 base) | [`10f1f45423f7`](https://github.com/mertsan2007/android_kernel_samsung_mt6768-k414/commit/10f1f45423f771a1105fd795533d638edcf58354) | 2026-11-17 |
+| Kernel | [mertsan2007/android_kernel_samsung_mt6768-k414](https://github.com/mertsan2007/android_kernel_samsung_mt6768-k414) | `upstream`, Linux 4.14.200 | [`10f1f45423f7`](https://github.com/mertsan2007/android_kernel_samsung_mt6768-k414/commit/10f1f45423f771a1105fd795533d638edcf58354) | 2026-11-17 |
 | xxKSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1-52 | [`ae59aa5509c3`](https://github.com/backslashxx/KernelSU/commit/ae59aa5509c39276117e15f8fedc0740e5bda7f8) | 2026-11-19 |
 | SUSFS patch | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`26f2313be61f`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/26f2313be61f7a8603a50b2dcd12171495a79d27) | 2026-11-18 |
 <!-- SOURCES:END -->
