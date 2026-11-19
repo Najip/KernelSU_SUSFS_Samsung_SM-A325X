@@ -53,7 +53,7 @@ jobs:
           work=$(mktemp -d "$RUNNER_TEMP/a325x-build.XXXXXX")
           if [[ "$SELF_HOSTED" == true ]]; then
             # Keep the kernel download between runs on the PC (saves ~1 GB per run).
-            cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-k414"
+            cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-bakasu"
             mkdir -p "$cache"
             kernel_dir="$cache/kernel-tree"
           else

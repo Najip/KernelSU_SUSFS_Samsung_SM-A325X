@@ -1,10 +1,10 @@
 diff --git a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
-index d4e50b5d7cc1..5c7fa9b5efc5 100644
+index d66f56d66..c16efed8a 100755
 --- a/net/ipv4/ip_output.c
 +++ b/net/ipv4/ip_output.c
-@@ -1148,7 +1148,7 @@ static int ip_setup_cork(struct sock *sk, struct inet_cork *cork,
- 	if (!inetdev_valid_mtu(cork->fragsize))
- 		return -ENETUNREACH;
+@@ -1154,7 +1154,7 @@ static int ip_setup_cork(struct sock *sk, struct inet_cork *cork,
+ 		cork->addr = ipc->addr;
+ 	}
  
 -	cork->gso_size = sk->sk_type == SOCK_DGRAM ? ipc->gso_size : 0;
 +	cork->gso_size = (sk->sk_type == SOCK_DGRAM && sk->sk_protocol == IPPROTO_UDP) ? ipc->gso_size : 0;
@@ -12,15 +12,15 @@ index d4e50b5d7cc1..5c7fa9b5efc5 100644
  	cork->dst = &rt->dst;
  	/* We stole this route, caller should not release it. */
 diff --git a/net/ipv6/ip6_output.c b/net/ipv6/ip6_output.c
-index 58d3cdace9f5..834830655210 100644
+index 6290adf05..7c03a8c7a 100644
 --- a/net/ipv6/ip6_output.c
 +++ b/net/ipv6/ip6_output.c
-@@ -1253,7 +1253,7 @@ static int ip6_setup_cork(struct sock *sk, struct inet_cork_full *cork,
- 	if (mtu < IPV6_MIN_MTU)
- 		return -EINVAL;
+@@ -1283,7 +1283,7 @@ static int ip6_setup_cork(struct sock *sk, struct inet_cork_full *cork,
  	cork->base.fragsize = mtu;
+ 	if (dst_allfrag(xfrm_dst_path(&rt->dst)))
+ 		cork->base.flags |= IPCORK_ALLFRAG;
 -	cork->base.gso_size = sk->sk_type == SOCK_DGRAM ? ipc6->gso_size : 0;
 +	cork->base.gso_size = (sk->sk_type == SOCK_DGRAM && sk->sk_protocol == IPPROTO_UDP) ? ipc6->gso_size : 0;
+ 	cork->base.length = 0;
  
- 	if (dst_allfrag(rt->dst.path))
- 		cork->base.flags |= IPCORK_ALLFRAG;
+ 	return 0;
