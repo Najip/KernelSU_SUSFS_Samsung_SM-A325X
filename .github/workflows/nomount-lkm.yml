@@ -207,6 +207,7 @@ jobs:
       - name: Make flashable module ZIP
         run: |
           set -euo pipefail
+          . scripts/sources.conf
           mod="$BUILD_WORK/module"
           rm -rf "$mod"
           cp -a "$NOMOUNT_UP/module" "$mod"
