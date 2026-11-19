@@ -69,6 +69,18 @@ The module is compiled together with a kernel from the same sources in the same 
 
 The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
 
+## Collecting logs
+
+`tools/collect-logs.sh` gathers everything needed to debug a bootloop or a root problem. It runs both in TWRP and in booted Android (as root).
+
+1. Download it to the phone: [collect-logs.sh](https://raw.githubusercontent.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/main/tools/collect-logs.sh) (long-press, "Download link"). It lands in `/sdcard/Download/`.
+2. Run it:
+   - TWRP: Advanced > Terminal, then `sh /sdcard/Download/collect-logs.sh`
+   - Termux: `su -c sh /sdcard/Download/collect-logs.sh`
+3. Logs are saved to `/sdcard/kernel-logs/<date-time>-twrp` (or `-android`), plus a `.tar.gz` of the same folder. Start with `summary.txt`.
+
+After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Power, without powering off) so the crash log of the failed boot is still in memory. If `/sdcard` is not writable in TWRP, the script falls back to the SD card or `/data/local/tmp`.
+
 ## Repo layout
 
 | Path | What it is |
@@ -80,6 +92,7 @@ The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
 | `scripts/build_kernel.sh` | Configures and compiles |
 | `scripts/package_zip.sh` | Makes the AnyKernel3 ZIP and `build-info.txt` |
 | `scripts/release_notes.py` | Release notes and README table |
+| `tools/collect-logs.sh` | Log collector for TWRP and rooted Android |
 | `patches/fixes/` | Build fixes for the kernel tree (left over from its 4.14.200 merge) |
 | `patches/integration/` | Connects xxKSU and SUSFS to the kernel (manual hooks) |
 | `patches/kernelsu/` | Small xxKSU changes for SUSFS |
