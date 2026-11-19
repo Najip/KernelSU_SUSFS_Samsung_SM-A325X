@@ -1,7 +1,7 @@
 {
   "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits.",
-  "updated": "2026-11-19T15:09:07Z",
-  "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44549119144",
+  "updated": "2026-11-19T22:01:13Z",
+  "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44618208320",
   "kernel": {
     "repo": "https://github.com/mzggr0914/android_kernel_a325x_bakasu",
     "branch": "common",
@@ -10,7 +10,7 @@
   "xxksu": {
     "repo": "https://github.com/backslashxx/KernelSU",
     "branch": "master",
-    "commit": "85746b7b6985a8fabeb15d844aabf7b725739ce3"
+    "commit": "8e585df71a869555d3514a9c16d6776e3daebd98"
   },
   "susfs": {
     "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
