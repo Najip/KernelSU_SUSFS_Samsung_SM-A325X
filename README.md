@@ -152,6 +152,7 @@ After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Pow
 | `configs/hooks/` | One config fragment per hook style |
 | `configs/verified.json` | Commits pinned by the last successful `Promoted` build |
 | `scripts/resolve_commits.py` | Picks the commits for Latest, Verified and Promoted |
+| `scripts/build_nomount.sh` | Builds the NoMount module that a release attaches |
 | `tools/hook-bench.c`, `tools/hook-bench.sh` | Benchmark for comparing hook styles |
 | `configs/` | Config fragments merged after the tree's own fragments |
 | `anykernel/anykernel.sh` | AnyKernel3 settings (device `a32`, `boot` partition) |
