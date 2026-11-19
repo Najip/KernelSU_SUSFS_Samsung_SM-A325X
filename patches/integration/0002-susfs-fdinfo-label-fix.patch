@@ -1,0 +1,12 @@
+diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
+index 3af7d96..d9cb7a8 100644
+--- a/fs/notify/fdinfo.c
++++ b/fs/notify/fdinfo.c
+@@ -159,6 +159,7 @@ out_kfree:
+ 			}
+ 		}
+ orig_flow:
++		;
+ #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ 		/*
+ 		 * IN_ALL_EVENTS represents all of the mask bits

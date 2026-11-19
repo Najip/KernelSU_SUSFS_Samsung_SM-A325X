@@ -1,0 +1,12 @@
+diff --git a/include/uapi/linux/input-event-codes.h b/include/uapi/linux/input-event-codes.h
+index 6aee114..d3cf22b 100644
+--- a/include/uapi/linux/input-event-codes.h
++++ b/include/uapi/linux/input-event-codes.h
+@@ -829,7 +829,6 @@
+ #define SW_GLOVE		0x0f	/* set = glove mode */
+ #define SW_MAX			0x3f
+ #define SW_MACHINE_COVER	0x10  /* set = cover closed */
+-#define SW_MAX			0x10
+ #define SW_CNT			(SW_MAX+1)
+ 
+ /*
