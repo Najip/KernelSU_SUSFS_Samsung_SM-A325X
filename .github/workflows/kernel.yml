@@ -272,28 +272,9 @@ jobs:
             rm -rf -- "$BUILD_WORK"
           fi
 
-  nomount:
-    name: Build matching NoMount module
-    needs: [pick, build]
-    if: inputs.release_type != 'CI'
-    uses: ./.github/workflows/nomount-lkm.yml
-    with:
-      called: true
-      self_hosted: ${{ inputs.self_hosted }}
-      nomount_ref: dev
-      perf_tuning: ${{ inputs.perf_tuning }}
-      ksu_hook: ${{ inputs.ksu_hook }}
-      kernel_ref: ${{ needs.pick.outputs.kernel_ref }}
-      ksu_ref: ${{ needs.pick.outputs.ksu_ref }}
-      susfs_ref: ${{ needs.pick.outputs.susfs_ref }}
-      kernel_branch: ${{ needs.pick.outputs.kernel_branch }}
-      ksu_branch: ${{ needs.pick.outputs.ksu_branch }}
-      susfs_branch: ${{ needs.pick.outputs.susfs_branch }}
-    secrets: inherit
-
   release:
     name: Publish release and update README
-    needs: [pick, build, nomount]
+    needs: [pick, build]
     if: inputs.release_type != 'CI'
     runs-on: ubuntu-latest
     permissions:
@@ -326,11 +307,25 @@ jobs:
           name: release-files
           path: release
 
-      - name: Download the matching NoMount module
-        uses: actions/download-artifact@v8
+      - name: Set up Zig
+        uses: jetsung/setup-zig@v0.0.4
         with:
-          name: nomount-release-files
-          path: release
+          version: master
+
+      - name: Build the matching NoMount dev module
+        run: |
+          set -euo pipefail
+          # Same commits, hook style and tuning as the kernel in this release.
+          export KERNEL_REF='${{ needs.pick.outputs.kernel_ref }}'
+          export KSU_REF='${{ needs.pick.outputs.ksu_ref }}'
+          export SUSFS_REF='${{ needs.pick.outputs.susfs_ref }}'
+          export KERNEL_BRANCH='${{ needs.pick.outputs.kernel_branch }}'
+          export KSU_BRANCH='${{ needs.pick.outputs.ksu_branch }}'
+          export SUSFS_BRANCH='${{ needs.pick.outputs.susfs_branch }}'
+          export KSU_HOOK='${{ inputs.ksu_hook }}'
+          export PERF_TUNING='${{ inputs.perf_tuning }}'
+          export NOMOUNT_REF=dev
+          bash scripts/build_nomount.sh release
 
       - name: Write release notes
         run: |
@@ -382,7 +377,7 @@ jobs:
   promote:
     name: Save verified commits
     needs: [build, nomount]
-    if: always() && inputs.commit_mode == 'Promoted' && needs.build.result == 'success' && (inputs.release_type == 'CI' || needs.nomount.result == 'success')
+    if: inputs.commit_mode == 'Promoted'
     runs-on: ubuntu-latest
     permissions:
       contents: write
