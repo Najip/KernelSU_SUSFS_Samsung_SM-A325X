@@ -118,5 +118,6 @@ unzip -l "$artifacts/$name.zip" | grep -q 'bin/lkmloader-arm64'
 unzip -l "$artifacts/$name.zip" | grep -q 'module.prop'
 
 mkdir -p "$dest"
-cp "$artifacts/$name.zip" "$artifacts/nomount-$KVER.ko" "$dest/"
+cp -v "$artifacts/$name.zip" "$artifacts/nomount-$KVER.ko" "$dest/"
+[[ -s "$dest/$name.zip" && -s "$dest/nomount-$KVER.ko" ]] || { echo "Copy into $dest failed" >&2; ls -l "$dest"; exit 1; }
 echo "NoMount module: $dest/$name.zip"

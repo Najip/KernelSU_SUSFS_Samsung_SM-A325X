@@ -358,7 +358,9 @@ jobs:
           set -euo pipefail
           zip=$(ls release/*.zip)
           name=$(basename "$zip" .zip)
+          shopt -s nullglob
           assets=(release/*.zip release/*.ko release/build-info.txt release/sources.json release/SHA256SUMS.txt)
+          ((${#assets[@]})) || { echo '::error::No files to attach to the release.'; exit 1; }
           gh release create "$TAG" "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$name" --notes-file notes.md \
