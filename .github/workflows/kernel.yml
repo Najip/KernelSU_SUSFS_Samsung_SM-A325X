@@ -30,7 +30,6 @@ env:
   SELF_HOSTED: ${{ inputs.self_hosted }}
   PERF_TUNING: ${{ inputs.perf_tuning }}
   GH_TOKEN: ${{ github.token }}
-  KEEP_GOING: '1'
 
 jobs:
   build:
