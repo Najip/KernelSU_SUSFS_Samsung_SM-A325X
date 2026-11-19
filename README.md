@@ -33,7 +33,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 - xxKSU in manual-hook mode (no LSM, syscall-table or branch-link hooking).
 - SUSFS (all features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging).
-- Samsung protections that block root are turned off: UH/RKP, KDP, DEFEX, PROCA, DSMS, Integrity.
+- Samsung protections that block root are turned off: UH/RKP, KDP, DEFEX, PROCA, DSMS, Integrity. Knox NCM stays on because Samsung's network code needs it.
 - Network fix (UDP GSO fix for IPv4 and IPv6). Always applied.
 - Optional performance tuning (only when ticked): fast-charge thermal limit fix, zram default `zstd`, GPU frequency meter, USB autosuspend off, BBR TCP and fq_codel by default. Stock already uses 250 Hz and schedutil.
 - No LTO.
@@ -79,6 +79,7 @@ The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
 | `scripts/build_kernel.sh` | Configures and compiles |
 | `scripts/package_zip.sh` | Makes the AnyKernel3 ZIP and `build-info.txt` |
 | `scripts/release_notes.py` | Release notes and README table |
+| `patches/fixes/` | Build fixes for the kernel tree (left over from its 4.14.200 merge) |
 | `patches/integration/` | Connects xxKSU and SUSFS to the kernel (manual hooks) |
 | `patches/kernelsu/` | Small xxKSU changes for SUSFS |
 | `patches/kernel/` | Network fix and optional tuning |

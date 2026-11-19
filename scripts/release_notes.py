@@ -81,7 +81,8 @@ def notes(cur_path, prev_path, info_path, out_path):
         md.append(head)
         old = prev.get(key, {}).get("commit") if prev else None
         if not old:
-            md.append(f"- Current commit: {s.get('subject', '')}".rstrip())
+            detail = s.get("subject") or (f"patch last changed {s['patch_date'][:10]}" if s.get("patch_date") else "")
+            md.append(f"- Current commit{': ' + detail if detail else '.'}")
         elif old == s["commit"]:
             md.append("- No new commits.")
         else:
