@@ -80,6 +80,10 @@ def notes(cur_path, prev_path, info_path, out_path):
         head = f"### {title}: [`{s['commit'][:8]}`](https://github.com/{repo}/commit/{s['commit']})"
         md.append(head)
         old = prev.get(key, {}).get("commit") if prev else None
+        old_repo = slug(prev.get(key, {}).get("repo", "")) if prev else ""
+        if old and old_repo and old_repo != repo:
+            md.append(f"- Source changed from [{old_repo}](https://github.com/{old_repo}) to this repo.")
+            old = None
         if not old:
             detail = s.get("subject") or (f"patch last changed {s['patch_date'][:10]}" if s.get("patch_date") else "")
             md.append(f"- Current commit{': ' + detail if detail else '.'}")

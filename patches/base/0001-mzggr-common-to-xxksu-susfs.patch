@@ -1,0 +1,1354 @@
+diff --git a/Kconfig b/Kconfig
+index 8c4c1cb0f..8417b8778 100644
+--- a/Kconfig
++++ b/Kconfig
+@@ -10,3 +10,8 @@ config SRCARCH
+ 	option env="SRCARCH"
+ 
+ source "arch/$SRCARCH/Kconfig"
++
++config XXKSU_MANUAL_HOOKS
++	bool "xxKSU direct parent-kernel hooks"
++	depends on KSU=y
++	default y
+diff --git a/arch/arm64/configs/ksu-a325n-common.config b/arch/arm64/configs/ksu-a325n-common.config
+index 4a085a516..e1451f300 100644
+--- a/arch/arm64/configs/ksu-a325n-common.config
++++ b/arch/arm64/configs/ksu-a325n-common.config
+@@ -1,24 +1,28 @@
++# xxKSU (backslashxx/KernelSU): native hook configuration.
++# Parent-kernel SUSFS adapters must be ported before building this branch.
+ CONFIG_KSU=y
+-CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%"
+-# CONFIG_KSU_MANUAL_HOOK is not set
+-CONFIG_KSU_MULTI_MANAGER_SUPPORT=y
+-# CONFIG_KSU_TRACEPOINT_HOOK is not set
++# CONFIG_KSU_LSM_SECURITY_HOOKS is not set
++# CONFIG_KSU_HACK_ARM64_BRANCH_LINK is not set
++# CONFIG_KSU_TAMPER_SYSCALL_TABLE is not set
++# CONFIG_KSU_DISABLE_32BIT_HOOKS is not set
++# CONFIG_KSU_SHELL_HAS_SU_ALWAYS is not set
+ CONFIG_KSU_SUSFS=y
+ CONFIG_KSU_SUSFS_SUS_PATH=y
+ CONFIG_KSU_SUSFS_SUS_MOUNT=y
+ CONFIG_KSU_SUSFS_SUS_KSTAT=y
+ CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+-# CONFIG_KSU_SUSFS_ENABLE_LOG is not set
++CONFIG_KSU_SUSFS_ENABLE_LOG=y
+ CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+ CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+ CONFIG_KSU_SUSFS_SUS_MAP=y
+-# CONFIG_KSU_DISABLE_MANAGER is not set
+-# CONFIG_KSU_DISABLE_POLICY is not set
++CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y
+ CONFIG_KALLSYMS=y
+ CONFIG_KALLSYMS_ALL=y
+ 
+ CONFIG_KPROBES=y
+ CONFIG_KRETPROBES=y
+ 
+-CONFIG_NOMOUNT=y
++# Use the separate NoMount LKM by default.
++
++CONFIG_XXKSU_MANUAL_HOOKS=y
+diff --git a/block/ioprio.c b/block/ioprio.c
+index 42152cb69..90103b723 100644
+--- a/block/ioprio.c
++++ b/block/ioprio.c
+@@ -61,9 +61,9 @@ int set_task_ioprio(struct task_struct *task, int ioprio)
+ }
+ EXPORT_SYMBOL_GPL(set_task_ioprio);
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-#include <linux/susfs.h>
+-#endif
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
++extern bool susfs_is_priority_uid_filtered(uid_t uid);
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 
+ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
+ {
+@@ -125,11 +125,11 @@ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
+ 			if (!who)
+ 				user = current_user();
+ 			else {
+-#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 				if (current_uid().val >= 10000 &&
+ 				    susfs_is_priority_uid_filtered(uid.val))
+ 					break;
+-#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 				user = find_user(uid);
+ 			}
+ 
+@@ -224,11 +224,11 @@ SYSCALL_DEFINE2(ioprio_get, int, which, int, who)
+ 			if (!who)
+ 				user = current_user();
+ 			else {
+-#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 				if (current_uid().val >= 10000 &&
+ 				    susfs_is_priority_uid_filtered(uid.val))
+ 					break;
+-#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 				user = find_user(uid);
+ 			}
+ 
+diff --git a/drivers/input/input.c b/drivers/input/input.c
+index e9689b15a..93c19e320 100644
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -385,7 +385,7 @@ static void input_handle_event(struct input_dev *dev,
+ 			       unsigned int type, unsigned int code, int value)
+ {
+ 	int disposition = input_get_disposition(dev, type, code, &value);
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (static_branch_unlikely(&ksu_is_input_hook_enabled))
+ 		ksu_handle_input_handle_event(&type, &code, &value);
+ #endif
+diff --git a/fs/Kconfig b/fs/Kconfig
+index 619d8c08c..f055cff7e 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -316,6 +316,7 @@ source "fs/nls/Kconfig"
+ source "fs/dlm/Kconfig"
+ source "fs/unicode/Kconfig"
+ 
+-source "fs/nomount/Kconfig"
++
++source "fs/Kconfig.susfs"
+ 
+ endmenu
+diff --git a/fs/Kconfig.susfs b/fs/Kconfig.susfs
+new file mode 100644
+index 000000000..0bc339fb4
+--- /dev/null
++++ b/fs/Kconfig.susfs
+@@ -0,0 +1,71 @@
++# SPDX-License-Identifier: GPL-2.0
++#
++# SUSFS options for KernelSU-Next (legacy), which does not declare them itself.
++# BakaSU declared these in its own kernel/Kconfig; with KernelSU-Next they must
++# live in the parent kernel, otherwise olddefconfig silently drops every
++# CONFIG_KSU_SUSFS* line and the in-tree SUSFS code is never built.
++#
++
++menu "SUSFS (parent-kernel options for KernelSU-Next)"
++	depends on KSU
++
++config KSU_SUSFS
++	bool "SUSFS"
++	depends on KSU != m && THREAD_INFO_IN_TASK && 64BIT
++	default y
++	help
++	  Build the in-tree SUSFS (fs/susfs.c and the hooks around it).
++	  The command handler that connects it to KernelSU-Next lives in the
++	  parent kernel as well.
++
++config KSU_SUSFS_SUS_PATH
++	bool "Hide suspicious paths"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_SUS_MOUNT
++	bool "Hide suspicious mounts"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_SUS_KSTAT
++	bool "Spoof suspicious kstat"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_SPOOF_UNAME
++	bool "Spoof uname"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_ENABLE_LOG
++	bool "Log SUSFS messages to the kernel log"
++	depends on KSU_SUSFS
++	default n
++
++config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
++	bool "Hide ksu and susfs symbols from /proc/kallsyms"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
++	bool "Spoof /proc/cmdline"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_OPEN_REDIRECT
++	bool "Redirect opens of a path to another path"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_SUS_MAP
++	bool "Hide mapped files from /proc/<pid>/maps"
++	depends on KSU_SUSFS
++	default y
++
++config KSU_SUSFS_PRIORITY_UID_FILTER
++	bool "Priority UID filter (getpriority/ioprio hiding)"
++	depends on KSU_SUSFS
++	default y
++
++endmenu
+diff --git a/fs/Makefile b/fs/Makefile
+index 497809c7d..00b63f955 100644
+--- a/fs/Makefile
++++ b/fs/Makefile
+@@ -22,8 +22,18 @@ else
+ obj-y +=	no-block.o
+ endif
+ 
+-obj-$(CONFIG_KSU_SUSFS) += susfs.o susfs_priority.o
+-obj-$(CONFIG_NOMOUNT) += nomount/
++obj-$(CONFIG_KSU_SUSFS) += susfs.o susfs_ksu_glue.o
++ifeq ($(shell grep -q "ssize_t kernel_read" $(srctree)/fs/read_write.c $(srctree)/fs/exec.c 2>/dev/null; echo $$?),0)
++CFLAGS_susfs.o += -DSUSFS_KERNEL_READ_NEW
++endif
++obj-$(CONFIG_KSU_SUSFS) += xxksu_susfs_lifecycle.o
++obj-$(CONFIG_KSU) += ksun_compat.o
++
++ifdef CONFIG_KSU_SUSFS
++CFLAGS_exec.o += -include $(srctree)/include/linux/susfs_ksun.h
++CFLAGS_open.o += -include $(srctree)/include/linux/susfs_ksun.h
++CFLAGS_stat.o += -include $(srctree)/include/linux/susfs_ksun.h
++endif
+ 
+ obj-$(CONFIG_PROC_FS) += proc_namespace.o
+ obj-$(CONFIG_PROC_DLOG) += dlog_hook.o
+diff --git a/fs/exec.c b/fs/exec.c
+index e671a4775..88a5c0e9d 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1,3 +1,4 @@
++#include <linux/xxksu_manual_hooks.h>
+ /*
+  *  linux/fs/exec.c
+  *
+@@ -1905,7 +1906,7 @@ static int exec_binprm(struct linux_binprm *bprm)
+ /*
+  * sys_execve() executes a new program.
+  */
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ extern struct static_key_true ksu_su_compat_enabled;
+ extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
+ extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
+@@ -1926,7 +1927,7 @@ static int __do_execve_file(int fd, struct filename *filename,
+ 	struct files_struct *displaced;
+ 	int retval;
+ 
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	bool is_su_session = false;
+ 	struct filename *preinit_filename = NULL;
+ 	struct user_arg_ptr preinit_argv, preinit_envp;
+@@ -1936,7 +1937,7 @@ static int __do_execve_file(int fd, struct filename *filename,
+ 
+ 	if (IS_ERR(filename))
+ 		return PTR_ERR(filename);
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (!file && filename && current->pid == 1) {
+ 		struct filename *runner;
+ 
+@@ -1955,7 +1956,7 @@ retry_exec:
+ 	pathbuf = NULL;
+ 	bprm = NULL;
+ 	displaced = NULL;
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (!filename || likely(susfs_is_current_proc_no_su()))
+ 		goto orig_flow;
+ 	if (static_branch_likely(&ksu_su_compat_enabled)) {
+@@ -2080,7 +2081,7 @@ orig_flow:
+ 	}
+ 
+ 	retval = exec_binprm(bprm);
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	/* flush_old_exec() has replaced the old mm: retry is no longer safe. */
+ 	if (preinit_filename && retval < 0 && !bprm->mm)
+ 		preinit_committed = true;
+@@ -2088,7 +2089,7 @@ orig_flow:
+ 	if (retval < 0)
+ 		goto out;
+ 
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (unlikely(is_su_session))
+ 		(void)ksu_handle_post_execveat_sucompat(&fd, &filename, &argv, &envp, &flags, &retval);
+ #endif // #ifdef CONFIG_KSU_SUSFS
+@@ -2103,7 +2104,7 @@ orig_flow:
+ 	kfree(pathbuf);
+ 	if (filename)
+ 		putname(filename);
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (preinit_filename)
+ 		putname(preinit_filename);
+ #endif
+@@ -2130,7 +2131,7 @@ out_files:
+ 	if (displaced)
+ 		reset_files_struct(displaced);
+ out_ret:
+-#ifdef CONFIG_KSU_SUSFS
++#if defined(CONFIG_KSU_SUSFS) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (preinit_filename) {
+ 		/* reset_files_struct() must restore the table owning the fd first. */
+ 		bakasu_preinit_close(&preinit_fd);
+@@ -2256,6 +2257,10 @@ SYSCALL_DEFINE3(execve,
+ 		const char __user *const __user *, argv,
+ 		const char __user *const __user *, envp)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_handle_sys_execve(&filename, &argv, &envp);
++#endif
++
+ #ifdef CONFIG_KDP_CRED
+ 	struct filename *path = getname(filename);
+ 	int error = PTR_ERR(path);
+@@ -2309,6 +2314,10 @@ SYSCALL_DEFINE5(execveat,
+ 		const char __user *const __user *, envp,
+ 		int, flags)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_handle_sys_execveat(&fd, &filename, &argv, &envp, &flags);
++#endif
++
+ 	int lookup_flags = (flags & AT_EMPTY_PATH) ? LOOKUP_EMPTY : 0;
+ 
+ 	return do_execveat(fd,
+@@ -2321,6 +2330,10 @@ COMPAT_SYSCALL_DEFINE3(execve, const char __user *, filename,
+ 	const compat_uptr_t __user *, argv,
+ 	const compat_uptr_t __user *, envp)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_handle_sys_execve(&filename, &argv, &envp);
++#endif
++
+ 	return compat_do_execve(getname(filename), argv, envp);
+ }
+ 
+@@ -2330,6 +2343,10 @@ COMPAT_SYSCALL_DEFINE5(execveat, int, fd,
+ 		       const compat_uptr_t __user *, envp,
+ 		       int,  flags)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_handle_sys_execveat(&fd, &filename, &argv, &envp, &flags);
++#endif
++
+ 	int lookup_flags = (flags & AT_EMPTY_PATH) ? LOOKUP_EMPTY : 0;
+ 
+ 	return compat_do_execveat(fd,
+diff --git a/fs/ksun_compat.c b/fs/ksun_compat.c
+new file mode 100644
+index 000000000..31fe09c6c
+--- /dev/null
++++ b/fs/ksun_compat.c
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Compatibility shim for KernelSU-Next (legacy).
++ *
++ * fs/read_write.c gates its call to ksu_handle_sys_read() with the static key
++ * ksu_is_init_rc_hook_enabled, which BakaSU used to define. KernelSU-Next gates
++ * inside its own ksu_handle_sys_read() with a plain bool (ksu_init_rc_hook), so
++ * the key only has to exist and stay enabled. It is weak so a BakaSU build of
++ * this tree still links with BakaSU's own definition.
++ */
++#include <linux/compiler.h>
++#include <linux/jump_label.h>
++
++#ifdef CONFIG_KSU
++struct static_key_true ksu_is_init_rc_hook_enabled __weak = STATIC_KEY_TRUE_INIT;
++#endif
+diff --git a/fs/read_write.c b/fs/read_write.c
+index 251a5ef22..ab511c082 100644
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -589,7 +589,7 @@ static inline void file_pos_write(struct file *file, loff_t pos)
+ 		file->f_pos = pos;
+ }
+ 
+-#ifdef CONFIG_KSU
++#if defined(CONFIG_KSU) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ #include <linux/susfs_ksu.h>
+ extern struct static_key_true ksu_is_init_rc_hook_enabled;
+ #endif
+@@ -599,7 +599,7 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+ 	ssize_t ret = -EBADF;
+ 
+ 
+-#ifdef CONFIG_KSU
++#if defined(CONFIG_KSU) && !defined(CONFIG_XXKSU_MANUAL_HOOKS)
+ 	if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
+ 		ksu_handle_sys_read(fd, &buf, &count);
+ #endif
+diff --git a/fs/stat.c b/fs/stat.c
+index 9caf72abc..85ca41b29 100644
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/uaccess.h>
+ #include <asm/unistd.h>
++#include <linux/xxksu_manual_hooks.h>
+ #ifdef CONFIG_KSU_SUSFS
+ #include <linux/susfs_def.h>
+ #include "mount.h"
+@@ -434,6 +435,10 @@ SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
+ 
+ 	if (!error)
+ 		error = cp_new_stat(&stat, statbuf);
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	/* xxKSU: report init.rc size including the injected KernelSU rc lines. */
++	ksu_handle_newfstat_ret(&fd, &statbuf);
++#endif
+ 	return error;
+ }
+ 
+@@ -553,6 +558,10 @@ SYSCALL_DEFINE2(fstat64, unsigned long, fd, struct stat64 __user *, statbuf)
+ 
+ 	if (!error)
+ 		error = cp_new_stat64(&stat, statbuf);
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	/* xxKSU: same init.rc size fix for a 32-bit init. */
++	ksu_handle_fstat64_ret(&fd, &statbuf);
++#endif
+ 	return error;
+ }
+ 
+diff --git a/fs/susfs_ksu_glue.c b/fs/susfs_ksu_glue.c
+new file mode 100644
+index 000000000..9e971ffc0
+--- /dev/null
++++ b/fs/susfs_ksu_glue.c
+@@ -0,0 +1,179 @@
++// SPDX-License-Identifier: GPL-2.0
++#define SUSFS_KSUN_GLUE_BUILD 1
++
++#include <linux/compiler.h>
++#include <linux/cred.h>
++#include <linux/dcache.h>
++#include <linux/err.h>
++#include <linux/errno.h>
++#include <linux/file.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/jump_label.h>
++#include <linux/sched.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <linux/uaccess.h>
++#include <linux/susfs.h>
++#include <linux/susfs_def.h>
++#include <linux/susfs_ksu.h>
++
++#ifdef CONFIG_KSU_SUSFS
++struct user_arg_ptr;
++#include <linux/xxksu_parent_bridge.h>
++#if !defined(CONFIG_XXKSU_MANUAL_HOOKS)
++extern int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
++extern int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags);
++#endif
++extern const size_t ksu_rc_len __weak;
++extern bool ksu_init_rc_hook __weak;
++extern bool is_ksu_domain(void) __weak;
++
++bool __weak susfs_is_current_ksu_domain(void)
++{
++    return is_ksu_domain ? is_ksu_domain() : false;
++}
++
++static int susfs_ksu_handle_cmd(unsigned int cmd, void __user **arg)
++{
++    switch (cmd) {
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
++    case CMD_SUSFS_SET_PRIORITY_UID_FILTER: susfs_set_priority_uid_filter(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_SUS_PATH
++    case CMD_SUSFS_ADD_SUS_PATH: susfs_add_sus_path(arg); break;
++    case CMD_SUSFS_ADD_SUS_PATH_LOOP: susfs_add_sus_path_loop(arg); break;
++    case CMD_SUSFS_SET_SUS_PATH_UID_FILTER: susfs_set_sus_path_uid_filter(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++    case CMD_SUSFS_HIDE_SUS_MNTS_FOR_NON_SU_PROCS: susfs_set_hide_sus_mnts_for_non_su_procs(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
++    case CMD_SUSFS_ADD_SUS_KSTAT:
++    case CMD_SUSFS_ADD_SUS_KSTAT_STATICALLY: susfs_add_sus_kstat(arg); break;
++    case CMD_SUSFS_UPDATE_SUS_KSTAT: susfs_update_sus_kstat(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
++    case CMD_SUSFS_SET_UNAME: susfs_set_uname(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
++    case CMD_SUSFS_ENABLE_LOG: susfs_enable_log(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
++    case CMD_SUSFS_SET_CMDLINE_OR_BOOTCONFIG: susfs_set_cmdline_or_bootconfig(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
++    case CMD_SUSFS_ADD_OPEN_REDIRECT: susfs_add_open_redirect(arg); break;
++#endif
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++    case CMD_SUSFS_ADD_SUS_MAP: susfs_add_sus_map(arg); break;
++#endif
++    case CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING: susfs_set_avc_log_spoofing(arg); break;
++    case CMD_SUSFS_SHOW_ENABLED_FEATURES: susfs_get_enabled_features(arg); break;
++    case CMD_SUSFS_SHOW_VARIANT: susfs_show_variant(arg); break;
++    case CMD_SUSFS_SHOW_VERSION: susfs_show_version(arg); break;
++    default: break;
++    }
++    return 0;
++}
++
++int susfs_ksu_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg)
++{
++    if ((u32)magic2 == SUSFS_MAGIC) {
++        if (!uid_eq(current_uid(), GLOBAL_ROOT_UID))
++            return 0;
++        return susfs_ksu_handle_cmd(cmd, arg);
++    }
++    return ksu_handle_sys_reboot(magic1, magic2, cmd, arg);
++}
++
++static int __init susfs_ksu_glue_init(void)
++{
++    susfs_init();
++    return 0;
++}
++late_initcall(susfs_ksu_glue_init);
++
++struct static_key_true susfs_ksun_su_compat_key = STATIC_KEY_TRUE_INIT;
++
++static void susfs_ksun_su_to_sh(struct filename **filename)
++{
++    static const char su[] = "/system/bin/su";
++    struct filename *fn;
++    if (!filename || IS_ERR_OR_NULL(*filename) || !xxksu_parent_sucompat_enabled() ||
++        !xxksu_parent_uid_allowed(current_uid().val) || likely(strcmp((*filename)->name, su)))
++        return;
++    fn = getname_kernel("/system/bin/sh");
++    if (IS_ERR(fn))
++        return;
++    putname(*filename);
++    *filename = fn;
++}
++
++int susfs_ksun_handle_faccessat(int *dfd, struct filename **filename, int *mode, int *flags)
++{
++    susfs_ksun_su_to_sh(filename);
++    return 0;
++}
++
++int susfs_ksun_handle_stat(int *dfd, struct filename **filename, int *flags)
++{
++    susfs_ksun_su_to_sh(filename);
++    return 0;
++}
++
++#if !defined(CONFIG_XXKSU_MANUAL_HOOKS)
++int susfs_ksun_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags)
++{
++    ksu_handle_execveat_ksud(fd, filename_ptr, argv, envp, flags);
++    return ksu_handle_execveat_sucompat(fd, filename_ptr, argv, envp, flags);
++}
++#endif
++
++static bool susfs_ksun_is_init_rc(struct file *fp)
++{
++    char path[256];
++    char *dpath;
++    if (strcmp(current->comm, "init") || !d_is_reg(fp->f_path.dentry))
++        return false;
++    dpath = d_path(&fp->f_path, path, sizeof(path));
++    if (IS_ERR(dpath))
++        return false;
++    return !strcmp(dpath, "/init.rc") || !strcmp(dpath, "/system/etc/init/hw/init.rc");
++}
++
++void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr)
++{
++    struct file *file;
++    if (!&ksu_rc_len || !&ksu_init_rc_hook || !ksu_init_rc_hook)
++        return;
++    file = fget(fd);
++    if (!file)
++        return;
++    if (susfs_ksun_is_init_rc(file))
++        *kstat_size_ptr += ksu_rc_len;
++    fput(file);
++}
++
++struct static_key_true ksu_is_input_hook_enabled __weak = STATIC_KEY_TRUE_INIT;
++
++int __weak ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr, void *argv, void *envp, int *flags, int *retval)
++{
++    return 0;
++}
++
++int __weak ksu_setup_preinit_file(struct filename **filename_ptr, struct user_arg_ptr *argv)
++{
++    return -ENOSYS;
++}
++
++u32 susfs_ksu_sid __weak;
++u32 susfs_priv_app_sid __weak;
++bool ksu_selinux_hide_running __weak;
++struct page *fake_status __weak;
++DEFINE_STATIC_KEY_FALSE(fake_status_initialize_key);
++void __weak initialize_fake_status(void) { }
++ssize_t __weak my_write_context(struct file *file, char *buf, size_t size) { return -EINVAL; }
++ssize_t __weak my_write_access(struct file *file, char *buf, size_t size) { return -EINVAL; }
++int __weak my_setprocattr(const char *name, void *value, size_t size) { return -EINVAL; }
++#endif
+diff --git a/fs/susfs_priority.c b/fs/susfs_priority.c
+deleted file mode 100644
+index f58f7d4a0..000000000
+--- a/fs/susfs_priority.c
++++ /dev/null
+@@ -1,360 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-/*
+- * SUSFS priority UID filter, adapted from simonpunk eb95da0 for Linux 4.14.
+- * The parent kernel owns command dispatch and package observation so BakaSU
+- * can remain an unmodified submodule.
+- */
+-#include <linux/bitmap.h>
+-#include <linux/cred.h>
+-#include <linux/fs.h>
+-#include <linux/fsnotify_backend.h>
+-#include <linux/mm.h>
+-#include <linux/mutex.h>
+-#include <linux/namei.h>
+-#include <linux/rcupdate.h>
+-#include <linux/ratelimit.h>
+-#include <linux/slab.h>
+-#include <linux/susfs.h>
+-#include <linux/susfs_ksu.h>
+-#include <linux/uaccess.h>
+-#include <linux/workqueue.h>
+-
+-struct priority_bitmap {
+-	DECLARE_BITMAP(bits, SUSFS_PRIORITY_UID_FILTER_UID_NUM);
+-};
+-
+-static struct priority_bitmap __rcu *priority_bitmap;
+-static DEFINE_MUTEX(priority_lock);
+-static char *priority_packages;
+-static u64 priority_generation;
+-static struct path priority_data_root;
+-static struct path priority_system_root;
+-static struct fsnotify_group *priority_group;
+-static atomic_t priority_events = ATOMIC_INIT(0);
+-static void priority_refresh(struct work_struct *work);
+-static DECLARE_DELAYED_WORK(priority_work, priority_refresh);
+-
+-static char *priority_dup(const char *s)
+-{
+-	size_t len = strlen(s) + 1;
+-	char *copy = kvmalloc(len, GFP_KERNEL);
+-
+-	if (copy)
+-		memcpy(copy, s, len);
+-	return copy;
+-}
+-
+-static bool priority_valid_package(const char *name)
+-{
+-	const char *p;
+-	size_t len = strlen(name);
+-
+-	if (!len || len > 255 || !strcmp(name, ".") || !strcmp(name, ".."))
+-		return false;
+-	for (p = name; *p; p++) {
+-		if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+-		    (*p >= '0' && *p <= '9') || *p == '.' || *p == '_')
+-			continue;
+-		return false;
+-	}
+-	return true;
+-}
+-
+-/* Caller holds a reference to root and has overridden subjective credentials. */
+-static int priority_resolve(const struct path *root, const char *name, uid_t *uid)
+-{
+-	struct path path;
+-	struct kstat stat;
+-	int err;
+-
+-	err = vfs_path_lookup(root->dentry, root->mnt, name,
+-			      LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &path);
+-	if (err)
+-		return err;
+-	err = vfs_getattr(&path, &stat, STATX_BASIC_STATS, 0);
+-	path_put(&path);
+-	if (err)
+-		return err;
+-	*uid = from_kuid(&init_user_ns, stat.uid);
+-	if (*uid < SUSFS_PRIORITY_UID_FILTER_MIN_UID ||
+-	    *uid > SUSFS_PRIORITY_UID_FILTER_MAX_UID)
+-		return -ERANGE;
+-	return 0;
+-}
+-
+-static int priority_parse(char *names, const struct path *root,
+-			  struct priority_bitmap *bitmap, bool refresh)
+-{
+-	const struct cred *saved;
+-	struct cred *cred = READ_ONCE(ksu_cred);
+-	char *name;
+-	uid_t uid;
+-	int err = 0;
+-
+-	if (!cred)
+-		return -EAGAIN;
+-	saved = override_creds(cred);
+-	if (!susfs_is_current_ksu_domain()) {
+-		err = -EACCES;
+-		goto out;
+-	}
+-	while ((name = strsep(&names, ","))) {
+-		name = strim(name);
+-		if (!*name)
+-			continue;
+-		if (!priority_valid_package(name)) {
+-			err = -EINVAL;
+-			break;
+-		}
+-		err = priority_resolve(root, name, &uid);
+-		/*
+-		 * Missing packages and changed app-id ranges disappear on refresh.
+-		 * Transient failures must not replace a working filter with zeros.
+-		 */
+-		if (refresh && (err == -ENOENT || err == -ENOTDIR || err == -ERANGE)) {
+-			err = 0;
+-			continue;
+-		}
+-		if (err)
+-			break;
+-		set_bit(uid - SUSFS_PRIORITY_UID_FILTER_MIN_UID, bitmap->bits);
+-	}
+-out:
+-	revert_creds(saved);
+-	return err;
+-}
+-
+-static void priority_queue_refresh(unsigned long delay)
+-{
+-	atomic_inc(&priority_events);
+-	mod_delayed_work(system_unbound_wq, &priority_work, delay);
+-}
+-
+-/* This callback holds fsnotify SRCU/rename locks: never resolve paths here. */
+-static SUSFS_DECL_FSNOTIFY_OPS(priority_inode_event)
+-{
+-	if (file_name && susfs_fname_len(file_name) == 13 &&
+-	    !memcmp(susfs_fname_arg(file_name), "packages.list", 13))
+-		priority_queue_refresh(msecs_to_jiffies(250));
+-	return 0;
+-}
+-
+-static void priority_free_mark(struct fsnotify_mark *mark)
+-{
+-	kfree(mark);
+-}
+-
+-static const struct fsnotify_ops priority_notify_ops = {
+-	.handle_event = priority_inode_event,
+-	.free_mark = priority_free_mark,
+-};
+-
+-/* Called outside fsnotify callbacks, with priority_lock held. */
+-static int priority_watch(const struct path *system)
+-{
+-	struct fsnotify_group *group;
+-	struct fsnotify_mark *mark;
+-	int err;
+-
+-	if (priority_group)
+-		return d_backing_inode(priority_system_root.dentry) ==
+-		       d_backing_inode(system->dentry) ? 0 : -EXDEV;
+-	group = fsnotify_alloc_group(&priority_notify_ops);
+-	if (IS_ERR(group))
+-		return PTR_ERR(group);
+-	mark = kzalloc(sizeof(*mark), GFP_KERNEL);
+-	if (!mark) {
+-		fsnotify_destroy_group(group);
+-		return -ENOMEM;
+-	}
+-	fsnotify_init_mark(mark, group);
+-	mark->mask = FS_CREATE | FS_MOVED_TO | FS_CLOSE_WRITE | FS_DELETE |
+-		     FS_EVENT_ON_CHILD;
+-	err = fsnotify_add_mark(mark, d_backing_inode(system->dentry), NULL, 0);
+-	fsnotify_put_mark(mark);
+-	if (err) {
+-		fsnotify_destroy_group(group);
+-		return err;
+-	}
+-	priority_system_root = *system;
+-	path_get(&priority_system_root);
+-	priority_group = group;
+-	return 0;
+-}
+-
+-static int priority_get_roots(struct path *data, struct path *system)
+-{
+-	const struct cred *saved;
+-	struct cred *cred = READ_ONCE(ksu_cred);
+-	int err;
+-
+-	if (!cred)
+-		return -EAGAIN;
+-	saved = override_creds(cred);
+-	if (!susfs_is_current_ksu_domain()) {
+-		err = -EACCES;
+-		goto out;
+-	}
+-	err = kern_path("/data/data", LOOKUP_FOLLOW | LOOKUP_DIRECTORY, data);
+-	if (err)
+-		goto out;
+-	err = kern_path("/data/system", LOOKUP_FOLLOW | LOOKUP_DIRECTORY, system);
+-	if (err) {
+-		path_put(data);
+-		memset(data, 0, sizeof(*data));
+-	}
+-out:
+-	revert_creds(saved);
+-	return err;
+-}
+-
+-int susfs_set_priority_uid_filter(void __user *arg)
+-{
+-	struct st_susfs_priority_uid_filter *info = NULL;
+-	struct priority_bitmap *bitmap = NULL, *old;
+-	struct path data = { }, system = { }, old_data;
+-	char *names = NULL, *old_names;
+-	int err;
+-
+-	BUILD_BUG_ON(offsetof(struct st_susfs_priority_uid_filter, err) != 65536);
+-	BUILD_BUG_ON(sizeof(struct st_susfs_priority_uid_filter) != 65540);
+-	if (!uid_eq(current_uid(), GLOBAL_ROOT_UID))
+-		return -EPERM;
+-	if (!arg)
+-		return -EFAULT;
+-	info = kvmalloc(sizeof(*info), GFP_KERNEL);
+-	if (!info) {
+-		err = -ENOMEM;
+-		goto out;
+-	}
+-	if (copy_from_user(info, arg, sizeof(*info))) {
+-		err = -EFAULT;
+-		goto out;
+-	}
+-	if (!memchr(info->app_strings, '\0', sizeof(info->app_strings)) ||
+-	    !info->app_strings[0]) {
+-		err = -EINVAL;
+-		goto out;
+-	}
+-	names = priority_dup(info->app_strings);
+-	bitmap = kzalloc(sizeof(*bitmap), GFP_KERNEL);
+-	if (!names || !bitmap) {
+-		err = -ENOMEM;
+-		goto out;
+-	}
+-	err = priority_get_roots(&data, &system);
+-	if (err)
+-		goto out;
+-	err = priority_parse(info->app_strings, &data, bitmap, false);
+-	if (err)
+-		goto out;
+-	mutex_lock(&priority_lock);
+-	err = priority_watch(&system);
+-	if (err) {
+-		mutex_unlock(&priority_lock);
+-		goto out;
+-	}
+-	old = rcu_dereference_protected(priority_bitmap, lockdep_is_held(&priority_lock));
+-	old_data = priority_data_root;
+-	old_names = priority_packages;
+-	priority_data_root = data;
+-	memset(&data, 0, sizeof(data));
+-	priority_packages = names;
+-	names = NULL;
+-	priority_generation++;
+-	rcu_assign_pointer(priority_bitmap, bitmap);
+-	bitmap = NULL;
+-	mutex_unlock(&priority_lock);
+-	/* Readers own their RCU section; wait outside all config/fsnotify locks. */
+-	synchronize_rcu();
+-	kfree(old);
+-	kvfree(old_names);
+-	if (old_data.mnt)
+-		path_put(&old_data);
+-	priority_queue_refresh(msecs_to_jiffies(250));
+-out:
+-	if (system.mnt)
+-		path_put(&system);
+-	if (data.mnt)
+-		path_put(&data);
+-	kfree(bitmap);
+-	kvfree(names);
+-	kvfree(info);
+-	/* Preserve the official ksu_susfs payload ABI, including error reporting. */
+-	if (put_user(err, &((struct st_susfs_priority_uid_filter __user *)arg)->err))
+-		return -EFAULT;
+-	return 0;
+-}
+-
+-static void priority_refresh(struct work_struct *work)
+-{
+-	struct priority_bitmap *bitmap = NULL, *old;
+-	struct path root;
+-	char *names;
+-	u64 generation;
+-	int event = atomic_read(&priority_events);
+-	int err;
+-
+-	mutex_lock(&priority_lock);
+-	if (!priority_packages) {
+-		mutex_unlock(&priority_lock);
+-		return;
+-	}
+-	names = priority_dup(priority_packages);
+-	root = priority_data_root;
+-	path_get(&root);
+-	generation = priority_generation;
+-	mutex_unlock(&priority_lock);
+-	if (!names) {
+-		err = -ENOMEM;
+-		goto out;
+-	}
+-	bitmap = kzalloc(sizeof(*bitmap), GFP_KERNEL);
+-	if (!bitmap) {
+-		err = -ENOMEM;
+-		goto out;
+-	}
+-	/* Relative to the captured Android path; a kworker may have no fs. */
+-	err = priority_parse(names, &root, bitmap, true);
+-	if (err)
+-		goto out;
+-	mutex_lock(&priority_lock);
+-	if (generation != priority_generation || event != atomic_read(&priority_events)) {
+-		mutex_unlock(&priority_lock);
+-		err = -EAGAIN;
+-		goto out;
+-	}
+-	old = rcu_dereference_protected(priority_bitmap, lockdep_is_held(&priority_lock));
+-	rcu_assign_pointer(priority_bitmap, bitmap);
+-	bitmap = NULL;
+-	mutex_unlock(&priority_lock);
+-	synchronize_rcu();
+-	kfree(old);
+-out:
+-	path_put(&root);
+-	kvfree(names);
+-	kfree(bitmap);
+-	if (err) {
+-		if (err != -EAGAIN)
+-			pr_warn_ratelimited("susfs: priority UID refresh failed: %d\n", err);
+-		mod_delayed_work(system_unbound_wq, &priority_work,
+-				 err == -EAGAIN ? msecs_to_jiffies(250) : 5 * HZ);
+-	}
+-}
+-
+-bool susfs_is_priority_uid_filtered(uid_t uid)
+-{
+-	struct priority_bitmap *bitmap;
+-	uid_t app_id = uid % 100000;
+-	bool filtered = false;
+-
+-	if (app_id < SUSFS_PRIORITY_UID_FILTER_MIN_UID ||
+-	    app_id > SUSFS_PRIORITY_UID_FILTER_MAX_UID)
+-		return false;
+-	rcu_read_lock();
+-	bitmap = rcu_dereference(priority_bitmap);
+-	if (bitmap)
+-		filtered = test_bit(app_id - SUSFS_PRIORITY_UID_FILTER_MIN_UID, bitmap->bits);
+-	rcu_read_unlock();
+-	return filtered;
+-}
+diff --git a/fs/xxksu_susfs_lifecycle.c b/fs/xxksu_susfs_lifecycle.c
+new file mode 100644
+index 000000000..e8a7c60fb
+--- /dev/null
++++ b/fs/xxksu_susfs_lifecycle.c
+@@ -0,0 +1,49 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/sched.h>
++#include <linux/thread_info.h>
++#include <linux/workqueue.h>
++#include <linux/susfs.h>
++#include <linux/susfs_def.h>
++#include <linux/xxksu_parent_bridge.h>
++
++extern struct work_struct susfs_extra_works;
++
++void xxksu_parent_reset_task(void)
++{
++	susfs_clear_current_proc_no_su();
++	susfs_clear_current_proc_umounted();
++	susfs_clear_current_proc_umounted_for_zygote_next();
++}
++
++void xxksu_parent_deny_task(void)
++{
++	susfs_set_current_proc_no_su();
++}
++
++void xxksu_parent_finish_umount(void)
++{
++	/* Mirrors selection of xxKSU's unmount path, not per-mount success. */
++	susfs_set_current_proc_umounted();
++	schedule_work(&susfs_extra_works);
++}
++
++void xxksu_parent_post_fs_data(void)
++{
++	/* Called from xxKSU's existing once-only post-fs-data path. */
++	susfs_start_sdcard_monitor_fn();
++}
++
++void xxksu_parent_packages_changed(void)
++{
++	/*
++	 * Called from xxKSU's throne tracker thread after packages.list has
++	 * settled. Jack's UID filters store package names; an install or
++	 * reinstall changes the UID, so both bitmaps are resolved again.
++	 */
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
++	susfs_parse_priority_app_strings();
++#endif
++#ifdef CONFIG_KSU_SUSFS_SUS_PATH
++	susfs_parse_sus_path_app_strings();
++#endif
++}
+diff --git a/include/linux/susfs_ksu.h b/include/linux/susfs_ksu.h
+index 43bba886a..1a605affe 100644
+--- a/include/linux/susfs_ksu.h
++++ b/include/linux/susfs_ksu.h
+@@ -19,6 +19,9 @@ extern struct cred *ksu_cred;
+ bool susfs_is_current_ksu_domain(void);
+ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
+ 			  void __user **arg);
++/* Parent-kernel glue (fs/susfs_ksu_glue.c): SUSFS commands, then KernelSU. */
++int susfs_ksu_sys_reboot(int magic1, int magic2, unsigned int cmd,
++			 void __user **arg);
+ 
+ /* Published by BakaSU's supported SUSFS manual SELinux hook mode. */
+ extern bool ksu_selinux_hide_running;
+diff --git a/include/linux/susfs_ksun.h b/include/linux/susfs_ksun.h
+new file mode 100644
+index 000000000..ca5a7f077
+--- /dev/null
++++ b/include/linux/susfs_ksun.h
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_SUSFS_KSUN_H
++#define _LINUX_SUSFS_KSUN_H
++
++#if defined(CONFIG_KSU_SUSFS) && !defined(SUSFS_KSUN_GLUE_BUILD)
++#define ksu_handle_faccessat	susfs_ksun_handle_faccessat
++#define ksu_handle_stat		susfs_ksun_handle_stat
++#define ksu_su_compat_enabled	susfs_ksun_su_compat_key
++#define ksu_handle_execveat	susfs_ksun_handle_execveat
++#define ksu_handle_sys_reboot	susfs_ksu_sys_reboot
++#endif
++
++#endif /* _LINUX_SUSFS_KSUN_H */
+diff --git a/include/linux/xxksu_manual_hooks.h b/include/linux/xxksu_manual_hooks.h
+new file mode 100644
+index 000000000..d988724af
+--- /dev/null
++++ b/include/linux/xxksu_manual_hooks.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_XXKSU_MANUAL_HOOKS_H
++#define _LINUX_XXKSU_MANUAL_HOOKS_H
++#include <linux/compiler.h>
++#include <linux/types.h>
++struct cred;
++struct inode;
++struct dentry;
++struct file;
++struct linux_binprm;
++struct stat;
++struct stat64;
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++int ksu_handle_sys_execve(const char __user **filename, void *argv, void *envp);
++int ksu_handle_sys_execveat(int *fd, const char __user **filename, void *argv, void *envp, int *flags);
++int ksu_task_fix_setuid(struct cred *new, const struct cred *old, int flags);
++int ksu_inode_rename(struct inode *old_dir, struct dentry *old_dentry, struct inode *new_dir, struct dentry *new_dentry);
++int ksu_bprm_check(struct linux_binprm *bprm);
++int ksu_file_permission(struct file *file, int mask);
++int ksu_hide_setprocattr(const char *name, void *value, size_t size);
++int ksu_hide_inode_setxattr(struct dentry *dentry, const char *name, void *value, size_t *size, int *flags);
++void ksu_handle_newfstat_ret(unsigned int *fd, struct stat __user **statbuf_ptr);
++void ksu_handle_fstat64_ret(unsigned long *fd, struct stat64 __user **statbuf_ptr);
++#endif
++#endif
+diff --git a/include/linux/xxksu_parent_bridge.h b/include/linux/xxksu_parent_bridge.h
+new file mode 100644
+index 000000000..41651cf6b
+--- /dev/null
++++ b/include/linux/xxksu_parent_bridge.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_XXKSU_PARENT_BRIDGE_H
++#define _LINUX_XXKSU_PARENT_BRIDGE_H
++
++#include <linux/types.h>
++
++bool xxksu_parent_sucompat_enabled(void);
++bool xxksu_parent_uid_allowed(uid_t uid);
++void xxksu_parent_read_fd(unsigned int fd);
++
++void xxksu_parent_reset_task(void);
++void xxksu_parent_deny_task(void);
++void xxksu_parent_finish_umount(void);
++void xxksu_parent_post_fs_data(void);
++void xxksu_parent_packages_changed(void);
++
++#endif
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 67a17e947..f6bdb83df 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -21,6 +21,11 @@ obj-y     = fork.o exec_domain.o panic.o \
+ obj-$(CONFIG_USERMODE_DRIVER) += usermode_driver.o
+ obj-$(CONFIG_MODULES) += kmod.o
+ obj-$(CONFIG_MULTIUSER) += groups.o
++obj-$(CONFIG_KSU_SUSFS) += xxksu_setresuid_compat.o
++
++ifdef CONFIG_KSU_SUSFS
++CFLAGS_reboot.o += -include $(srctree)/include/linux/susfs_ksun.h
++endif
+ 
+ ifdef CONFIG_FUNCTION_TRACER
+ # Do not trace internal ftrace files
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index 2a62aa490..0c4430983 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -296,12 +296,15 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ #ifdef CONFIG_KSU_SUSFS
+ 	if (system_state == SYSTEM_RUNNING &&
+ 	    (u32)magic1 == SUSFS_KSU_INSTALL_MAGIC1) {
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 		if ((u32)magic2 == SUSFS_MAGIC &&
+ 		    cmd == CMD_SUSFS_SET_PRIORITY_UID_FILTER) {
+ 			if (!uid_eq(current_uid(), GLOBAL_ROOT_UID))
+ 				return -EPERM;
+-			return susfs_set_priority_uid_filter(arg);
++			susfs_set_priority_uid_filter(&arg);
++			return 0;
+ 		}
++#endif
+ 		return ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
+ 	}
+ #endif
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 4bc1a760d..e5cdd26fb 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -193,9 +193,9 @@ out:
+ 	return error;
+ }
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-#include <linux/susfs.h>
+-#endif
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
++extern bool susfs_is_priority_uid_filtered(uid_t uid);
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+@@ -242,10 +242,10 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ 		if (!who)
+ 			uid = cred->uid;
+ 		else if (!uid_eq(uid, cred->uid)) {
+-#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
+ 				goto out_unlock;
+-#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 			user = find_user(uid);
+ 			if (!user)
+ 				goto out_unlock;	/* No processes for this user */
+@@ -314,10 +314,10 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
+ 		if (!who)
+ 			uid = cred->uid;
+ 		else if (!uid_eq(uid, cred->uid)) {
+-#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
+ 				goto out_unlock;
+-#endif
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
+ 			user = find_user(uid);
+ 			if (!user)
+ 				goto out_unlock;	/* No processes for this user */
+diff --git a/kernel/xxksu_setresuid_compat.c b/kernel/xxksu_setresuid_compat.c
+new file mode 100644
+index 000000000..3a6522a77
+--- /dev/null
++++ b/kernel/xxksu_setresuid_compat.c
+@@ -0,0 +1,12 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/types.h>
++
++/*
++ * kernel/sys.c still calls the legacy setresuid hook. The pinned xxKSU source
++ * performs this work from its task_fix_setuid LSM hook, so this compatibility
++ * stub intentionally does nothing.
++ */
++int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
++{
++	return 0;
++}
+diff --git a/scripts/bakasu_preinit.mk b/scripts/bakasu_preinit.mk
+index 90d8760af..88c62c6fb 100644
+--- a/scripts/bakasu_preinit.mk
++++ b/scripts/bakasu_preinit.mk
+@@ -1,11 +1,13 @@
+ # SPDX-License-Identifier: GPL-2.0
+ # Loaded after upstream Kbuild, only for drivers/kernelsu with SUSFS enabled.
++#
++# BakaSU orders preinit.o after its generated syscall header, exposed through
++# KSU_SYSCALL_NO_TARGET. KernelSU-Next legacy builds its preinit runner without
++# that generator, so when the variable is empty there is nothing to add and this
++# file must not fail the build.
++ifneq ($(strip $(KSU_SYSCALL_NO_TARGET)),)
+ ifeq ($(filter preinit/preinit.o preinit/blob.o,$(kernelsu-objs)),preinit/preinit.o preinit/blob.o)
+-ifeq ($(strip $(KSU_SYSCALL_NO_TARGET)),)
+-$(error BakaSU preinit requires the upstream syscall header generator)
+-endif
+ # Upstream registers this object after its generic generated-header dependencies.
+ $(obj)/preinit/preinit.o: $(KSU_SYSCALL_NO_TARGET)
+-else
+-$(error BakaSU preinit is required; install target UAPI headers before building)
++endif
+ endif
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index 76b5be661..318fb340c 100755
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -181,13 +181,13 @@ vmlinux_link()
+ 			objects="-Wl,--whole-archive			\
+ 				built-in.o				\
+ 				-Wl,--no-whole-archive			\
+-				-Wl,--start-group			\
++				-Wl,--start-group				\
+ 				${KBUILD_VMLINUX_LIBS}			\
+ 				-Wl,--end-group				\
+ 				${@:2}"
+ 		else
+ 			objects="${KBUILD_VMLINUX_INIT}			\
+-				-Wl,--start-group			\
++				-Wl,--start-group				\
+ 				${KBUILD_VMLINUX_MAIN}			\
+ 				${KBUILD_VMLINUX_LIBS}			\
+ 				-Wl,--end-group				\
+@@ -367,9 +367,11 @@ fi
+ 
+ btf_vmlinux_bin_o=""
+ if [ -n "${CONFIG_DEBUG_INFO_BTF}" ]; then
+-	if gen_btf .tmp_vmlinux.btf .btf.vmlinux.bin.o ; then
+-		btf_vmlinux_bin_o=.btf.vmlinux.bin.o
+-	fi
++	# Do not call gen_btf in a conditional: that suppresses set -e inside
++	# the function and can let dd manufacture an invalid object after a
++	# failed link, pahole invocation or objcopy operation.
++	gen_btf .tmp_vmlinux.btf .btf.vmlinux.bin.o
++	btf_vmlinux_bin_o=.btf.vmlinux.bin.o
+ fi
+ 
+ kallsymso=""
+diff --git a/security/security.c b/security/security.c
+index a6342591b..686b942c7 100644
+--- a/security/security.c
++++ b/security/security.c
+@@ -1,3 +1,4 @@
++#include <linux/xxksu_manual_hooks.h>
+ /*
+  * Security plug functions
+  *
+@@ -774,6 +775,10 @@ int security_bprm_set_creds(struct linux_binprm *bprm)
+ 
+ int security_bprm_check(struct linux_binprm *bprm)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_bprm_check(bprm);
++#endif
++
+ 	int ret;
+ 
+ 	ret = call_int_hook(bprm_check_security, 0, bprm);
+@@ -1138,6 +1143,10 @@ int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
+ 			   struct inode *new_dir, struct dentry *new_dentry,
+ 			   unsigned int flags)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_inode_rename(old_dir, old_dentry, new_dir, new_dentry);
++#endif
++
+         if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
+             (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
+ 		return 0;
+@@ -1198,6 +1207,10 @@ int security_inode_getattr(const struct path *path)
+ int security_inode_setxattr(struct dentry *dentry, const char *name,
+ 			    const void *value, size_t size, int flags)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_hide_inode_setxattr(dentry, name, (void *)value, &size, &flags);
++#endif
++
+ 	int ret;
+ 
+ 	if (unlikely(IS_PRIVATE(d_backing_inode(dentry))))
+@@ -1349,6 +1362,10 @@ int security_kernfs_init_security(struct kernfs_node *kn_dir,
+ 
+ int security_file_permission(struct file *file, int mask)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_file_permission(file, mask);
++#endif
++
+ 	int ret;
+ 
+ 	ret = call_int_hook(file_permission, 0, file, mask);
+@@ -1624,6 +1641,10 @@ int security_kernel_load_data(enum kernel_load_data_id id)
+ int security_task_fix_setuid(struct cred *new, const struct cred *old,
+ 			     int flags)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_task_fix_setuid(new, old, flags);
++#endif
++
+ 	return call_int_hook(task_fix_setuid, 0, new, old, flags);
+ }
+ 
+@@ -1884,6 +1905,10 @@ int security_getprocattr(struct task_struct *p, const char *lsm, char *name,
+ int security_setprocattr(const char *lsm, const char *name, void *value,
+ 			 size_t size)
+ {
++#ifdef CONFIG_XXKSU_MANUAL_HOOKS
++	(void)ksu_hide_setprocattr(name, value, size);
++#endif
++
+ 	struct security_hook_list *hp;
+ 
+ 	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {

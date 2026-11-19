@@ -45,10 +45,16 @@ cd "$KERNEL_DIR"
 kernel_sha=$(git rev-parse HEAD)
 kernel_date=$(git show -s --format=%cI HEAD)
 kernel_subject=$(git show -s --format=%s HEAD)
-# Upstream commits a stale build folder; it would break O= builds.
-rm -rf -- out
+# The tree ships its own KernelSU submodule and an in-tree NoMount; this build
+# uses xxKSU (fetched below) and the separate NoMount LKM instead.
+rm -rf -- out KernelSU fs/nomount .gitmodules drivers/kernelsu
 
-log "SUSFS patch: $SUSFS_REPO ($SUSFS_REF)"
+applied=()
+log "Converting the tree to the xxKSU + SUSFS layout"
+git apply --whitespace=nowarn "$ROOT/patches/base/0001-mzggr-common-to-xxksu-susfs.patch"
+applied+=("base/0001-mzggr-common-to-xxksu-susfs.patch")
+
+log "SUSFS core: $SUSFS_REPO ($SUSFS_REF)"
 susfs_sha=$(git ls-remote "$SUSFS_REPO" "refs/heads/$SUSFS_REF" | cut -f1)
 [[ -n "$susfs_sha" ]] || susfs_sha=$SUSFS_REF   # allow a commit hash as ref
 susfs_patch="$INFO_DIR/susfs_patch_to_4.14.patch"
@@ -57,6 +63,18 @@ curl -fsSL --retry 3 -o "$susfs_patch" "$raw/$susfs_sha/$SUSFS_PATCH"
 susfs_patch_date=$(api \
   "repos/${SUSFS_REPO#https://github.com/}/commits?sha=$susfs_sha&path=$SUSFS_PATCH&per_page=1" \
   | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["commit"]["committer"]["date"] if d else "")' || true)
+# Only the three SUSFS core files are taken from Jack's patch. The hooks in
+# the rest of the kernel stay as the bakasu tree already has them for 4.14.
+core_files=(fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h)
+rm -f -- "${core_files[@]}"
+awk -v want="fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h" '
+  BEGIN { n = split(want, w, " "); for (i = 1; i <= n; i++) keep["a/" w[i]] = 1 }
+  /^diff --git / { on = ($3 in keep) }
+  on' "$susfs_patch" > "$INFO_DIR/susfs-core.patch"
+git apply --whitespace=nowarn "$INFO_DIR/susfs-core.patch"
+sed -i 's/[ \t]*$//' "${core_files[@]}"
+git apply --whitespace=nowarn "$ROOT/patches/susfs/0001-jack-core-local-additions.patch"
+applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12} (core files)" "susfs/0001-jack-core-local-additions.patch")
 
 log "xxKSU: $KSU_REPO ($KSU_REF)"
 fetch "$KSU_REPO" "$KSU_REF" KernelSU
@@ -66,30 +84,6 @@ ksu_subject=$(git -C KernelSU show -s --format=%s HEAD)
 ksu_version=$(grep -o 'KSU_VERSION=[0-9]*' KernelSU/kernel/Makefile | head -n1 | cut -d= -f2)
 ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
-
-applied=()
-log "Applying build fixes for the kernel tree"
-for p in "$ROOT"/patches/fixes/*.patch; do
-  [[ -e "$p" ]] || continue
-  echo "  $(basename "$p")"
-  patch -p1 -F2 -N --no-backup-if-mismatch -s -i "$p"
-  applied+=("fixes/$(basename "$p")")
-done
-
-log "Applying SUSFS (JackA1ltman)"
-python3 "$ROOT/scripts/apply_susfs.py" "$KERNEL_DIR" "$susfs_patch"
-applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12}")
-
-log "Applying xxKSU + SUSFS integration"
-cp -a "$ROOT/overlay/." "$KERNEL_DIR/"
-for p in "$ROOT"/patches/integration/*.patch; do
-  echo "  $(basename "$p")"
-  patch -p1 -F2 -N --no-backup-if-mismatch -s -i "$p"
-  applied+=("$(basename "$p")")
-done
-if find . -name '*.rej' -print -quit | grep -q .; then
-  echo "Patch rejects found:" >&2; find . -name '*.rej' >&2; exit 1
-fi
 
 log "Applying xxKSU patches"
 for p in "$ROOT"/patches/kernelsu/*.patch; do
@@ -101,11 +95,11 @@ ln -sfn ../KernelSU/kernel drivers/kernelsu
 
 log "Applying kernel patches"
 echo "  0001-network-udp-gso.patch (always)"
-patch -p1 -F2 -N --no-backup-if-mismatch -s -i "$ROOT/patches/kernel/0001-network-udp-gso.patch"
+git apply "$ROOT/patches/kernel/0001-network-udp-gso.patch"
 applied+=("0001-network-udp-gso.patch")
 if [[ "$PERF_TUNING" == true ]]; then
   echo "  0002-optional-tuning.patch (tuning ticked)"
-  patch -p1 -F2 -N --no-backup-if-mismatch -s -i "$ROOT/patches/kernel/0002-optional-tuning.patch"
+  git apply "$ROOT/patches/kernel/0002-optional-tuning.patch"
   applied+=("0002-optional-tuning.patch")
 fi
 if find . -name '*.rej' -print -quit | grep -q .; then
