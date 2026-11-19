@@ -307,6 +307,12 @@ jobs:
           name: release-files
           path: release
 
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc binutils-aarch64-linux-gnu bison pahole build-essential ca-certificates cpio curl file flex git libelf-dev libssl-dev libncurses-dev lz4 patch python3 unzip xz-utils zip zlib1g-dev zstd util-linux
+
       - name: Set up Zig
         uses: jetsung/setup-zig@v0.0.4
         with:
