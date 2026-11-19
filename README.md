@@ -39,6 +39,12 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - Optional performance tuning (only when ticked): fast-charge thermal limit fix, zram default `zstd`, GPU frequency meter, USB autosuspend off, BBR TCP and fq_codel by default. Stock already uses 250 Hz and schedutil.
 - No LTO.
 
+## ROM compatibility
+
+This kernel is Samsung's stock 4.14 source (A325FXXSCDYB2) and keeps the stock 4.14 BPF code. That is fine for stock One UI and ROMs up to Android 14.
+
+Android 15 and newer (for example LumiROM 9.x) do not boot with it: the network BPF loader (`netbpfload`) refuses kernels older than 4.19 and also needs BPF features from 5.x kernels (ring buffer, cgroup socket hooks and more). Kernels that boot those ROMs on the A32, such as the SLM-based 4.14.357 kernel, carry thousands of backported BPF commits plus a fake kernel version for `netbpfload`. Those backports are not in this kernel source.
+
 ## How to build
 
 1. Open the repo on GitHub and go to the **Actions** tab.
