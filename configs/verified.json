@@ -1,21 +1,21 @@
 {
-  "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits. Empty until the first Promoted build.",
-  "updated": "",
-  "run": "",
+  "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits.",
+  "updated": "2026-11-19T15:09:07Z",
+  "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44549119144",
   "kernel": {
     "repo": "https://github.com/mzggr0914/android_kernel_a325x_bakasu",
     "branch": "common",
-    "commit": ""
+    "commit": "7dd52de28d1ee64dddc1f3e853e214fab7578c44"
   },
   "xxksu": {
     "repo": "https://github.com/backslashxx/KernelSU",
     "branch": "master",
-    "commit": ""
+    "commit": "85746b7b6985a8fabeb15d844aabf7b725739ce3"
   },
   "susfs": {
     "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
     "branch": "mainline",
-    "path": "Patches/Patch/susfs_patch_to_4.14.patch",
-    "commit": ""
+    "commit": "26f2313be61f7a8603a50b2dcd12171495a79d27",
+    "path": "Patches/Patch/susfs_patch_to_4.14.patch"
   }
 }
