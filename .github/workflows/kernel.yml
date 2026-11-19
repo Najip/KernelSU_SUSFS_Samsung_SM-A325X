@@ -1,0 +1,262 @@
+name: Build Kernel
+run-name: A325X xxKSU + SUSFS kernel${{ inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.release && ' + release' || '' }}
+
+# Run it: Actions -> Build Kernel -> Run workflow.
+# Every source (kernel, xxKSU, SUSFS patch) is downloaded fresh during the run.
+on:
+  workflow_dispatch:
+    inputs:
+      self_hosted:
+        description: 'Build on my own PC (self-hosted runner). Untick = GitHub runner'
+        type: boolean
+        default: true
+      perf_tuning:
+        description: 'Performance tuning (fast charge, zstd zram, GPU freq meter, BBR, fq_codel). The network fix is always applied'
+        type: boolean
+        default: false
+      release:
+        description: 'Publish a GitHub Release and update the README sources table'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a325x-kernel-${{ inputs.self_hosted && 'pc' || 'gh' }}
+  cancel-in-progress: false
+
+env:
+  SELF_HOSTED: ${{ inputs.self_hosted }}
+  PERF_TUNING: ${{ inputs.perf_tuning }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    name: Build xxKSU + SUSFS kernel
+    runs-on: ${{ inputs.self_hosted && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 180
+    outputs:
+      zip_name: ${{ steps.package.outputs.zip_name }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Prepare build folders
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d "$RUNNER_TEMP/a325x-build.XXXXXX")
+          if [[ "$SELF_HOSTED" == true ]]; then
+            # Keep the kernel download between runs on the PC (saves ~1 GB per run).
+            cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-k414"
+            mkdir -p "$cache"
+            kernel_dir="$cache/kernel-tree"
+          else
+            kernel_dir="$work/kernel"
+          fi
+          {
+            echo "BUILD_WORK=$work"
+            echo "KERNEL_DIR=$kernel_dir"
+            echo "OUT_DIR=$work/out"
+            echo "INFO_DIR=$work/info"
+            echo "PACKAGE_DIR=$work/package"
+            echo "TOOLCHAIN=$RUNNER_TEMP/aosp-clang14"
+            echo "BUILD_LOG=$work/build.log"
+          } >> "$GITHUB_ENV"
+          df -h "$RUNNER_TEMP"
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          packages=(bc binutils-aarch64-linux-gnu bison build-essential ca-certificates cpio curl file flex git libelf-dev libssl-dev libncurses-dev lz4 patch python3 unzip xz-utils zip zlib1g-dev zstd util-linux)
+          if [[ "$SELF_HOSTED" != true ]]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends "${packages[@]}"
+            exit 0
+          fi
+          fail() { echo "::error::$*" >&2; exit 1; }
+          missing=()
+          for package in "${packages[@]}"; do
+            status=$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)
+            [[ "$status" == 'install ok installed' ]] || missing+=("$package")
+          done
+          if ((${#missing[@]})); then
+            privilege=()
+            if ((EUID != 0)); then
+              sudo -n true || fail "Missing packages (run: sudo apt install ${missing[*]})"
+              privilege=(sudo -n)
+            fi
+            "${privilege[@]}" env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 update
+            "${privilege[@]}" env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends --no-remove "${missing[@]}"
+          else
+            echo 'All build dependencies are already installed.'
+          fi
+
+      - name: Use cached AOSP Clang 14 (own PC)
+        if: env.SELF_HOSTED == 'true'
+        run: |
+          set -euo pipefail
+          cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325-kernel/xxksu"
+          mkdir -p "$cache"
+          exec 9>"$cache/.lock"
+          flock 9
+          key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
+          toolchain="$cache/aosp-clang14-$key"
+          AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          echo "TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+
+      - name: Download sources and apply patches
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_sources.sh 2>&1 | tee "$BUILD_LOG"
+          python3 - <<'EOF'
+          import json, os, subprocess
+          p = os.path.join(os.environ["INFO_DIR"], "sources.json")
+          d = json.load(open(p))
+          d["build_repo"] = {
+              "repo": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}",
+              "ref": os.environ["GITHUB_REF_NAME"], "commit": os.environ["GITHUB_SHA"],
+              "subject": subprocess.check_output(["git", "show", "-s", "--format=%s", "HEAD"], text=True).strip(),
+          }
+          json.dump(d, open(p, "w"), indent=2)
+          EOF
+
+      - name: Compile kernel
+        run: |
+          set -euo pipefail
+          bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"
+
+      - name: Make flashable ZIP
+        id: package
+        run: |
+          set -euo pipefail
+          bash scripts/package_zip.sh 2>&1 | tee -a "$BUILD_LOG"
+          name=$(cat "$PACKAGE_DIR/zip-name.txt")
+          echo "zip_name=$name" >> "$GITHUB_OUTPUT"
+          echo "ZIP_PATH=$PACKAGE_DIR/$name.zip" >> "$GITHUB_ENV"
+          {
+            echo "### Flashable ZIP: \`$name.zip\`"
+            echo '```'
+            cat "$PACKAGE_DIR/build-info.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload flashable ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.ZIP_PATH }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build-info.txt
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.PACKAGE_DIR }}/build-info.txt
+          archive: false
+          retention-days: 30
+
+      - name: Keep files for the release job
+        if: inputs.release
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files
+          path: |
+            ${{ env.ZIP_PATH }}
+            ${{ env.PACKAGE_DIR }}/build-info.txt
+            ${{ env.PACKAGE_DIR }}/sources.json
+            ${{ env.PACKAGE_DIR }}/SHA256SUMS.txt
+          retention-days: 3
+
+      - name: Upload logs for troubleshooting
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-logs-${{ github.run_number }}
+          include-hidden-files: true
+          path: |
+            ${{ env.BUILD_LOG }}
+            ${{ env.OUT_DIR }}/.config
+            ${{ env.OUT_DIR }}/System.map
+            ${{ env.OUT_DIR }}/toolchain-source.txt
+            ${{ env.INFO_DIR }}/sources.json
+            ${{ env.INFO_DIR }}/applied-patches.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Clean build folder (own PC)
+        if: always() && env.SELF_HOSTED == 'true'
+        run: |
+          if [[ -n "${BUILD_WORK:-}" && "$BUILD_WORK" == "$RUNNER_TEMP"/a325x-build.* ]]; then
+            rm -rf -- "$BUILD_WORK"
+          fi
+
+  release:
+    name: Publish release and update README
+    needs: build
+    if: inputs.release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+          fetch-depth: 1
+
+      - name: Download release files
+        uses: actions/download-artifact@v8
+        with:
+          name: release-files
+          path: release
+
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          ls -l release
+          tag="build-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          prev=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // ""')
+          if [[ -n "$prev" ]] && gh release download "$prev" --repo "$GITHUB_REPOSITORY" --pattern sources.json --dir prev 2>/dev/null; then
+            echo "Previous release: $prev"
+            prev_json=prev/sources.json
+          else
+            echo "No previous release with sources.json; this is the first one."
+            prev_json=-
+          fi
+          python3 scripts/release_notes.py notes release/sources.json "$prev_json" release/build-info.txt notes.md
+
+      - name: Publish release
+        run: |
+          set -euo pipefail
+          zip=$(ls release/*.zip)
+          name=$(basename "$zip" .zip)
+          gh release create "$TAG" "$zip" release/build-info.txt release/sources.json release/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$name" --notes-file notes.md
+
+      - name: Update README sources table
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch -q origin "$DEFAULT_BRANCH" && git reset -q --hard FETCH_HEAD
+            python3 scripts/release_notes.py readme release/sources.json README.md "$TAG"
+            if git diff --quiet; then echo 'README already up to date.'; exit 0; fi
+            git commit -q -am "README: sources for release $TAG"
+            git push -q origin "HEAD:$DEFAULT_BRANCH" && exit 0
+            sleep 5
+          done
+          echo '::error::Could not push the README update.'; exit 1

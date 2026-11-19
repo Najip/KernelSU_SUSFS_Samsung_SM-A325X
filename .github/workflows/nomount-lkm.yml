@@ -1,0 +1,288 @@
+name: NoMount LKM
+run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.perf_tuning && ' for tuning kernel' || '' }}
+
+# Builds nomount-4.14.ko and the flashable NoMount module ZIP (flash it in the
+# KernelSU manager). The kernel is compiled in the same run with the same
+# settings, so the module always matches a kernel built from the same sources.
+# Run it: Actions -> NoMount LKM -> Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      self_hosted:
+        description: 'Build on my own PC (self-hosted runner). Untick = GitHub runner'
+        type: boolean
+        default: true
+      nomount_ref:
+        description: 'NoMount branch'
+        type: choice
+        options:
+          - master
+          - dev
+        default: dev
+      perf_tuning:
+        description: 'Tick if your kernel was built with Performance tuning'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nomount-lkm-${{ inputs.self_hosted && 'pc' || 'gh' }}
+  cancel-in-progress: false
+
+env:
+  SELF_HOSTED: ${{ inputs.self_hosted }}
+  PERF_TUNING: ${{ inputs.perf_tuning }}
+  NOMOUNT_REF: ${{ inputs.nomount_ref }}
+  GH_TOKEN: ${{ github.token }}
+  KVER: '4.14'
+
+jobs:
+  build:
+    name: Build nomount-4.14.ko and module ZIP
+    runs-on: ${{ inputs.self_hosted && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Prepare build folders
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d "$RUNNER_TEMP/a325x-lkm.XXXXXX")
+          if [[ "$SELF_HOSTED" == true ]]; then
+            cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-k414"
+            mkdir -p "$cache"
+            kernel_dir="$cache/nomount-kernel-tree"
+          else
+            kernel_dir="$work/kernel"
+          fi
+          {
+            echo "BUILD_WORK=$work"
+            echo "KERNEL_DIR=$kernel_dir"
+            echo "OUT_DIR=$work/out"
+            echo "INFO_DIR=$work/info"
+            echo "MOD_SRC=$work/nomount-kmod"
+            echo "ARTIFACTS=$work/artifacts"
+            echo "TOOLCHAIN=$RUNNER_TEMP/aosp-clang14"
+            echo "BUILD_LOG=$work/build.log"
+          } >> "$GITHUB_ENV"
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          packages=(bc binutils-aarch64-linux-gnu bison build-essential ca-certificates cpio curl file flex git libelf-dev libssl-dev libncurses-dev lz4 patch python3 unzip xz-utils zip zlib1g-dev zstd util-linux)
+          if [[ "$SELF_HOSTED" != true ]]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends "${packages[@]}"
+            exit 0
+          fi
+          fail() { echo "::error::$*" >&2; exit 1; }
+          missing=()
+          for package in "${packages[@]}"; do
+            status=$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)
+            [[ "$status" == 'install ok installed' ]] || missing+=("$package")
+          done
+          if ((${#missing[@]})); then
+            privilege=()
+            if ((EUID != 0)); then
+              sudo -n true || fail "Missing packages (run: sudo apt install ${missing[*]})"
+              privilege=(sudo -n)
+            fi
+            "${privilege[@]}" env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 update
+            "${privilege[@]}" env DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends --no-remove "${missing[@]}"
+          else
+            echo 'All build dependencies are already installed.'
+          fi
+
+      - name: Use cached AOSP Clang 14 (own PC)
+        if: env.SELF_HOSTED == 'true'
+        run: |
+          set -euo pipefail
+          cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325-kernel/xxksu"
+          mkdir -p "$cache"
+          exec 9>"$cache/.lock"
+          flock 9
+          key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
+          toolchain="$cache/aosp-clang14-$key"
+          AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          echo "TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+
+      - name: Download NoMount (${{ inputs.nomount_ref }})
+        run: |
+          set -euo pipefail
+          . scripts/sources.conf
+          up="$BUILD_WORK/nomount"
+          git clone -q --branch "$NOMOUNT_REF" "$NOMOUNT_REPO" "$up"
+          src="$up/kernel/src"
+          for f in Makefile nomount.c nomount.h; do
+            test -f "$src/$f" || { echo "::error::NoMount $NOMOUNT_REF has no kernel/src/$f"; exit 1; }
+          done
+          test -f "$up/module/module.prop"
+          sha=$(git -C "$up" rev-parse HEAD)
+          count=$(git -C "$up" rev-list --count HEAD)
+          mkdir -p "$MOD_SRC"
+          cp -f "$src"/nomount.c "$src"/nomount.h "$MOD_SRC/"
+          [[ -f "$src/Kconfig" ]] && cp -f "$src/Kconfig" "$MOD_SRC/"
+          {
+            echo "# NoMount $sha ($count commits), copied by CI."
+            printf 'ccflags-y += -DNOMOUNT_COMMIT_COUNT=\\"%s\\"\n' "$count"
+            echo
+            sed -n '/^obj-\$(CONFIG_NOMOUNT)/,$p' "$src/Makefile"
+          } > "$MOD_SRC/Makefile"
+          grep -q 'obj-\$(CONFIG_NOMOUNT)' "$MOD_SRC/Makefile"
+          echo "Using NoMount $NOMOUNT_REF at $sha ($count commits)"
+          {
+            echo "NOMOUNT_UP=$up"
+            echo "NOMOUNT_SHA=$sha"
+            echo "NOMOUNT_COUNT=$count"
+          } >> "$GITHUB_ENV"
+
+      - name: Download kernel sources and apply patches
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_sources.sh 2>&1 | tee "$BUILD_LOG"
+
+      - name: Compile kernel and nomount.ko
+        run: |
+          set -euo pipefail
+          EXTRA_MODULE_DIR="$MOD_SRC" bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"
+          test -s "$MOD_SRC/nomount.ko"
+
+      - name: Check module matches the kernel
+        run: |
+          set -euo pipefail
+          release=$(cat "$OUT_DIR/include/config/kernel.release")
+          vermagic=$(strings "$MOD_SRC/nomount.ko" | grep -m1 '^vermagic=' || true)
+          echo "kernel.release: $release"
+          echo "$vermagic"
+          case "$vermagic" in
+            "vermagic=$release "*) ;;
+            *) echo "::error::vermagic does not match kernel.release"; exit 1 ;;
+          esac
+          mkdir -p "$ARTIFACTS"
+          install -m644 "$MOD_SRC/nomount.ko" "$ARTIFACTS/nomount-$KVER.ko"
+          "$TOOLCHAIN/bin/llvm-strip" --strip-debug "$ARTIFACTS/nomount-$KVER.ko"
+          echo "KERNEL_RELEASE=$release" >> "$GITHUB_ENV"
+
+      - name: Setup zig
+        uses: jetsung/setup-zig@v0.0.4
+        with:
+          version: master
+
+      - name: Build nm and lkmloader (arm64, arm)
+        run: |
+          set -euo pipefail
+          . scripts/sources.conf
+          bin="$BUILD_WORK/bin"
+          mkdir -p "$bin"
+          cd "$NOMOUNT_UP/userspace/src"
+          if grep -q '#include <unistd.h>' nm.h; then
+            zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -ffreestanding -fno-unwind-tables -fno-ident \
+              -Wno-invalid-noreturn -mllvm -enable-machine-outliner=always nm.c -o "$bin/nm-arm64"
+            zig cc -target arm-linux -Oz -static -ffreestanding -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+              -ffunction-sections -fdata-sections -Wl,--gc-sections nm.c -o "$bin/nm-arm"
+          else
+            zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -nostdlib -ffreestanding -fno-unwind-tables \
+              -fno-ident -Wno-invalid-noreturn -mllvm -enable-machine-outliner=always -Wl,--entry=_start nm.c -o "$bin/nm-arm64"
+            zig cc -target arm-linux -Oz -static -nostdlib -ffreestanding -fno-unwind-tables -fno-ident -Wno-invalid-noreturn \
+              -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--entry=_start nm.c -o "$bin/nm-arm"
+          fi
+          git clone -q --depth=1 "$LKMLOADER_REPO" "$BUILD_WORK/lkmloader"
+          echo "LKMLOADER_SHA=$(git -C "$BUILD_WORK/lkmloader" rev-parse HEAD)" >> "$GITHUB_ENV"
+          cd "$BUILD_WORK/lkmloader"
+          zig cc -target aarch64-linux -Oz -mcmodel=tiny -static -Wl,--gc-sections,-z,norelro -fno-unwind-tables \
+            -fno-ident -flto -fmerge-all-constants -fomit-frame-pointer -mllvm -enable-machine-outliner=always \
+            src/lkmloader.c -o "$bin/lkmloader-arm64"
+          zig cc -target arm-linux -Oz -static -Wl,--gc-sections,-z,norelro -fno-unwind-tables \
+            -fno-ident -flto -fmerge-all-constants -fomit-frame-pointer src/lkmloader.c -o "$bin/lkmloader-arm"
+          ls -l "$bin"
+
+      - name: Make flashable module ZIP
+        run: |
+          set -euo pipefail
+          mod="$BUILD_WORK/module"
+          rm -rf "$mod"
+          cp -a "$NOMOUNT_UP/module" "$mod"
+          mkdir -p "$mod/bin" "$mod/lkm"
+          cp "$BUILD_WORK"/bin/* "$mod/bin/"
+          cp "$ARTIFACTS/nomount-$KVER.ko" "$mod/lkm/nomount-$KVER.ko"
+          kshort=$(python3 -c "import json;print(json.load(open('$INFO_DIR/sources.json'))['kernel']['commit'][:8])")
+          nshort=${NOMOUNT_SHA:0:8}
+          base_ver=$(sed -n 's/^version=//p' "$mod/module.prop" | tr -d '\r ' | head -n1)
+          sed -i "s/^versionCode=.*/versionCode=${NOMOUNT_COUNT}/" "$mod/module.prop"
+          sed -i "s/^version=.*/version=${base_ver} (${NOMOUNT_COUNT}-${nshort}, LKM ${KVER})/" "$mod/module.prop"
+          suffix=
+          [[ "$PERF_TUNING" == true ]] && suffix=-tuning
+          name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-k${kshort}-n${nshort}${suffix}"
+          {
+            echo "NoMount LKM for A325X xxKSU + SUSFS kernel"
+            echo "NoMount: $NOMOUNT_REPO branch $NOMOUNT_REF @ $NOMOUNT_SHA ($NOMOUNT_COUNT commits)"
+            echo "lkmloader: $LKMLOADER_REPO @ $LKMLOADER_SHA"
+            echo "Built for kernel release: $KERNEL_RELEASE"
+            echo "Performance tuning kernel: $PERF_TUNING"
+            echo "Kernel sources used:"
+            python3 -c "import json;d=json.load(open('$INFO_DIR/sources.json'));[print(f'  {k}: {v[\"repo\"]} @ {v[\"commit\"]}') for k,v in d.items()]"
+            echo "Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$ARTIFACTS/build-info.txt"
+          cp "$ARTIFACTS/build-info.txt" "$mod/build-info.txt"
+          (cd "$mod" && zip -qr9 "$ARTIFACTS/$name.zip" .)
+          zip_path="$ARTIFACTS/$name.zip"
+          unzip -tq "$zip_path"
+          unzip -l "$zip_path" | grep -q "lkm/nomount-$KVER.ko"
+          unzip -l "$zip_path" | grep -q 'bin/lkmloader-arm64'
+          unzip -l "$zip_path" | grep -q 'module.prop'
+          cat "$ARTIFACTS/build-info.txt"
+          echo "ZIP_PATH=$zip_path" >> "$GITHUB_ENV"
+          {
+            echo "### NoMount module ZIP: \`$name.zip\`"
+            echo '```'
+            cat "$ARTIFACTS/build-info.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload flashable module ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.ZIP_PATH }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload nomount.ko
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.ARTIFACTS }}/nomount-4.14.ko
+          archive: false
+          retention-days: 30
+
+      - name: Upload build-info.txt
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.ARTIFACTS }}/build-info.txt
+          archive: false
+          retention-days: 30
+
+      - name: Upload logs for troubleshooting
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nomount-logs-${{ github.run_number }}
+          path: |
+            ${{ env.BUILD_LOG }}
+            ${{ env.ARTIFACTS }}/build-info.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Clean build folder (own PC)
+        if: always() && env.SELF_HOSTED == 'true'
+        run: |
+          if [[ -n "${BUILD_WORK:-}" && "$BUILD_WORK" == "$RUNNER_TEMP"/a325x-lkm.* ]]; then
+            rm -rf -- "$BUILD_WORK"
+          fi
