@@ -4,8 +4,10 @@
 #   KERNEL_DIR   where the kernel tree goes (required). Reused if it exists.
 #   INFO_DIR     where sources.json / applied-patches.txt are written (required)
 #   PERF_TUNING  true = also apply the optional tuning patch (default false)
-#   KSU_HOOK     xxKSU hook style: manual (default), syscall_table, branch_link
+#   KSU_HOOK     xxKSU hook style: branch_link (default), manual, syscall_table
 #   KERNEL_REF / KSU_REF / SUSFS_REF override scripts/sources.conf
+#   KERNEL_BRANCH / KSU_BRANCH / SUSFS_BRANCH  branch name recorded in sources.json
+#                when the ref above is a pinned commit (Verified mode)
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck source=sources.conf
@@ -13,7 +15,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 : "${KERNEL_DIR:?KERNEL_DIR is required}"
 : "${INFO_DIR:?INFO_DIR is required}"
 PERF_TUNING=${PERF_TUNING:-false}
-KSU_HOOK=${KSU_HOOK:-manual}
+KSU_HOOK=${KSU_HOOK:-branch_link}
 case "$KSU_HOOK" in
   manual|syscall_table|branch_link) ;;
   *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
@@ -124,9 +126,14 @@ fi
 
 susfs_version=$(sed -n 's/^#define SUSFS_VERSION "\([^"]*\)".*/\1/p' include/linux/susfs.h | head -n1)
 kernel_version=$(make -s kernelversion 2>/dev/null || true)
+# When a ref is a pinned commit, record the branch it came from instead.
+branch_of() { [[ -n "${2:-}" && "$1" != "$2" ]] && printf '%s' "$2" || printf '%s' "$1"; }
+kernel_branch=$(branch_of "$KERNEL_REF" "${KERNEL_BRANCH:-}")
+ksu_branch=$(branch_of "$KSU_REF" "${KSU_BRANCH:-}")
+susfs_branch=$(branch_of "$SUSFS_REF" "${SUSFS_BRANCH:-}")
 printf '%s\n' "${applied[@]}" > "$INFO_DIR/applied-patches.txt"
 
-export kernel_sha kernel_date kernel_subject kernel_version susfs_sha susfs_patch_date susfs_version
+export kernel_sha kernel_date kernel_subject kernel_version kernel_branch ksu_branch susfs_branch susfs_sha susfs_patch_date susfs_version
 export ksu_sha ksu_date ksu_subject ksu_version ksu_tag
 export KERNEL_REPO KERNEL_REF KSU_REPO KSU_REF SUSFS_REPO SUSFS_REF SUSFS_PATCH
 python3 - "$INFO_DIR/sources.json" <<'EOF'
@@ -135,12 +142,12 @@ e = os.environ
 data = {
     "kernel": {"repo": e["KERNEL_REPO"], "ref": e["KERNEL_REF"], "commit": e["kernel_sha"],
                "date": e["kernel_date"], "subject": e["kernel_subject"],
-               "version": e["kernel_version"]},
+               "version": e["kernel_version"], "branch": e["kernel_branch"]},
     "xxksu": {"repo": e["KSU_REPO"], "ref": e["KSU_REF"], "commit": e["ksu_sha"],
               "date": e["ksu_date"], "subject": e["ksu_subject"],
-              "ksu_version": e["ksu_version"], "tag": e["ksu_tag"]},
+              "ksu_version": e["ksu_version"], "tag": e["ksu_tag"], "branch": e["ksu_branch"]},
     "susfs": {"repo": e["SUSFS_REPO"], "ref": e["SUSFS_REF"], "commit": e["susfs_sha"],
-              "path": e["SUSFS_PATCH"], "patch_date": e["susfs_patch_date"],
+              "path": e["SUSFS_PATCH"], "patch_date": e["susfs_patch_date"], "branch": e["susfs_branch"],
               "version": e["susfs_version"]},
 }
 json.dump(data, open(sys.argv[1], "w"), indent=2)

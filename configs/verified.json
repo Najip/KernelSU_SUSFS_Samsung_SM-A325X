@@ -1,0 +1,21 @@
+{
+  "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits. Empty until the first Promoted build.",
+  "updated": "",
+  "run": "",
+  "kernel": {
+    "repo": "https://github.com/mzggr0914/android_kernel_a325x_bakasu",
+    "branch": "common",
+    "commit": ""
+  },
+  "xxksu": {
+    "repo": "https://github.com/backslashxx/KernelSU",
+    "branch": "master",
+    "commit": ""
+  },
+  "susfs": {
+    "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
+    "branch": "mainline",
+    "path": "Patches/Patch/susfs_patch_to_4.14.patch",
+    "commit": ""
+  }
+}
