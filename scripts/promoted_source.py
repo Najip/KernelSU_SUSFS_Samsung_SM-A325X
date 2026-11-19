@@ -6,6 +6,11 @@
     Latest on $BRANCH whose kernel ZIP has not expired yet. Writes
     source_run, source_url and source_sha to $GITHUB_OUTPUT.
 
+  promoted_source.py download <run id> <artifacts folder>
+    Downloads the kernel ZIP, build-info.txt, release-files and build logs of
+    that run. Files uploaded unarchived (the kernel ZIP, build-info.txt) are
+    kept byte for byte; the others are unpacked into a folder of their name.
+
   promoted_source.py inspect <artifacts folder>
     Reads the downloaded artifacts of that run. Writes the commits
     (kernel_ref, ksu_ref, susfs_ref and *_branch), hook, tuning,
@@ -70,6 +75,32 @@ def find():
         })
         return
     fail(f"No successful Latest build with files left on {branch}. Run one with commit mode Latest first.")
+
+
+def download(run_id, folder):
+    import zipfile
+    repo = os.environ["GITHUB_REPOSITORY"]
+    folder = Path(folder)
+    arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
+    for art in arts:
+        name = art["name"]
+        if art.get("expired"):
+            continue
+        raw = name.startswith("A325X-") and name.endswith(".zip") or name == "build-info.txt"
+        if not (raw or name == "release-files" or name.startswith("build-logs-")):
+            continue
+        data = subprocess.check_output(["gh", "api", f"repos/{repo}/actions/artifacts/{art['id']}/zip"])
+        target = folder / name
+        target.mkdir(parents=True, exist_ok=True)
+        if raw:
+            (target / name).write_bytes(data)
+        else:
+            tmp = folder / f".{name}.zip"
+            tmp.write_bytes(data)
+            with zipfile.ZipFile(tmp) as z:
+                z.extractall(target)
+            tmp.unlink()
+        print(f"Downloaded {name} ({len(data)} bytes)")
 
 
 def locate(folder):
@@ -146,6 +177,8 @@ def collect(folder, dest):
 if __name__ == "__main__":
     if sys.argv[1:2] == ["find"] and len(sys.argv) == 2:
         find()
+    elif sys.argv[1:2] == ["download"] and len(sys.argv) == 4:
+        download(sys.argv[2], sys.argv[3])
     elif sys.argv[1:2] == ["inspect"] and len(sys.argv) == 3:
         inspect(sys.argv[2])
     elif sys.argv[1:2] == ["collect"] and len(sys.argv) == 4:
