@@ -33,7 +33,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 - xxKSU in manual-hook mode (no LSM, syscall-table or branch-link hooking).
 - SUSFS (all features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging).
-- Samsung protections that block root are turned off: UH/RKP, KDP, DEFEX, PROCA, DSMS, Integrity, Knox NCM.
+- Samsung protections that block root are turned off: UH/RKP, KDP, DEFEX, PROCA, DSMS, Integrity.
 - Network fix (UDP GSO fix for IPv4 and IPv6). Always applied.
 - Optional performance tuning (only when ticked): fast-charge thermal limit fix, zram default `zstd`, GPU frequency meter, USB autosuspend off, BBR TCP and fq_codel by default. Stock already uses 250 Hz and schedutil.
 - No LTO.
