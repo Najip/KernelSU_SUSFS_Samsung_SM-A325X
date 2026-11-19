@@ -238,7 +238,7 @@ jobs:
           retention-days: 30
 
       - name: Keep files for the release job
-        if: inputs.release_type != 'CI'
+        if: inputs.release_type != 'CI' || inputs.commit_mode == 'Promoted'
         uses: actions/upload-artifact@v7
         with:
           name: release-files
