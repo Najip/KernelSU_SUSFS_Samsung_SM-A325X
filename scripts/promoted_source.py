@@ -74,17 +74,18 @@ def find():
 
 def locate(folder):
     folder = Path(folder)
-    zips = sorted({p.name: p for p in folder.rglob("A325X-*.zip")}.values())
+    # Unarchived artifacts are downloaded as <name>/<name>, so only look at files.
+    zips = sorted({p.name: p for p in folder.rglob("A325X-*.zip") if p.is_file()}.values())
     if not zips:
         fail("The Latest run has no kernel ZIP.")
     if len(zips) > 1:
         fail("The Latest run has more than one kernel ZIP: " + ", ".join(p.name for p in zips))
-    sources = [p for p in folder.rglob("sources.json")]
+    sources = [p for p in folder.rglob("sources.json") if p.is_file()]
     if not sources:
         fail("The Latest run has no sources.json.")
     # Prefer the packaged copy (it also has build_repo).
     sources.sort(key=lambda p: ("release-files" not in p.parts, len(p.parts)))
-    infos = [p for p in folder.rglob("build-info.txt") if "nomount" not in p.parts]
+    infos = [p for p in folder.rglob("build-info.txt") if p.is_file() and "nomount" not in p.parts]
     if not infos:
         fail("The Latest run has no build-info.txt.")
     nomount = sorted({p.name: p for p in folder.rglob("*") if p.is_file() and "nomount" in p.parts}.values())
