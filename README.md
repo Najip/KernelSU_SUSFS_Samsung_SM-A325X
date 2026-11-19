@@ -95,7 +95,9 @@ Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of
 | `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. A full `Release` only works in this mode. |
 | `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
 
-Which `Latest` runs `Promoted` accepts: hook style `branch_link`, **Performance tuning** unticked, NoMount `lkm` or `no` (not `integrate`), and not a **NoMount only** run. The runner (your PC or GitHub), the release type and the benchmark tick do not matter. Runs with other options are skipped.
+Releases never include tuning: a `Pre-release` or `Release` with **Performance tuning** ticked stops with "Releases are built without tuning". For the same reason, `Promoted` only takes builds without tuning.
+
+Which `Latest` runs `Promoted` accepts: hook style `branch_link`, **Performance tuning** unticked, NoMount `lkm` or `no` (not `integrate`), and not a **NoMount only** run. The runner (your PC or GitHub), the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
 
 How `Promoted` gets the NoMount module:
 
