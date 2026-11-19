@@ -1,8 +1,8 @@
 name: Build Kernel
-run-name: A325X xxKSU + SUSFS kernel [${{ inputs.ksu_hook }}]${{ inputs.perf_tuning && ' (tuning)' || '' }} (${{ inputs.commit_mode }})${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && ' (tuning)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
-# Every source (kernel, xxKSU, SUSFS patch) is downloaded fresh during the run.
+# Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
 on:
   workflow_dispatch:
     inputs:
@@ -22,8 +22,27 @@ on:
         description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel). The network fix is always applied'
         type: boolean
         default: false
+      nomount:
+        description: 'NoMount. lkm = separate module (ZIP + .ko) built for this kernel (default). integrate = built into the kernel. no = not included'
+        type: choice
+        options:
+          - lkm
+          - integrate
+          - 'no'
+        default: lkm
+      nomount_branch:
+        description: 'NoMount branch'
+        type: choice
+        options:
+          - dev
+          - master
+        default: dev
+      nomount_only:
+        description: 'Build only the NoMount module (no kernel ZIP). Uses the saved kernel kit of the same kernel when there is one, otherwise compiles the kernel to match it'
+        type: boolean
+        default: false
       commit_mode:
-        description: 'Which commits to use. Latest = newest of every source (testing). Verified = the pinned commits saved by Promoted (required for a full Release). Promoted = no kernel rebuild: take the files of the most recent successful Latest run and save its commits as Verified (hook and tuning come from that run)'
+        description: 'Which commits to use. Latest = newest of every source (testing). Verified = the pinned commits saved by Promoted (required for a full Release). Promoted = no kernel rebuild: take the newest Latest run with the default kernel options and save its commits as Verified'
         type: choice
         options:
           - Latest
@@ -51,6 +70,8 @@ permissions:
 env:
   PERF_TUNING: ${{ inputs.perf_tuning }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'branch_link' }}
+  NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
+  NOMOUNT_REF: ${{ inputs.nomount_branch || 'dev' }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -66,25 +87,41 @@ jobs:
             scripts/pick_runner.py
             scripts/resolve_commits.py
             scripts/promoted_source.py
+            scripts/kernel_kit.py
             scripts/sources.conf
           sparse-checkout-cone-mode: false
+      - name: Check the options fit together
+        env:
+          MODE: ${{ inputs.commit_mode }}
+          TYPE: ${{ inputs.release_type }}
+          NM_ONLY: ${{ inputs.nomount_only }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          if [[ "$TYPE" == Release && "$MODE" != Verified ]]; then
+            fail "Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
+          fi
+          if [[ "$NM_ONLY" == true ]]; then
+            [[ "$NOMOUNT_MODE" == lkm ]] || fail "NoMount only needs the NoMount option lkm."
+            [[ "$TYPE" == CI ]] || fail "NoMount only builds are not released. Choose CI."
+            [[ "$MODE" != Promoted ]] || fail "NoMount only does not work with Promoted (Promoted already builds the module when it is missing)."
+          fi
+          if [[ "$MODE" == Promoted && "$NOMOUNT_MODE" == integrate ]]; then
+            fail "Promoted takes the kernel of a default Latest build, where NoMount is a separate LKM. Choose lkm or no."
+          fi
+          echo "Options are fine."
       - name: Choose self-hosted PC or GitHub runner
         id: pick
         env:
           WANT_SELF_HOSTED: ${{ inputs.self_hosted }}
         run: python3 scripts/pick_runner.py
-      - name: Check the release is allowed
-        if: inputs.release_type == 'Release' && inputs.commit_mode != 'Verified'
-        run: |
-          echo "::error::Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
-          exit 1
       - name: Resolve source commits
         id: commits
         if: inputs.commit_mode != 'Promoted'
         env:
           COMMIT_MODE: ${{ inputs.commit_mode }}
         run: python3 scripts/resolve_commits.py resolve
-      - name: Find the most recent Latest build (Promoted)
+      - name: Find the most recent default Latest build (Promoted)
         id: source
         if: inputs.commit_mode == 'Promoted'
         env:
@@ -97,37 +134,72 @@ jobs:
         id: promoted
         if: inputs.commit_mode == 'Promoted'
         run: python3 scripts/promoted_source.py inspect source
+      - name: Look for a saved kernel kit
+        id: kit
+        env:
+          MODE: ${{ inputs.commit_mode }}
+          NM_ONLY: ${{ inputs.nomount_only }}
+          SOURCE_RUN: ${{ steps.source.outputs.source_run }}
+          KERNEL_REF: ${{ steps.commits.outputs.kernel_ref }}
+          KSU_REF: ${{ steps.commits.outputs.ksu_ref }}
+          SUSFS_REF: ${{ steps.commits.outputs.susfs_ref }}
+          NOMOUNT_PART: separate
+        run: |
+          set -euo pipefail
+          if [[ "$MODE" == Promoted ]]; then
+            python3 scripts/kernel_kit.py in-run "$SOURCE_RUN"
+          elif [[ "$NM_ONLY" == true ]]; then
+            git fetch -q --depth=1 origin "$GITHUB_SHA"   # tree ids for the kit key
+            k=$(python3 scripts/kernel_kit.py key)
+            echo "Kit key: $k"
+            python3 scripts/kernel_kit.py find "$k"
+          else
+            echo "kit_id=" >> "$GITHUB_OUTPUT"
+          fi
       - name: Decide what to build
         id: plan
         env:
           MODE: ${{ inputs.commit_mode }}
-          TYPE: ${{ inputs.release_type }}
-          HAS_NOMOUNT: ${{ steps.promoted.outputs.has_nomount }}
+          NM_ONLY: ${{ inputs.nomount_only }}
+          SRC_NM_BRANCH: ${{ steps.promoted.outputs.nomount_branch }}
+          KIT_ID: ${{ steps.kit.outputs.kit_id }}
         run: |
           set -euo pipefail
+          kernel=true nomount=false
+          [[ "$NOMOUNT_MODE" == lkm ]] && nomount=true
           if [[ "$MODE" == Promoted ]]; then
-            # No kernel rebuild. NoMount is only built when the Latest run has none (it was a CI run).
             kernel=false
-            if [[ "$HAS_NOMOUNT" == true ]]; then nomount=false; else nomount=true; fi
-          else
-            kernel=true
-            if [[ "$TYPE" != CI ]]; then nomount=true; else nomount=false; fi
+            # Reuse the module of the Latest run when it was built from the chosen branch.
+            [[ "$NOMOUNT_MODE" == lkm && "$SRC_NM_BRANCH" == "$NOMOUNT_REF" ]] && nomount=false
+          elif [[ "$NM_ONLY" == true ]]; then
+            kernel=false
           fi
-          echo "build_kernel=$kernel" >> "$GITHUB_OUTPUT"
-          echo "build_nomount=$nomount" >> "$GITHUB_OUTPUT"
-          echo "Kernel package: $kernel, NoMount build: $nomount"
-          if [[ "$MODE" == Promoted ]]; then
-            {
+          kit=
+          [[ "$kernel" == false && "$nomount" == true ]] && kit=$KIT_ID
+          {
+            echo "build_kernel=$kernel"
+            echo "build_nomount=$nomount"
+            echo "kit_id=$kit"
+          } >> "$GITHUB_OUTPUT"
+          echo "Kernel ZIP: $kernel, NoMount LKM build: $nomount, kernel kit: ${kit:-none}"
+          {
+            if [[ "$MODE" == Promoted ]]; then
               echo "### Promoted from ${{ steps.source.outputs.source_url }}"
               echo "${{ steps.source.outputs.source_title }}"
               echo
-              echo "NoMount: $([[ $nomount == true ]] && echo 'built now for that kernel' || echo 'taken from that run')"
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+            fi
+            if [[ "$kernel" == false && "$nomount" == true ]]; then
+              if [[ -n "$kit" ]]; then echo "NoMount: built from the saved kernel kit (no kernel compile)."
+              else echo "NoMount: no kernel kit found, the kernel is compiled once to match it."; fi
+            elif [[ "$MODE" == Promoted ]]; then
+              echo "NoMount: $([[ $NOMOUNT_MODE == no ]] && echo 'not included' || echo 'taken from that run')"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
     outputs:
       runner: ${{ steps.pick.outputs.runner }}
       build_kernel: ${{ steps.plan.outputs.build_kernel }}
       build_nomount: ${{ steps.plan.outputs.build_nomount }}
+      kit_id: ${{ steps.plan.outputs.kit_id }}
       source_run: ${{ steps.source.outputs.source_run }}
       source_url: ${{ steps.source.outputs.source_url }}
       checkout_sha: ${{ steps.promoted.outputs.build_sha || github.sha }}
@@ -142,7 +214,7 @@ jobs:
       susfs_branch: ${{ steps.commits.outputs.susfs_branch || steps.promoted.outputs.susfs_branch }}
 
   build:
-    name: ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build NoMount for the promoted kernel' }}
+    name: ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build the NoMount module' }}
     needs: pick
     if: needs.pick.outputs.build_kernel == 'true' || needs.pick.outputs.build_nomount == 'true'
     runs-on: ${{ needs.pick.outputs.runner }}
@@ -153,6 +225,7 @@ jobs:
       PERF_TUNING: ${{ needs.pick.outputs.perf_tuning }}
       BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
       BUILD_NOMOUNT: ${{ needs.pick.outputs.build_nomount }}
+      KIT_ID: ${{ needs.pick.outputs.kit_id }}
       KERNEL_REF: ${{ needs.pick.outputs.kernel_ref }}
       KSU_REF: ${{ needs.pick.outputs.ksu_ref }}
       SUSFS_REF: ${{ needs.pick.outputs.susfs_ref }}
@@ -160,8 +233,6 @@ jobs:
       KSU_BRANCH: ${{ needs.pick.outputs.ksu_branch }}
       SUSFS_BRANCH: ${{ needs.pick.outputs.susfs_branch }}
     timeout-minutes: 180
-    outputs:
-      zip_name: ${{ steps.package.outputs.zip_name }}
     defaults:
       run:
         shell: bash
@@ -194,6 +265,7 @@ jobs:
             echo "TOOLCHAIN=$RUNNER_TEMP/aosp-clang14"
             echo "BUILD_LOG=$work/build.log"
           } >> "$GITHUB_ENV"
+          mkdir -p "$work/package"
           df -h "$RUNNER_TEMP"
 
       - name: Install build dependencies
@@ -237,6 +309,9 @@ jobs:
           echo "TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
 
       - name: Download sources and apply patches
+        env:
+          # A module-only build needs the kernel exactly as it was, with NoMount separate.
+          NOMOUNT_MODE: ${{ env.BUILD_KERNEL == 'true' && env.NOMOUNT_MODE || 'lkm' }}
         run: |
           set -euo pipefail
           bash scripts/prepare_sources.sh 2>&1 | tee "$BUILD_LOG"
@@ -246,26 +321,24 @@ jobs:
           d = json.load(open(p))
           d["build_repo"] = {
               "repo": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}",
-              "ref": os.environ["GITHUB_REF_NAME"], "commit": os.environ["GITHUB_SHA"],
+              "ref": os.environ["GITHUB_REF_NAME"], "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
               "subject": subprocess.check_output(["git", "show", "-s", "--format=%s", "HEAD"], text=True).strip(),
           }
           json.dump(d, open(p, "w"), indent=2)
           EOF
 
+      - name: Download the kernel kit
+        if: env.KIT_ID != ''
+        run: |
+          set -euo pipefail
+          python3 scripts/kernel_kit.py download "$KIT_ID" "$BUILD_WORK/kit"
+          echo "KIT_DIR=$BUILD_WORK/kit" >> "$GITHUB_ENV"
+
       - name: Compile kernel
+        if: env.KIT_ID == ''
         run: |
           set -euo pipefail
           bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"
-
-      - name: Check the kernel matches the promoted one
-        if: env.BUILD_KERNEL != 'true'
-        env:
-          WANT_RELEASE: ${{ needs.pick.outputs.kernel_release }}
-        run: |
-          set -euo pipefail
-          got=$(cat "$OUT_DIR/include/config/kernel.release")
-          echo "Kernel release here: $got, promoted kernel: $WANT_RELEASE"
-          [[ -z "$WANT_RELEASE" || "$got" == "$WANT_RELEASE" ]] || { echo "::error::Kernel release differs from the promoted kernel."; exit 1; }
 
       - name: Make flashable ZIP
         id: package
@@ -274,7 +347,6 @@ jobs:
           set -euo pipefail
           bash scripts/package_zip.sh 2>&1 | tee -a "$BUILD_LOG"
           name=$(cat "$PACKAGE_DIR/zip-name.txt")
-          echo "zip_name=$name" >> "$GITHUB_OUTPUT"
           echo "ZIP_PATH=$PACKAGE_DIR/$name.zip" >> "$GITHUB_ENV"
           {
             echo "### Flashable ZIP: \`$name.zip\`"
@@ -283,20 +355,54 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Save the kernel kit (for NoMount builds without a kernel compile)
+        if: env.BUILD_KERNEL == 'true'
+        run: |
+          set -euo pipefail
+          kit="$BUILD_WORK/kit-out"
+          mkdir -p "$kit"
+          cp "$OUT_DIR/.config" "$OUT_DIR/Module.symvers" "$kit/"
+          cp "$OUT_DIR/include/config/kernel.release" "$kit/kernel.release"
+          commit() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))[sys.argv[2]]['commit'])" "$INFO_DIR/sources.json" "$1"; }
+          KERNEL_REF=$(commit kernel); KSU_REF=$(commit xxksu); SUSFS_REF=$(commit susfs)
+          export KERNEL_REF KSU_REF SUSFS_REF
+          part=separate
+          # A kernel with NoMount built in is a different kernel: own kit key.
+          [[ "$NOMOUNT_MODE" != integrate ]] || part="integrate@$(commit nomount)"
+          k=$(NOMOUNT_PART=$part python3 scripts/kernel_kit.py key)
+          echo "Kernel kit key: $k"
+          echo "KIT_NAME=kernel-kit-$k" >> "$GITHUB_ENV"
+          echo "KIT_OUT=$kit" >> "$GITHUB_ENV"
+
       - name: Set up Zig (NoMount)
         if: env.BUILD_NOMOUNT == 'true'
         uses: jetsung/setup-zig@v0.0.4
         with:
           version: master
 
-      - name: Build the matching NoMount dev module
+      - name: Build the NoMount ${{ env.NOMOUNT_REF }} module
         if: env.BUILD_NOMOUNT == 'true'
         run: |
           set -euo pipefail
-          # Same runner, same compiled kernel, same commits, hook style and tuning.
-          NOMOUNT_REF=dev NOMOUNT_REUSE_BUILD=true \
-            bash scripts/build_nomount.sh "$PACKAGE_DIR/nomount" 2>&1 | tee -a "$BUILD_LOG"
+          # Same commits, hook style and tuning as the kernel. Either the kernel
+          # compiled in this job, or the saved kernel kit of that kernel.
+          if [[ -n "${KIT_DIR:-}" ]]; then
+            NOMOUNT_KIT=$KIT_DIR bash scripts/build_nomount.sh "$PACKAGE_DIR/nomount" 2>&1 | tee -a "$BUILD_LOG"
+          else
+            NOMOUNT_REUSE_BUILD=true bash scripts/build_nomount.sh "$PACKAGE_DIR/nomount" 2>&1 | tee -a "$BUILD_LOG"
+          fi
           ls -l "$PACKAGE_DIR/nomount"
+          echo "NM_ZIP=$(ls "$PACKAGE_DIR"/nomount/NoMount-*.zip)" >> "$GITHUB_ENV"
+
+      - name: Check the module matches the promoted kernel
+        if: env.BUILD_KERNEL != 'true' && needs.pick.outputs.kernel_release != ''
+        env:
+          WANT_RELEASE: ${{ needs.pick.outputs.kernel_release }}
+        run: |
+          set -euo pipefail
+          got=$(cat "$OUT_DIR/include/config/kernel.release")
+          echo "Kernel release here: $got, promoted kernel: $WANT_RELEASE"
+          [[ "$got" == "$WANT_RELEASE" ]] || { echo "::error::Kernel release differs from the promoted kernel."; exit 1; }
 
       - name: Build hook benchmark
         if: inputs.bench_tool && env.BUILD_KERNEL == 'true'
@@ -326,12 +432,40 @@ jobs:
           archive: false
           retention-days: 30
 
+      - name: Upload NoMount module ZIP
+        if: env.BUILD_NOMOUNT == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.NM_ZIP }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload nomount-4.14.ko
+        if: env.BUILD_NOMOUNT == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.PACKAGE_DIR }}/nomount/nomount-4.14.ko
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload hook benchmark
         if: inputs.bench_tool && env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: hook-bench
           path: ${{ env.BENCH_DIR }}
+          retention-days: 30
+
+      - name: Upload the kernel kit
+        if: env.BUILD_KERNEL == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.KIT_NAME }}
+          path: ${{ env.KIT_OUT }}/
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 30
 
       - name: Keep files for the release job and a later Promoted run
@@ -347,8 +481,8 @@ jobs:
             ${{ env.PACKAGE_DIR }}/nomount/
           retention-days: 30
 
-      - name: Keep the NoMount files for the promoted release
-        if: env.BUILD_KERNEL != 'true'
+      - name: Keep the NoMount files for the promoted build
+        if: env.BUILD_KERNEL != 'true' && inputs.commit_mode == 'Promoted'
         uses: actions/upload-artifact@v7
         with:
           name: promoted-nomount
@@ -398,17 +532,20 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: promoted-nomount
-          path: source/promoted/nomount
+          path: promoted/nomount
       - name: Put the files together
         run: |
           set -euo pipefail
-          if [[ "${{ needs.pick.outputs.build_nomount }}" == true ]]; then
-            # Use only the module built now, not an older one.
-            find source -path '*/nomount/*' -not -path 'source/promoted/*' -delete
+          if [[ "${{ needs.pick.outputs.build_nomount }}" == true || "$NOMOUNT_MODE" == no ]]; then
+            # Only the module built now (or none), not the one of the Latest run.
+            find source -path '*/nomount/*' -type f -delete
           fi
+          [[ -d promoted ]] && mv promoted source/promoted
           python3 scripts/promoted_source.py collect source release
-          ls release/nomount/*.ko release/nomount/NoMount-*.zip >/dev/null \
-            || { echo "::error::No NoMount module for the promoted build."; exit 1; }
+          if [[ "$NOMOUNT_MODE" == lkm ]]; then
+            ls release/nomount/*.ko release/nomount/NoMount-*.zip >/dev/null \
+              || { echo "::error::No NoMount module for the promoted build."; exit 1; }
+          fi
           echo "Promoted from: ${{ needs.pick.outputs.source_url }}" >> release/build-info.txt
       - name: Keep files for the release job
         uses: actions/upload-artifact@v7
@@ -459,8 +596,11 @@ jobs:
           ls -lR release
           shopt -s nullglob
           files=(release/nomount/*)
-          ((${#files[@]})) || { echo "::error::The NoMount module was not built in the build job."; exit 1; }
-          mv release/nomount/* release/ && rmdir release/nomount
+          if [[ "$NOMOUNT_MODE" == lkm ]]; then
+            ((${#files[@]})) || { echo "::error::The NoMount module was not built."; exit 1; }
+          fi
+          if ((${#files[@]})); then mv release/nomount/* release/; fi
+          rm -rf release/nomount
 
       - name: Write release notes
         run: |
@@ -488,10 +628,7 @@ jobs:
           zip=$(ls release/A325X-*.zip)
           name=$(basename "$zip" .zip)
           shopt -s nullglob
-          ko=(release/*.ko)
-          ((${#ko[@]})) || { echo "::error::The NoMount module (.ko) was not built."; ls -l release; exit 1; }
           assets=(release/*.zip release/*.ko release/build-info.txt release/sources.json release/SHA256SUMS.txt)
-          ((${#assets[@]})) || { echo '::error::No files to attach to the release.'; exit 1; }
           gh release create "$TAG" "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$name" --notes-file notes.md \

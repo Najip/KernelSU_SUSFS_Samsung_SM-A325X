@@ -8,6 +8,11 @@
 #   KSU_HOOK     manual (default), syscall_table or branch_link
 #   EXTRA_MODULE_DIR  optional out-of-tree module folder to build afterwards
 #                     (used by the NoMount LKM workflow)
+#   NOMOUNT_MODE      integrate = also merge configs/nomount-integrate.config
+#   KERNEL_KIT        folder with .config, Module.symvers and kernel.release
+#                     from an earlier full build of this exact kernel. Then the
+#                     kernel is not compiled again; only modules_prepare runs,
+#                     which is enough to build EXTRA_MODULE_DIR for it.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/scripts/sources.conf"
@@ -57,6 +62,33 @@ base=()
 for f in $KERNEL_FRAGMENTS; do base+=("arch/arm64/configs/$f"); done
 fragments=("$ROOT/configs/a325x-xxksu-susfs.config" "$ROOT/configs/hooks/$KSU_HOOK.config")
 [[ "$PERF_TUNING" == true ]] && fragments+=("$ROOT/configs/a325x-tuning.config")
+[[ "${NOMOUNT_MODE:-lkm}" == integrate ]] && fragments+=("$ROOT/configs/nomount-integrate.config")
+
+if [[ -n "${KERNEL_KIT:-}" ]]; then
+  [[ -n "${EXTRA_MODULE_DIR:-}" ]] || { echo "KERNEL_KIT is only for building a module" >&2; exit 1; }
+  for f in .config Module.symvers kernel.release; do
+    [[ -s "$KERNEL_KIT/$f" ]] || { echo "Kernel kit has no $f" >&2; exit 1; }
+  done
+  echo "Using the kernel kit of $(cat "$KERNEL_KIT/kernel.release"): no kernel compile"
+  cp -f "$KERNEL_KIT/.config" "$OUT_DIR/.config"
+  make O="$OUT_DIR" olddefconfig
+  # The kit must describe this tree exactly; olddefconfig changes nothing then.
+  if ! diff -q <(grep '^CONFIG_' "$KERNEL_KIT/.config" | sort) <(grep '^CONFIG_' "$OUT_DIR/.config" | sort) >/dev/null; then
+    diff <(grep '^CONFIG_' "$KERNEL_KIT/.config" | sort) <(grep '^CONFIG_' "$OUT_DIR/.config" | sort) >&2 || true
+    echo "The kernel kit .config does not match this tree." >&2; exit 1
+  fi
+  make O="$OUT_DIR" -j"$JOBS" modules_prepare
+  release=$(cat "$OUT_DIR/include/config/kernel.release")
+  [[ "$release" == "$(cat "$KERNEL_KIT/kernel.release")" ]] || {
+    echo "Kernel release $release differs from the kit" >&2; exit 1; }
+  # Symbol versions (CONFIG_MODVERSIONS) of the kernel that was really built.
+  cp -f "$KERNEL_KIT/Module.symvers" "$OUT_DIR/Module.symvers"
+  echo "Building out-of-tree module in $EXTRA_MODULE_DIR"
+  make O="$OUT_DIR" M="$EXTRA_MODULE_DIR" CONFIG_NOMOUNT=m -j"$JOBS" modules
+  echo "Module built for: $release"
+  exit 0
+fi
+
 sh scripts/kconfig/merge_config.sh -m -O "$OUT_DIR" "${base[@]}" "${fragments[@]}"
 make O="$OUT_DIR" olddefconfig
 
@@ -90,6 +122,10 @@ for symbol in erofs_fs_type ksu_handle_sys_reboot ksu_handle_newfstat_ret $hook_
   grep -Eq "[[:space:]]$symbol$" "$OUT_DIR/kernel-symbols.txt" || {
     echo "Missing linked xxKSU/SUSFS symbol: $symbol" >&2; exit 1; }
 done
+if [[ "${NOMOUNT_MODE:-lkm}" == integrate ]]; then
+  grep -q '^CONFIG_NOMOUNT=y' "$OUT_DIR/.config" || { echo "NoMount is not built in" >&2; exit 1; }
+  test -s "$OUT_DIR/fs/nomount/nomount.o" || { echo "NoMount was not compiled into the kernel" >&2; exit 1; }
+fi
 if [[ -n "${EXTRA_MODULE_DIR:-}" ]]; then
   echo "Building out-of-tree module in $EXTRA_MODULE_DIR"
   make O="$OUT_DIR" M="$EXTRA_MODULE_DIR" CONFIG_NOMOUNT=m -j"$JOBS" modules

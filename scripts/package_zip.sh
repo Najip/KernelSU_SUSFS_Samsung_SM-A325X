@@ -36,6 +36,13 @@ case "$KSU_HOOK" in
   branch_link) suffix=-bl ;;
 esac
 [[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
+NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
+[[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
+case "$NOMOUNT_MODE" in
+  integrate) nomount_line="built into the kernel ($(read_json '["nomount"]["branch"]') @ $(read_json '["nomount"]["commit"]'))" ;;
+  lkm) nomount_line="separate LKM (${NOMOUNT_REF:-dev})" ;;
+  *) nomount_line="not included" ;;
+esac
 name="A325X-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
 
 sed -i "s|^kernel\.string=.*|kernel.string=A325X ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
@@ -55,6 +62,7 @@ gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
   echo "Network fix (UDP GSO): applied"
   echo "xxKSU hook style: $KSU_HOOK"
   echo "Performance tuning: $PERF_TUNING"
+  echo "NoMount: $nomount_line"
   echo "Patches applied:"
   sed 's/^/  - /' "$INFO_DIR/applied-patches.txt"
   [[ -n "${GITHUB_RUN_ID:-}" ]] && echo "Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

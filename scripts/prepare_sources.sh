@@ -8,6 +8,8 @@
 #   KERNEL_REF / KSU_REF / SUSFS_REF override scripts/sources.conf
 #   KERNEL_BRANCH / KSU_BRANCH / SUSFS_BRANCH  branch name recorded in sources.json
 #                when the ref above is a pinned commit (Verified mode)
+#   NOMOUNT_MODE lkm (default, separate module), no, or integrate (built into
+#                the kernel from NOMOUNT_REPO at NOMOUNT_REF, default dev)
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck source=sources.conf
@@ -16,6 +18,12 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 : "${INFO_DIR:?INFO_DIR is required}"
 PERF_TUNING=${PERF_TUNING:-false}
 KSU_HOOK=${KSU_HOOK:-branch_link}
+NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
+NOMOUNT_REF=${NOMOUNT_REF:-dev}
+case "$NOMOUNT_MODE" in
+  no|lkm|integrate) ;;
+  *) echo "Unknown NOMOUNT_MODE '$NOMOUNT_MODE' (use no, lkm or integrate)" >&2; exit 1 ;;
+esac
 case "$KSU_HOOK" in
   manual|syscall_table|branch_link) ;;
   *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
@@ -120,6 +128,34 @@ if [[ "$PERF_TUNING" == true ]]; then
   git apply "$ROOT/patches/kernel/0002-optional-tuning.patch"
   applied+=("0002-optional-tuning.patch")
 fi
+nomount_sha=
+if [[ "$NOMOUNT_MODE" == integrate ]]; then
+  log "NoMount built into the kernel: $NOMOUNT_REPO ($NOMOUNT_REF)"
+  nm_up=$(mktemp -d)
+  git clone -q --branch "$NOMOUNT_REF" "$NOMOUNT_REPO" "$nm_up"
+  nomount_sha=$(git -C "$nm_up" rev-parse HEAD)
+  nm_count=$(git -C "$nm_up" rev-list --count HEAD)
+  nm_src=$nm_up/kernel/src
+  for f in Kconfig Makefile nomount.c nomount.h; do
+    [[ -f "$nm_src/$f" ]] || { echo "NoMount $NOMOUNT_REF has no kernel/src/$f" >&2; exit 1; }
+  done
+  mkdir -p fs/nomount
+  cp -f "$nm_src"/Kconfig "$nm_src"/nomount.c "$nm_src"/nomount.h fs/nomount/
+  # Same Makefile, with the commit count fixed (the tree is not a NoMount git checkout).
+  {
+    echo "# NoMount $nomount_sha ($nm_count commits), copied by CI."
+    printf 'ccflags-y += -DNOMOUNT_COMMIT_COUNT=\\"%s\\"\n' "$nm_count"
+    echo
+    sed -n '/^obj-\$(CONFIG_NOMOUNT)/,$p' "$nm_src/Makefile"
+  } > fs/nomount/Makefile
+  grep -q 'obj-\$(CONFIG_NOMOUNT)' fs/nomount/Makefile
+  grep -q 'fs/nomount/Kconfig' fs/Kconfig || sed -i 's|^source "fs/Kconfig.susfs"$|&\nsource "fs/nomount/Kconfig"|' fs/Kconfig
+  grep -q 'fs/nomount/Kconfig' fs/Kconfig || { echo "Could not add NoMount to fs/Kconfig" >&2; exit 1; }
+  grep -q 'nomount/' fs/Makefile || echo 'obj-$(CONFIG_NOMOUNT) += nomount/' >> fs/Makefile
+  rm -rf -- "$nm_up"
+  applied+=("NoMount built in: $NOMOUNT_REF @ ${nomount_sha:0:12} ($nm_count commits)")
+fi
+
 if find . -name '*.rej' -print -quit | grep -q .; then
   echo "Patch rejects found:" >&2; find . -name '*.rej' >&2; exit 1
 fi
@@ -134,7 +170,7 @@ susfs_branch=$(branch_of "$SUSFS_REF" "${SUSFS_BRANCH:-}")
 printf '%s\n' "${applied[@]}" > "$INFO_DIR/applied-patches.txt"
 
 export kernel_sha kernel_date kernel_subject kernel_version kernel_branch ksu_branch susfs_branch susfs_sha susfs_patch_date susfs_version
-export ksu_sha ksu_date ksu_subject ksu_version ksu_tag
+export ksu_sha ksu_date ksu_subject ksu_version ksu_tag nomount_sha NOMOUNT_MODE NOMOUNT_REF NOMOUNT_REPO
 export KERNEL_REPO KERNEL_REF KSU_REPO KSU_REF SUSFS_REPO SUSFS_REF SUSFS_PATCH
 python3 - "$INFO_DIR/sources.json" <<'EOF'
 import json, os, sys
@@ -150,6 +186,10 @@ data = {
               "path": e["SUSFS_PATCH"], "patch_date": e["susfs_patch_date"], "branch": e["susfs_branch"],
               "version": e["susfs_version"]},
 }
+if e.get("nomount_sha"):
+    # Only when NoMount is built into the kernel (it is then part of the kernel itself).
+    data["nomount"] = {"repo": e["NOMOUNT_REPO"], "ref": e["NOMOUNT_REF"], "commit": e["nomount_sha"],
+                       "branch": e["NOMOUNT_REF"], "mode": "integrate"}
 json.dump(data, open(sys.argv[1], "w"), indent=2)
 print(json.dumps(data, indent=2))
 EOF
