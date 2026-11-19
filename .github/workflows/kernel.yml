@@ -23,7 +23,7 @@ on:
         type: boolean
         default: false
       commit_mode:
-        description: 'Which commits to build. Latest = newest of every source (testing). Verified = the pinned commits saved by Promoted (required for a full Release). Promoted = build the newest and, if it succeeds, save those commits as Verified'
+        description: 'Which commits to use. Latest = newest of every source (testing). Verified = the pinned commits saved by Promoted (required for a full Release). Promoted = no kernel rebuild: take the files of the most recent successful Latest run and save its commits as Verified (hook and tuning come from that run)'
         type: choice
         options:
           - Latest
@@ -38,6 +38,10 @@ on:
           - Pre-release
           - Release
         default: CI
+      bench_tool:
+        description: 'Also build the hook benchmark tool (hook-bench artifact). Not needed to use the kernel'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,6 +65,7 @@ jobs:
           sparse-checkout: |
             scripts/pick_runner.py
             scripts/resolve_commits.py
+            scripts/promoted_source.py
             scripts/sources.conf
           sparse-checkout-cone-mode: false
       - name: Choose self-hosted PC or GitHub runner
@@ -75,24 +80,83 @@ jobs:
           exit 1
       - name: Resolve source commits
         id: commits
+        if: inputs.commit_mode != 'Promoted'
         env:
           COMMIT_MODE: ${{ inputs.commit_mode }}
         run: python3 scripts/resolve_commits.py resolve
+      - name: Find the most recent Latest build (Promoted)
+        id: source
+        if: inputs.commit_mode == 'Promoted'
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: python3 scripts/promoted_source.py find
+      - name: Download the files of that build (Promoted)
+        if: inputs.commit_mode == 'Promoted'
+        uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ steps.source.outputs.source_run }}
+          github-token: ${{ github.token }}
+          path: source
+      - name: Read the commits of that build (Promoted)
+        id: promoted
+        if: inputs.commit_mode == 'Promoted'
+        run: python3 scripts/promoted_source.py inspect source
+      - name: Decide what to build
+        id: plan
+        env:
+          MODE: ${{ inputs.commit_mode }}
+          TYPE: ${{ inputs.release_type }}
+          HAS_NOMOUNT: ${{ steps.promoted.outputs.has_nomount }}
+        run: |
+          set -euo pipefail
+          if [[ "$MODE" == Promoted ]]; then
+            # No kernel rebuild. NoMount is only built when the Latest run has none (it was a CI run).
+            kernel=false
+            if [[ "$HAS_NOMOUNT" == true ]]; then nomount=false; else nomount=true; fi
+          else
+            kernel=true
+            if [[ "$TYPE" != CI ]]; then nomount=true; else nomount=false; fi
+          fi
+          echo "build_kernel=$kernel" >> "$GITHUB_OUTPUT"
+          echo "build_nomount=$nomount" >> "$GITHUB_OUTPUT"
+          echo "Kernel package: $kernel, NoMount build: $nomount"
+          if [[ "$MODE" == Promoted ]]; then
+            {
+              echo "### Promoted from ${{ steps.source.outputs.source_url }}"
+              echo "${{ steps.source.outputs.source_title }}"
+              echo
+              echo "NoMount: $([[ $nomount == true ]] && echo 'built now for that kernel' || echo 'taken from that run')"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
     outputs:
       runner: ${{ steps.pick.outputs.runner }}
-      kernel_ref: ${{ steps.commits.outputs.kernel_ref }}
-      ksu_ref: ${{ steps.commits.outputs.ksu_ref }}
-      susfs_ref: ${{ steps.commits.outputs.susfs_ref }}
-      kernel_branch: ${{ steps.commits.outputs.kernel_branch }}
-      ksu_branch: ${{ steps.commits.outputs.ksu_branch }}
-      susfs_branch: ${{ steps.commits.outputs.susfs_branch }}
+      build_kernel: ${{ steps.plan.outputs.build_kernel }}
+      build_nomount: ${{ steps.plan.outputs.build_nomount }}
+      source_run: ${{ steps.source.outputs.source_run }}
+      source_url: ${{ steps.source.outputs.source_url }}
+      checkout_sha: ${{ steps.promoted.outputs.build_sha || github.sha }}
+      ksu_hook: ${{ steps.promoted.outputs.hook || inputs.ksu_hook }}
+      perf_tuning: ${{ steps.promoted.outputs.tuning || inputs.perf_tuning }}
+      kernel_release: ${{ steps.promoted.outputs.kernel_release }}
+      kernel_ref: ${{ steps.commits.outputs.kernel_ref || steps.promoted.outputs.kernel_ref }}
+      ksu_ref: ${{ steps.commits.outputs.ksu_ref || steps.promoted.outputs.ksu_ref }}
+      susfs_ref: ${{ steps.commits.outputs.susfs_ref || steps.promoted.outputs.susfs_ref }}
+      kernel_branch: ${{ steps.commits.outputs.kernel_branch || steps.promoted.outputs.kernel_branch }}
+      ksu_branch: ${{ steps.commits.outputs.ksu_branch || steps.promoted.outputs.ksu_branch }}
+      susfs_branch: ${{ steps.commits.outputs.susfs_branch || steps.promoted.outputs.susfs_branch }}
 
   build:
-    name: Build xxKSU + SUSFS kernel
+    name: ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build NoMount for the promoted kernel' }}
     needs: pick
+    if: needs.pick.outputs.build_kernel == 'true' || needs.pick.outputs.build_nomount == 'true'
     runs-on: ${{ needs.pick.outputs.runner }}
     env:
       SELF_HOSTED: ${{ needs.pick.outputs.runner == 'self-hosted' }}
+      # Promoted: same hook style and tuning as the Latest run it takes the kernel from.
+      KSU_HOOK: ${{ needs.pick.outputs.ksu_hook }}
+      PERF_TUNING: ${{ needs.pick.outputs.perf_tuning }}
+      BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
+      BUILD_NOMOUNT: ${{ needs.pick.outputs.build_nomount }}
       KERNEL_REF: ${{ needs.pick.outputs.kernel_ref }}
       KSU_REF: ${{ needs.pick.outputs.ksu_ref }}
       SUSFS_REF: ${{ needs.pick.outputs.susfs_ref }}
@@ -109,6 +173,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # Promoted: the same build-repo commit as the Latest run, so the module matches its kernel.
+          ref: ${{ needs.pick.outputs.checkout_sha }}
           fetch-depth: 1
 
       - name: Prepare build folders
@@ -195,8 +261,19 @@ jobs:
           set -euo pipefail
           bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"
 
+      - name: Check the kernel matches the promoted one
+        if: env.BUILD_KERNEL != 'true'
+        env:
+          WANT_RELEASE: ${{ needs.pick.outputs.kernel_release }}
+        run: |
+          set -euo pipefail
+          got=$(cat "$OUT_DIR/include/config/kernel.release")
+          echo "Kernel release here: $got, promoted kernel: $WANT_RELEASE"
+          [[ -z "$WANT_RELEASE" || "$got" == "$WANT_RELEASE" ]] || { echo "::error::Kernel release differs from the promoted kernel."; exit 1; }
+
       - name: Make flashable ZIP
         id: package
+        if: env.BUILD_KERNEL == 'true'
         run: |
           set -euo pipefail
           bash scripts/package_zip.sh 2>&1 | tee -a "$BUILD_LOG"
@@ -210,14 +287,14 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Set up Zig (release only)
-        if: inputs.release_type != 'CI'
+      - name: Set up Zig (NoMount)
+        if: env.BUILD_NOMOUNT == 'true'
         uses: jetsung/setup-zig@v0.0.4
         with:
           version: master
 
-      - name: Build the matching NoMount dev module (release only)
-        if: inputs.release_type != 'CI'
+      - name: Build the matching NoMount dev module
+        if: env.BUILD_NOMOUNT == 'true'
         run: |
           set -euo pipefail
           # Same runner, same compiled kernel, same commits, hook style and tuning.
@@ -226,6 +303,7 @@ jobs:
           ls -l "$PACKAGE_DIR/nomount"
 
       - name: Build hook benchmark
+        if: inputs.bench_tool && env.BUILD_KERNEL == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$BUILD_WORK/bench"
@@ -236,6 +314,7 @@ jobs:
           echo "BENCH_DIR=$BUILD_WORK/bench" >> "$GITHUB_ENV"
 
       - name: Upload flashable ZIP
+        if: env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
           path: ${{ env.ZIP_PATH }}
@@ -244,6 +323,7 @@ jobs:
           retention-days: 30
 
       - name: Upload build-info.txt
+        if: env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
           path: ${{ env.PACKAGE_DIR }}/build-info.txt
@@ -251,14 +331,15 @@ jobs:
           retention-days: 30
 
       - name: Upload hook benchmark
+        if: inputs.bench_tool && env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: hook-bench
           path: ${{ env.BENCH_DIR }}
           retention-days: 30
 
-      - name: Keep files for the release job
-        if: inputs.release_type != 'CI' || inputs.commit_mode == 'Promoted'
+      - name: Keep files for the release job and a later Promoted run
+        if: env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: release-files
@@ -268,7 +349,16 @@ jobs:
             ${{ env.PACKAGE_DIR }}/sources.json
             ${{ env.PACKAGE_DIR }}/SHA256SUMS.txt
             ${{ env.PACKAGE_DIR }}/nomount/
-          retention-days: 3
+          retention-days: 30
+
+      - name: Keep the NoMount files for the promoted release
+        if: env.BUILD_KERNEL != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: promoted-nomount
+          path: ${{ env.PACKAGE_DIR }}/nomount/
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload logs for troubleshooting
         if: always()
@@ -293,10 +383,53 @@ jobs:
             rm -rf -- "$BUILD_WORK"
           fi
 
+  collect:
+    name: Collect the promoted build
+    needs: [pick, build]
+    if: ${{ !cancelled() && !failure() && inputs.commit_mode == 'Promoted' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          sparse-checkout: scripts/promoted_source.py
+          sparse-checkout-cone-mode: false
+      - name: Download the files of the Latest run
+        uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ needs.pick.outputs.source_run }}
+          github-token: ${{ github.token }}
+          path: source
+      - name: Download the NoMount module built now
+        if: needs.pick.outputs.build_nomount == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: promoted-nomount
+          path: source/promoted/nomount
+      - name: Put the files together
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.pick.outputs.build_nomount }}" == true ]]; then
+            # Use only the module built now, not an older one.
+            find source -path '*/nomount/*' -not -path 'source/promoted/*' -delete
+          fi
+          python3 scripts/promoted_source.py collect source release
+          ls release/nomount/*.ko release/nomount/NoMount-*.zip >/dev/null \
+            || { echo "::error::No NoMount module for the promoted build."; exit 1; }
+          echo "Promoted from: ${{ needs.pick.outputs.source_url }}" >> release/build-info.txt
+      - name: Keep files for the release job
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
   release:
     name: Publish release and update README
-    needs: [pick, build]
-    if: inputs.release_type != 'CI'
+    needs: [pick, build, collect]
+    if: ${{ !cancelled() && !failure() && inputs.release_type != 'CI' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -390,8 +523,8 @@ jobs:
 
   promote:
     name: Save verified commits
-    needs: build
-    if: inputs.commit_mode == 'Promoted'
+    needs: [pick, collect]
+    if: ${{ !cancelled() && !failure() && inputs.commit_mode == 'Promoted' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -404,7 +537,7 @@ jobs:
           ref: ${{ github.ref_name }}
           fetch-depth: 1
 
-      - name: Download the built sources
+      - name: Download the promoted sources
         uses: actions/download-artifact@v8
         with:
           name: release-files
@@ -417,7 +550,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           for attempt in 1 2 3; do
             git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
-            python3 scripts/resolve_commits.py promote release/sources.json configs/verified.json
+            SOURCE_RUN_URL="${{ needs.pick.outputs.source_url }}" \
+              python3 scripts/resolve_commits.py promote release/sources.json configs/verified.json
             if git diff --quiet; then echo 'Verified commits already match this build.'; exit 0; fi
             git commit -q -am "Verified commits: promote run ${GITHUB_RUN_NUMBER}"
             git push -q origin "HEAD:$BRANCH" && exit 0
