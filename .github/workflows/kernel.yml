@@ -92,11 +92,7 @@ jobs:
         run: python3 scripts/promoted_source.py find
       - name: Download the files of that build (Promoted)
         if: inputs.commit_mode == 'Promoted'
-        uses: actions/download-artifact@v8
-        with:
-          run-id: ${{ steps.source.outputs.source_run }}
-          github-token: ${{ github.token }}
-          path: source
+        run: python3 scripts/promoted_source.py download "${{ steps.source.outputs.source_run }}" source
       - name: Read the commits of that build (Promoted)
         id: promoted
         if: inputs.commit_mode == 'Promoted'
@@ -396,11 +392,7 @@ jobs:
           sparse-checkout: scripts/promoted_source.py
           sparse-checkout-cone-mode: false
       - name: Download the files of the Latest run
-        uses: actions/download-artifact@v8
-        with:
-          run-id: ${{ needs.pick.outputs.source_run }}
-          github-token: ${{ github.token }}
-          path: source
+        run: python3 scripts/promoted_source.py download "${{ needs.pick.outputs.source_run }}" source
       - name: Download the NoMount module built now
         if: needs.pick.outputs.build_nomount == 'true'
         uses: actions/download-artifact@v8
