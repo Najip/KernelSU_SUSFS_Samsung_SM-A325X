@@ -116,10 +116,13 @@ def readme(cur_path, readme_path, tag):
                     f"[`{s['commit'][:12]}`](https://github.com/{repo}/commit/{s['commit']}) | "
                     f"{(s.get('date') or s.get('patch_date') or '')[:10]} |")
 
+    def ref_of(s):
+        return s.get("branch") or s.get("ref") or ""
+
     k, x, f = cur["kernel"], cur["xxksu"], cur["susfs"]
-    row("Kernel", k, f"`{k['ref']}`, Linux {k.get('version', '')}")
-    row("xxKSU", x, f"`{x['ref']}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}")
-    row("SUSFS patch", f, f"`{f['ref']}`, SUSFS {f.get('version', '')}, `{f['path']}`")
+    row("Kernel", k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
+    row("xxKSU", x, f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}")
+    row("SUSFS patch", f, f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`")
     block = ["<!-- SOURCES:START -->",
              f"Last release: [{tag}](../../releases/tag/{tag})", ""] + rows + ["<!-- SOURCES:END -->"]
     text = open(readme_path).read()
