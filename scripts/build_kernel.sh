@@ -83,7 +83,7 @@ test -s "$OUT_DIR/vmlinux"
 test -s "$OUT_DIR/arch/arm64/boot/Image"
 "$READELF" -h "$OUT_DIR/vmlinux" | grep -q AArch64
 "$NM" --defined-only "$OUT_DIR/vmlinux" > "$OUT_DIR/kernel-symbols.txt"
-for symbol in ksu_handle_sys_reboot ksu_handle_sys_execve ksu_handle_newfstat_ret \
+for symbol in erofs_fs_type ksu_handle_sys_reboot ksu_handle_sys_execve ksu_handle_newfstat_ret \
     xxksu_parent_sucompat_enabled susfs_set_priority_uid_filter susfs_is_priority_uid_filtered; do
   grep -Eq "[[:space:]]$symbol$" "$OUT_DIR/kernel-symbols.txt" || {
     echo "Missing linked xxKSU/SUSFS symbol: $symbol" >&2; exit 1; }
