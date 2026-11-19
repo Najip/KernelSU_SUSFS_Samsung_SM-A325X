@@ -26,13 +26,20 @@ done
 export ARCH=arm64
 export PATH="$TOOLCHAIN/bin:$PATH"
 export LD_LIBRARY_PATH="$TOOLCHAIN/lib64:$TOOLCHAIN/lib:${LD_LIBRARY_PATH:-}"
-export CC="$TOOLCHAIN/bin/clang" LD="$TOOLCHAIN/bin/ld.lld"
-export AR="$TOOLCHAIN/bin/llvm-ar" NM="$TOOLCHAIN/bin/llvm-nm"
-export STRIP="$TOOLCHAIN/bin/llvm-strip" OBJCOPY="$TOOLCHAIN/bin/llvm-objcopy"
-export OBJDUMP="$TOOLCHAIN/bin/llvm-objdump" READELF="$TOOLCHAIN/bin/llvm-readelf"
 export CROSS_COMPILE=aarch64-linux-gnu-
+NM="$TOOLCHAIN/bin/llvm-nm" READELF="$TOOLCHAIN/bin/llvm-readelf"
+# This Samsung Makefile hard-codes CC to a bundled clang, so the tools must be
+# given on the make command line. Clang 14 compiles; GNU binutils assemble and
+# link, like the stock Samsung build (no LTO).
+MAKE_ARGS=(
+  ARCH=arm64
+  CC="$TOOLCHAIN/bin/clang"
+  CLANG_TRIPLE=aarch64-linux-gnu-
+  CROSS_COMPILE=aarch64-linux-gnu-
+  HOSTCC=gcc HOSTCXX=g++ PYTHON=python3
+)
+CC="$TOOLCHAIN/bin/clang" LD=$(command -v aarch64-linux-gnu-ld)
 AS=$(command -v aarch64-linux-gnu-as)
-export AS LLVM=1 LLVM_IAS=0
 # Empty LOCALVERSION stops the kernel adding "+" / git hashes to the version.
 export LOCALVERSION=
 export KBUILD_BUILD_USER=${KBUILD_BUILD_USER:-xxksu}
@@ -54,8 +61,8 @@ OUT_DIR=$(cd -- "$OUT_DIR" && pwd)
 fragments=("$ROOT/configs/a325x-xxksu-susfs.config")
 [[ "$PERF_TUNING" == true ]] && fragments+=("$ROOT/configs/a325x-tuning.config")
 cd "$KERNEL_DIR"
-sh scripts/kconfig/merge_config.sh -m -O "$OUT_DIR" "arch/arm64/configs/$DEFCONFIG" "${fragments[@]}"
-make O="$OUT_DIR" olddefconfig
+CC="$CC" sh scripts/kconfig/merge_config.sh -m -O "$OUT_DIR" "arch/arm64/configs/$DEFCONFIG" "${fragments[@]}"
+make "${MAKE_ARGS[@]}" O="$OUT_DIR" olddefconfig
 
 # Make sure every requested option really ended up in .config.
 missing=0
@@ -71,7 +78,7 @@ for frag in "${fragments[@]}"; do
 done
 ((missing == 0)) || { echo "Some config options were dropped by olddefconfig." >&2; exit 1; }
 
-make O="$OUT_DIR" -j"$JOBS"
+make "${MAKE_ARGS[@]}" O="$OUT_DIR" -j"$JOBS"
 test -s "$OUT_DIR/vmlinux"
 test -s "$OUT_DIR/arch/arm64/boot/Image"
 "$READELF" -h "$OUT_DIR/vmlinux" | grep -q AArch64
@@ -83,6 +90,6 @@ for symbol in ksu_handle_sys_reboot ksu_handle_sys_execve ksu_handle_newfstat_re
 done
 if [[ -n "${EXTRA_MODULE_DIR:-}" ]]; then
   echo "Building out-of-tree module in $EXTRA_MODULE_DIR"
-  make O="$OUT_DIR" M="$EXTRA_MODULE_DIR" CONFIG_NOMOUNT=m -j"$JOBS" modules
+  make "${MAKE_ARGS[@]}" O="$OUT_DIR" M="$EXTRA_MODULE_DIR" CONFIG_NOMOUNT=m -j"$JOBS" modules
 fi
 echo "Build finished: $(cat "$OUT_DIR/include/config/kernel.release")"
