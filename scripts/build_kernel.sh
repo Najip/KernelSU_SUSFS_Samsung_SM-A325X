@@ -5,6 +5,7 @@
 #   OUT_DIR      build output folder (required)
 #   TOOLCHAIN    AOSP Clang 14 folder (made by fetch_aosp_clang.sh if missing)
 #   PERF_TUNING  true = merge configs/a325x-tuning.config too
+#   KSU_HOOK     manual (default), syscall_table or branch_link
 #   EXTRA_MODULE_DIR  optional out-of-tree module folder to build afterwards
 #                     (used by the NoMount LKM workflow)
 set -euo pipefail
@@ -14,6 +15,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 : "${KERNEL_DIR:?KERNEL_DIR is required}"
 : "${OUT_DIR:?OUT_DIR is required}"
 PERF_TUNING=${PERF_TUNING:-false}
+KSU_HOOK=${KSU_HOOK:-manual}
 TOOLCHAIN=${TOOLCHAIN:-"$ROOT/.toolchains/$AOSP_CLANG_DIRECTORY"}
 JOBS=${JOBS:-$(nproc)}
 
@@ -53,7 +55,7 @@ OUT_DIR=$(cd -- "$OUT_DIR" && pwd)
 cd "$KERNEL_DIR"
 base=()
 for f in $KERNEL_FRAGMENTS; do base+=("arch/arm64/configs/$f"); done
-fragments=("$ROOT/configs/a325x-xxksu-susfs.config")
+fragments=("$ROOT/configs/a325x-xxksu-susfs.config" "$ROOT/configs/hooks/$KSU_HOOK.config")
 [[ "$PERF_TUNING" == true ]] && fragments+=("$ROOT/configs/a325x-tuning.config")
 sh scripts/kconfig/merge_config.sh -m -O "$OUT_DIR" "${base[@]}" "${fragments[@]}"
 make O="$OUT_DIR" olddefconfig
@@ -78,7 +80,12 @@ test -s "$OUT_DIR/vmlinux"
 test -s "$OUT_DIR/arch/arm64/boot/Image"
 "$READELF" -h "$OUT_DIR/vmlinux" | grep -q AArch64
 "$NM" --defined-only "$OUT_DIR/vmlinux" > "$OUT_DIR/kernel-symbols.txt"
-for symbol in erofs_fs_type ksu_handle_sys_reboot ksu_handle_sys_execve ksu_handle_newfstat_ret \
+case "$KSU_HOOK" in
+  manual) hook_symbols="ksu_handle_sys_execve" ;;
+  syscall_table) hook_symbols="hook_aarch64_execve hook_aarch64_reboot" ;;
+  branch_link) hook_symbols="bl_hack_init_thread ksu_do_faccessat hook_aarch64_execve" ;;
+esac
+for symbol in erofs_fs_type ksu_handle_sys_reboot ksu_handle_newfstat_ret $hook_symbols \
     xxksu_parent_sucompat_enabled susfs_set_priority_uid_filter susfs_is_priority_uid_filtered; do
   grep -Eq "[[:space:]]$symbol$" "$OUT_DIR/kernel-symbols.txt" || {
     echo "Missing linked xxKSU/SUSFS symbol: $symbol" >&2; exit 1; }

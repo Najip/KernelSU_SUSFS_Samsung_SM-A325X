@@ -4,6 +4,7 @@
 #   KERNEL_DIR   where the kernel tree goes (required). Reused if it exists.
 #   INFO_DIR     where sources.json / applied-patches.txt are written (required)
 #   PERF_TUNING  true = also apply the optional tuning patch (default false)
+#   KSU_HOOK     xxKSU hook style: manual (default), syscall_table, branch_link
 #   KERNEL_REF / KSU_REF / SUSFS_REF override scripts/sources.conf
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -12,6 +13,11 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 : "${KERNEL_DIR:?KERNEL_DIR is required}"
 : "${INFO_DIR:?INFO_DIR is required}"
 PERF_TUNING=${PERF_TUNING:-false}
+KSU_HOOK=${KSU_HOOK:-manual}
+case "$KSU_HOOK" in
+  manual|syscall_table|branch_link) ;;
+  *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
+esac
 mkdir -p "$INFO_DIR"
 INFO_DIR=$(cd -- "$INFO_DIR" && pwd)
 
@@ -92,6 +98,16 @@ for p in "$ROOT"/patches/kernelsu/*.patch; do
   applied+=("kernelsu/$(basename "$p")")
 done
 ln -sfn ../KernelSU/kernel drivers/kernelsu
+
+log "Hook style: $KSU_HOOK"
+if [[ "$KSU_HOOK" != manual ]]; then
+  # xxKSU hooks these syscalls itself; skip the kernel's own calls to it.
+  echo "  hooks/0001-hookless-skip-parent-hooks.patch"
+  git apply "$ROOT/patches/hooks/0001-hookless-skip-parent-hooks.patch"
+  applied+=("hooks/0001-hookless-skip-parent-hooks.patch ($KSU_HOOK)")
+else
+  applied+=("hook style: manual (kernel calls xxKSU directly)")
+fi
 
 log "Applying kernel patches"
 echo "  0001-network-udp-gso.patch (always)"
