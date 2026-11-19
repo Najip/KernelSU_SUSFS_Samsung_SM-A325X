@@ -101,6 +101,9 @@ jobs:
           if [[ "$TYPE" == Release && "$MODE" != Verified ]]; then
             fail "Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
           fi
+          if [[ "$TYPE" != CI && "$MODE" != Promoted && "$PERF_TUNING" == true ]]; then
+            fail "Releases are built without tuning. Untick Performance tuning, or choose CI."
+          fi
           if [[ "$NM_ONLY" == true ]]; then
             [[ "$NOMOUNT_MODE" == lkm ]] || fail "NoMount only needs the NoMount option lkm."
             [[ "$TYPE" == CI ]] || fail "NoMount only builds are not released. Choose CI."
@@ -128,14 +131,15 @@ jobs:
           BRANCH: ${{ github.ref_name }}
         run: python3 scripts/promoted_source.py find
       - name: Download the files of that build (Promoted)
-        if: inputs.commit_mode == 'Promoted'
+        if: inputs.commit_mode == 'Promoted' && steps.source.outputs.found == 'true'
         run: python3 scripts/promoted_source.py download "${{ steps.source.outputs.source_run }}" source
       - name: Read the commits of that build (Promoted)
         id: promoted
-        if: inputs.commit_mode == 'Promoted'
+        if: inputs.commit_mode == 'Promoted' && steps.source.outputs.found == 'true'
         run: python3 scripts/promoted_source.py inspect source
       - name: Look for a saved kernel kit
         id: kit
+        if: inputs.commit_mode != 'Promoted' || steps.source.outputs.found == 'true'
         env:
           MODE: ${{ inputs.commit_mode }}
           NM_ONLY: ${{ inputs.nomount_only }}
@@ -163,8 +167,15 @@ jobs:
           NM_ONLY: ${{ inputs.nomount_only }}
           SRC_NM_BRANCH: ${{ steps.promoted.outputs.nomount_branch }}
           KIT_ID: ${{ steps.kit.outputs.kit_id }}
+          FOUND: ${{ steps.source.outputs.found }}
         run: |
           set -euo pipefail
+          if [[ "$MODE" == Promoted && "$FOUND" != true ]]; then
+            # find already printed the warning; nothing else runs.
+            printf 'build_kernel=false\nbuild_nomount=false\nkit_id=\npromote_ok=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "promote_ok=$([[ $MODE == Promoted ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           kernel=true nomount=false
           [[ "$NOMOUNT_MODE" == lkm ]] && nomount=true
           if [[ "$MODE" == Promoted ]]; then
@@ -199,6 +210,7 @@ jobs:
       runner: ${{ steps.pick.outputs.runner }}
       build_kernel: ${{ steps.plan.outputs.build_kernel }}
       build_nomount: ${{ steps.plan.outputs.build_nomount }}
+      promote_ok: ${{ steps.plan.outputs.promote_ok }}
       kit_id: ${{ steps.plan.outputs.kit_id }}
       source_run: ${{ steps.source.outputs.source_run }}
       source_url: ${{ steps.source.outputs.source_url }}
@@ -516,7 +528,7 @@ jobs:
   collect:
     name: Collect the promoted build
     needs: [pick, build]
-    if: ${{ !cancelled() && !failure() && inputs.commit_mode == 'Promoted' }}
+    if: ${{ !cancelled() && !failure() && needs.pick.outputs.promote_ok == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -558,7 +570,7 @@ jobs:
   release:
     name: Publish release and update README
     needs: [pick, build, collect]
-    if: ${{ !cancelled() && !failure() && inputs.release_type != 'CI' }}
+    if: ${{ !cancelled() && !failure() && inputs.release_type != 'CI' && (inputs.commit_mode != 'Promoted' || needs.pick.outputs.promote_ok == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -594,6 +606,9 @@ jobs:
         run: |
           set -euo pipefail
           ls -lR release
+          if grep -q '^Performance tuning: true' release/build-info.txt; then
+            echo "::error::Releases are built without tuning."; exit 1
+          fi
           shopt -s nullglob
           files=(release/nomount/*)
           if [[ "$NOMOUNT_MODE" == lkm ]]; then
@@ -653,7 +668,7 @@ jobs:
   promote:
     name: Save verified commits
     needs: [pick, collect]
-    if: ${{ !cancelled() && !failure() && inputs.commit_mode == 'Promoted' }}
+    if: ${{ !cancelled() && !failure() && needs.pick.outputs.promote_ok == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

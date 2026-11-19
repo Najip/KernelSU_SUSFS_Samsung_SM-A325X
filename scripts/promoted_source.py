@@ -62,7 +62,10 @@ def find():
         # run-name contains "(Latest)" for commit mode Latest.
         if "(Latest)" not in title:
             continue
-        if "[branch_link]" not in title or "(tuning)" in title or "integrate" in title or "LKM only" in title:
+        if "(tuning)" in title:
+            print(f"Skipping run {run['id']} ({title}): built with tuning (releases are without tuning).")
+            continue
+        if "[branch_link]" not in title or "integrate" in title or "LKM only" in title:
             print(f"Skipping run {run['id']} ({title}): not the default options.")
             continue
         arts = api(f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100").get("artifacts", [])
@@ -74,13 +77,22 @@ def find():
             continue
         print(f"Taking the files of run {run['id']}: {title}")
         emit({
+            "found": "true",
             "source_run": run["id"],
             "source_url": run["html_url"],
             "source_sha": run["head_sha"],
             "source_title": title.replace("\n", " "),
         })
         return
-    fail(f"No successful Latest build with files left on {branch}. Run one with commit mode Latest first.")
+    message = (f"Nothing to promote: no successful Latest build without tuning (hook branch_link, NoMount not "
+               f"built in) with files left on {branch}. Run Build Kernel with commit mode Latest and "
+               f"Performance tuning unticked first, then run Promoted again.")
+    print(f"::warning title=Nothing promoted::{message}")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with open(summary, "a", encoding="utf-8") as handle:
+            handle.write(f"### Nothing promoted\n\n{message}\n")
+    emit({"found": "false"})
 
 
 def download(run_id, folder):
