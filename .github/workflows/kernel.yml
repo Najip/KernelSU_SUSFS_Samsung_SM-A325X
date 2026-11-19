@@ -11,7 +11,7 @@ on:
         type: boolean
         default: true
       perf_tuning:
-        description: 'Performance tuning (fast charge, zstd zram, GPU freq meter, BBR, fq_codel). The network fix is always applied'
+        description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel). The network fix is always applied'
         type: boolean
         default: false
       release:
