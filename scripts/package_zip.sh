@@ -47,6 +47,7 @@ case "$KSU_HOOK" in
 esac
 [[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
 [[ "${VALHALL_GPU:-false}" == true ]] && suffix=$suffix-vgpu
+[[ "${KERNEL_TOOLCHAIN:-zyc}" == aosp ]] && suffix=$suffix-aospclang
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in

@@ -57,6 +57,8 @@ def key():
         parts.append("network_fix=false")
     if e.get("VALHALL_GPU", "false") == "true":
         parts.append("gpu=valhall")
+    if e.get("KERNEL_TOOLCHAIN", "zyc") == "aosp":
+        parts.append("cc=aosp")
     for path in TRACKED:
         oid = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{path}"], text=True).strip()
         parts.append(f"{path}={oid}")
