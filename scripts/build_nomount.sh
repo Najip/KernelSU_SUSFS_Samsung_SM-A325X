@@ -39,7 +39,7 @@ else
   export TOOLCHAIN=${TOOLCHAIN:-$work/toolchain}
   bash "$ROOT/scripts/prepare_sources.sh"
 fi
-bash "$ROOT/scripts/fetch_aosp_clang.sh" "$TOOLCHAIN"
+bash "$ROOT/scripts/fetch_toolchain.sh" "$TOOLCHAIN"
 
 log=$work/build.log
 up=$work/nomount

@@ -6,15 +6,16 @@ LKM can be built for that exact kernel without compiling the kernel again.
   kernel_kit.py key
     Prints the kit key for the kernel described by the environment:
     KERNEL_REF, KSU_REF, SUSFS_REF (full commits), KSU_HOOK, PERF_TUNING,
-    NOMOUNT_PART (separate, or integrate@<commit>) plus the build-repo files
-    that change the kernel (patches, configs, build scripts).
+    NOMOUNT_PART (separate, or integrate@<commit>), KERNEL_SOURCE (with its
+    Aigis compiler and GPU) plus the build-repo files that change the kernel.
+    Aigis keys start with "aigis-".
 
   kernel_kit.py find <key>
     Finds the newest unexpired artifact kernel-kit-<key> in this repo and
     writes kit_id and kit_run to $GITHUB_OUTPUT (empty when none).
 
   kernel_kit.py in-run <run id>
-    Same, for the kernel-kit-* artifact of one run.
+    Same, for the kernel kit of one run (the Aigis one when KERNEL_SOURCE=aigis).
 
   kernel_kit.py download <artifact id> <folder>
 """
@@ -30,7 +31,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 # Build-repo paths that change the compiled kernel.
 TRACKED = ("patches", "configs", "scripts/prepare_sources.sh", "scripts/build_kernel.sh",
-           "scripts/sources.conf", "scripts/aosp_clang14.conf")
+           "scripts/sources.conf", "scripts/aosp_clang14.conf",
+           "scripts/zyc_clang14.conf", "scripts/fetch_zyc_clang.sh")
 
 
 def emit(pairs):
@@ -46,19 +48,37 @@ def api(path):
     return json.loads(subprocess.check_output(["gh", "api", path], text=True))
 
 
+def conf():
+    """Effective settings from scripts/sources.conf for this environment
+    (KERNEL_SOURCE, compiler, GPU, and tuning after Aigis ignores it)."""
+    names = ("KERNEL_SOURCE", "KERNEL_TOOLCHAIN", "VALHALL_GPU", "PERF_TUNING")
+    script = ('. "$1"; for n in ' + " ".join(names) + '; do printf "%s=%s\\n" "$n" "${!n:-}"; done')
+    out = subprocess.check_output(["bash", "-c", script, "bash", str(ROOT / "scripts/sources.conf")], text=True)
+    return dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+
+
 def key():
     e = os.environ
+    c = conf()
     parts = [f"kernel={e['KERNEL_REF']}", f"xxksu={e['KSU_REF']}", f"susfs={e['SUSFS_REF']}",
-             f"hook={e.get('KSU_HOOK', 'manual')}", f"tuning={e.get('PERF_TUNING', 'false')}",
+             f"hook={e.get('KSU_HOOK', 'manual')}", f"tuning={c.get('PERF_TUNING') or 'false'}",
              f"nomount={e.get('NOMOUNT_PART', 'separate')}"]
     # Older kits were made before the network fix became optional (always on).
     if e.get("NETWORK_FIX", "true") != "true":
         parts.append("network_fix=false")
+    aigis = c.get("KERNEL_SOURCE") == "aigis"
+    if aigis:
+        parts.append("source=aigis")
+        if c.get("VALHALL_GPU") == "true":
+            parts.append("gpu=valhall")
+        if c.get("KERNEL_TOOLCHAIN") == "aosp":
+            parts.append("cc=aosp")
     for path in TRACKED:
         oid = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{path}"], text=True).strip()
         parts.append(f"{path}={oid}")
     digest = hashlib.sha256("\n".join(parts).encode()).hexdigest()[:20]
-    print(digest)
+    # Aigis kits are named kernel-kit-aigis-<digest>, mzggr kits kernel-kit-<digest>.
+    print(f"aigis-{digest}" if aigis else digest)
 
 
 def pick(arts, test):
@@ -80,7 +100,10 @@ def find(k):
 def in_run(run_id):
     repo = os.environ["GITHUB_REPOSITORY"]
     arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
-    pick(arts, lambda n: n.startswith("kernel-kit-"))
+    if os.environ.get("KERNEL_SOURCE", "mzggr") == "aigis":
+        pick(arts, lambda n: n.startswith("kernel-kit-aigis-"))
+    else:
+        pick(arts, lambda n: n.startswith("kernel-kit-") and not n.startswith("kernel-kit-aigis-"))
 
 
 def download(art_id, folder):

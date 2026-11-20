@@ -1,11 +1,19 @@
 name: Build Kernel
-run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.kernel_source == 'aigis' && ' (Aigis)' || (inputs.kernel_source == 'both' && ' (mzggr + Aigis)' || '') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
 on:
   workflow_dispatch:
     inputs:
+      kernel_source:
+        description: 'Kernel. mzggr = mzggr0914 kernel (default). aigis = Aigis kernel by SlamZDank. both = build both (all ZIPs, one release)'
+        type: choice
+        options:
+          - mzggr
+          - aigis
+          - both
+        default: mzggr
       self_hosted:
         description: 'Prefer my own PC (self-hosted). If it is busy, a GitHub runner is used when that finishes sooner. Untick = GitHub runner'
         type: boolean
@@ -19,13 +27,24 @@ on:
           - branch_link
         default: manual
       perf_tuning:
-        description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel)'
+        description: 'Performance tuning, mzggr kernel only (Aigis keeps its own tuning, ignored there): GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel'
         type: boolean
-        default: false
+        default: true
       network_fix:
         description: 'Network fix (UDP-only GSO for IPv4 and IPv6). Allowed with every release type'
         type: boolean
         default: true
+      valhall_gpu:
+        description: 'Aigis only: Valhall GPU (Aigis r32p1 GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU'
+        type: boolean
+        default: false
+      compiler:
+        description: 'Aigis only: compiler. aigis = ZyC Clang 14.0.6 the Aigis CI way (default). main = AOSP Clang 14 as used for mzggr'
+        type: choice
+        options:
+          - aigis
+          - main
+        default: aigis
       nomount:
         description: 'NoMount. lkm = separate module (ZIP + .ko) built for this kernel (default). integrate = built into the kernel. no = not included'
         type: choice
@@ -72,7 +91,11 @@ permissions:
 
 
 env:
+  KERNEL_CHOICE: ${{ inputs.kernel_source || 'mzggr' }}
+  # sources.conf ignores tuning for Aigis (it keeps its own tuning).
   PERF_TUNING: ${{ inputs.perf_tuning }}
+  VALHALL_GPU: ${{ inputs.valhall_gpu }}
+  AIGIS_COMPILER: ${{ inputs.compiler || 'aigis' }}
   NETWORK_FIX: ${{ inputs.network_fix }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
@@ -90,6 +113,7 @@ jobs:
           fetch-depth: 1
           sparse-checkout: |
             scripts/pick_runner.py
+            scripts/plan_build.py
             scripts/resolve_commits.py
             scripts/promoted_source.py
             scripts/kernel_kit.py
@@ -106,8 +130,8 @@ jobs:
           if [[ "$TYPE" == Release && "$MODE" != Verified ]]; then
             fail "Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
           fi
-          if [[ "$TYPE" != CI && "$MODE" != Promoted && "$PERF_TUNING" == true ]]; then
-            fail "Releases are built without tuning. Untick Performance tuning, or choose CI."
+          if [[ "$PERF_TUNING" == true && "$KERNEL_CHOICE" != mzggr ]]; then
+            echo "::warning title=Tuning ignored for Aigis::Performance tuning is for the mzggr kernel only. The Aigis kernel is built without it (Aigis keeps its own tuning)."
           fi
           if [[ "$NM_ONLY" == true ]]; then
             [[ "$NOMOUNT_MODE" == lkm ]] || fail "NoMount only needs the NoMount option lkm."
@@ -123,134 +147,51 @@ jobs:
         env:
           WANT_SELF_HOSTED: ${{ inputs.self_hosted }}
         run: python3 scripts/pick_runner.py
-      - name: Resolve source commits
-        id: commits
-        if: inputs.commit_mode != 'Promoted'
-        env:
-          COMMIT_MODE: ${{ inputs.commit_mode }}
-        run: python3 scripts/resolve_commits.py resolve
-      - name: Find the most recent default Latest build (Promoted)
-        id: source
-        if: inputs.commit_mode == 'Promoted'
-        env:
-          BRANCH: ${{ github.ref_name }}
-        run: python3 scripts/promoted_source.py find
-      - name: Download the files of that build (Promoted)
-        if: inputs.commit_mode == 'Promoted' && steps.source.outputs.found == 'true'
-        run: python3 scripts/promoted_source.py download "${{ steps.source.outputs.source_run }}" source
-      - name: Read the commits of that build (Promoted)
-        id: promoted
-        if: inputs.commit_mode == 'Promoted' && steps.source.outputs.found == 'true'
-        run: python3 scripts/promoted_source.py inspect source
-      - name: Look for a saved kernel kit
-        id: kit
-        if: inputs.commit_mode != 'Promoted' || steps.source.outputs.found == 'true'
-        env:
-          MODE: ${{ inputs.commit_mode }}
-          NM_ONLY: ${{ inputs.nomount_only }}
-          SOURCE_RUN: ${{ steps.source.outputs.source_run }}
-          KERNEL_REF: ${{ steps.commits.outputs.kernel_ref }}
-          KSU_REF: ${{ steps.commits.outputs.ksu_ref }}
-          SUSFS_REF: ${{ steps.commits.outputs.susfs_ref }}
-          NOMOUNT_PART: separate
-        run: |
-          set -euo pipefail
-          if [[ "$MODE" == Promoted ]]; then
-            python3 scripts/kernel_kit.py in-run "$SOURCE_RUN"
-          elif [[ "$NM_ONLY" == true ]]; then
-            git fetch -q --depth=1 origin "$GITHUB_SHA"   # tree ids for the kit key
-            k=$(python3 scripts/kernel_kit.py key)
-            echo "Kit key: $k"
-            python3 scripts/kernel_kit.py find "$k"
-          else
-            echo "kit_id=" >> "$GITHUB_OUTPUT"
-          fi
       - name: Decide what to build
         id: plan
         env:
-          MODE: ${{ inputs.commit_mode }}
+          COMMIT_MODE: ${{ inputs.commit_mode }}
           NM_ONLY: ${{ inputs.nomount_only }}
-          SRC_NM_BRANCH: ${{ steps.promoted.outputs.nomount_branch }}
-          KIT_ID: ${{ steps.kit.outputs.kit_id }}
-          FOUND: ${{ steps.source.outputs.found }}
-        run: |
-          set -euo pipefail
-          if [[ "$MODE" == Promoted && "$FOUND" != true ]]; then
-            # find already printed the warning; nothing else runs.
-            printf 'build_kernel=false\nbuild_nomount=false\nkit_id=\npromote_ok=false\n' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "promote_ok=$([[ $MODE == Promoted ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          kernel=true nomount=false
-          [[ "$NOMOUNT_MODE" == lkm ]] && nomount=true
-          if [[ "$MODE" == Promoted ]]; then
-            kernel=false
-            # Reuse the module of the Latest run when it was built from the chosen branch.
-            [[ "$NOMOUNT_MODE" == lkm && "$SRC_NM_BRANCH" == "$NOMOUNT_REF" ]] && nomount=false
-          elif [[ "$NM_ONLY" == true ]]; then
-            kernel=false
-          fi
-          kit=
-          [[ "$kernel" == false && "$nomount" == true ]] && kit=$KIT_ID
-          {
-            echo "build_kernel=$kernel"
-            echo "build_nomount=$nomount"
-            echo "kit_id=$kit"
-          } >> "$GITHUB_OUTPUT"
-          echo "Kernel ZIP: $kernel, NoMount LKM build: $nomount, kernel kit: ${kit:-none}"
-          {
-            if [[ "$MODE" == Promoted ]]; then
-              echo "### Promoted from ${{ steps.source.outputs.source_url }}"
-              echo "${{ steps.source.outputs.source_title }}"
-              echo
-            fi
-            if [[ "$kernel" == false && "$nomount" == true ]]; then
-              if [[ -n "$kit" ]]; then echo "NoMount: built from the saved kernel kit (no kernel compile)."
-              else echo "NoMount: no kernel kit found, the kernel is compiled once to match it."; fi
-            elif [[ "$MODE" == Promoted ]]; then
-              echo "NoMount: $([[ $NOMOUNT_MODE == no ]] && echo 'not included' || echo 'taken from that run')"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          BRANCH: ${{ github.ref_name }}
+        run: python3 scripts/plan_build.py
     outputs:
       runner: ${{ steps.pick.outputs.runner }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      build_any: ${{ steps.plan.outputs.build_any }}
       build_kernel: ${{ steps.plan.outputs.build_kernel }}
-      build_nomount: ${{ steps.plan.outputs.build_nomount }}
       promote_ok: ${{ steps.plan.outputs.promote_ok }}
-      kit_id: ${{ steps.plan.outputs.kit_id }}
-      source_run: ${{ steps.source.outputs.source_run }}
-      source_url: ${{ steps.source.outputs.source_url }}
-      checkout_sha: ${{ steps.promoted.outputs.build_sha || github.sha }}
-      ksu_hook: ${{ steps.promoted.outputs.hook || inputs.ksu_hook }}
-      perf_tuning: ${{ steps.promoted.outputs.tuning || inputs.perf_tuning }}
-      network_fix: ${{ steps.promoted.outputs.network_fix || inputs.network_fix }}
-      kernel_release: ${{ steps.promoted.outputs.kernel_release }}
-      kernel_ref: ${{ steps.commits.outputs.kernel_ref || steps.promoted.outputs.kernel_ref }}
-      ksu_ref: ${{ steps.commits.outputs.ksu_ref || steps.promoted.outputs.ksu_ref }}
-      susfs_ref: ${{ steps.commits.outputs.susfs_ref || steps.promoted.outputs.susfs_ref }}
-      kernel_branch: ${{ steps.commits.outputs.kernel_branch || steps.promoted.outputs.kernel_branch }}
-      ksu_branch: ${{ steps.commits.outputs.ksu_branch || steps.promoted.outputs.ksu_branch }}
-      susfs_branch: ${{ steps.commits.outputs.susfs_branch || steps.promoted.outputs.susfs_branch }}
+      sources: ${{ steps.plan.outputs.sources }}
+      source_run: ${{ steps.plan.outputs.source_run }}
+      source_url: ${{ steps.plan.outputs.source_url }}
+      checkout_sha: ${{ steps.plan.outputs.checkout_sha }}
 
   build:
-    name: ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build the NoMount module' }}
+    name: ${{ matrix.source }} - ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build the NoMount module' }}
     needs: pick
-    if: needs.pick.outputs.build_kernel == 'true' || needs.pick.outputs.build_nomount == 'true'
+    if: needs.pick.outputs.build_any == 'true'
     runs-on: ${{ needs.pick.outputs.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.pick.outputs.matrix) }}
     env:
       SELF_HOSTED: ${{ needs.pick.outputs.runner == 'self-hosted' }}
+      KERNEL_SOURCE: ${{ matrix.source }}
+      # Artifact name suffix: none for mzggr (as before), -aigis for Aigis.
+      SFX: ${{ matrix.source != 'mzggr' && format('-{0}', matrix.source) || '' }}
       # Promoted: same hook style and tuning as the Latest run it takes the kernel from.
-      KSU_HOOK: ${{ needs.pick.outputs.ksu_hook }}
-      PERF_TUNING: ${{ needs.pick.outputs.perf_tuning }}
-      NETWORK_FIX: ${{ needs.pick.outputs.network_fix }}
+      KSU_HOOK: ${{ matrix.ksu_hook }}
+      PERF_TUNING: ${{ matrix.perf_tuning }}
+      NETWORK_FIX: ${{ matrix.network_fix }}
       BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
-      BUILD_NOMOUNT: ${{ needs.pick.outputs.build_nomount }}
-      KIT_ID: ${{ needs.pick.outputs.kit_id }}
-      KERNEL_REF: ${{ needs.pick.outputs.kernel_ref }}
-      KSU_REF: ${{ needs.pick.outputs.ksu_ref }}
-      SUSFS_REF: ${{ needs.pick.outputs.susfs_ref }}
-      KERNEL_BRANCH: ${{ needs.pick.outputs.kernel_branch }}
-      KSU_BRANCH: ${{ needs.pick.outputs.ksu_branch }}
-      SUSFS_BRANCH: ${{ needs.pick.outputs.susfs_branch }}
+      BUILD_NOMOUNT: ${{ matrix.build_nomount }}
+      KIT_ID: ${{ matrix.kit_id }}
+      KERNEL_REF: ${{ matrix.kernel_ref }}
+      KSU_REF: ${{ matrix.ksu_ref }}
+      SUSFS_REF: ${{ matrix.susfs_ref }}
+      KERNEL_BRANCH: ${{ matrix.kernel_branch }}
+      KSU_BRANCH: ${{ matrix.ksu_branch }}
+      SUSFS_BRANCH: ${{ matrix.susfs_branch }}
     timeout-minutes: 180
     defaults:
       run:
@@ -271,7 +212,7 @@ jobs:
             # Keep the kernel download between runs on the PC (saves ~1 GB per run).
             cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-bakasu"
             mkdir -p "$cache"
-            kernel_dir="$cache/kernel-tree-${GITHUB_REF_NAME//\//-}"
+            kernel_dir="$cache/kernel-tree-${GITHUB_REF_NAME//\//-}$SFX"
           else
             kernel_dir="$work/kernel"
           fi
@@ -314,7 +255,7 @@ jobs:
             echo 'All build dependencies are already installed.'
           fi
 
-      - name: Use cached AOSP Clang 14 (own PC)
+      - name: Use cached toolchain (own PC)
         if: env.SELF_HOSTED == 'true'
         run: |
           set -euo pipefail
@@ -322,9 +263,16 @@ jobs:
           mkdir -p "$cache"
           exec 9>"$cache/.lock"
           flock 9
-          key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
-          toolchain="$cache/aosp-clang14-$key"
-          AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          . scripts/sources.conf
+          if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then
+            key=$(sha256sum scripts/fetch_zyc_clang.sh scripts/zyc_clang14.conf | sha256sum | cut -c1-16)
+            toolchain="$cache/zyc-clang14-$key"
+            ZYC_CLANG_CACHE="$cache/archives" bash scripts/fetch_zyc_clang.sh "$toolchain"
+          else
+            key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
+            toolchain="$cache/aosp-clang14-$key"
+            AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          fi
           echo "TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
 
       - name: Download sources and apply patches
@@ -367,6 +315,13 @@ jobs:
           bash scripts/package_zip.sh 2>&1 | tee -a "$BUILD_LOG"
           name=$(cat "$PACKAGE_DIR/zip-name.txt")
           echo "ZIP_PATH=$PACKAGE_DIR/$name.zip" >> "$GITHUB_ENV"
+          if [[ -f "$PACKAGE_DIR/zip-name-valhall.txt" ]]; then
+            echo "VALHALL_ZIP_PATH=$PACKAGE_DIR/$(cat "$PACKAGE_DIR/zip-name-valhall.txt").zip" >> "$GITHUB_ENV"
+            echo "### Flashable ZIP with the Valhall GPU drivers: \`$(cat "$PACKAGE_DIR/zip-name-valhall.txt").zip\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Unarchived uploads are named after the file: give the Aigis copies their own names.
+          cp "$PACKAGE_DIR/build-info.txt" "$BUILD_WORK/build-info$SFX.txt"
+          echo "INFO_FILE=$BUILD_WORK/build-info$SFX.txt" >> "$GITHUB_ENV"
           {
             echo "### Flashable ZIP: \`$name.zip\`"
             echo '```'
@@ -412,11 +367,13 @@ jobs:
           fi
           ls -l "$PACKAGE_DIR/nomount"
           echo "NM_ZIP=$(ls "$PACKAGE_DIR"/nomount/NoMount-*.zip)" >> "$GITHUB_ENV"
+          cp "$PACKAGE_DIR/nomount/nomount-4.14.ko" "$BUILD_WORK/nomount-4.14$SFX.ko"
+          echo "NM_KO=$BUILD_WORK/nomount-4.14$SFX.ko" >> "$GITHUB_ENV"
 
       - name: Check the module matches the promoted kernel
-        if: env.BUILD_KERNEL != 'true' && needs.pick.outputs.kernel_release != ''
+        if: env.BUILD_KERNEL != 'true' && matrix.kernel_release != ''
         env:
-          WANT_RELEASE: ${{ needs.pick.outputs.kernel_release }}
+          WANT_RELEASE: ${{ matrix.kernel_release }}
         run: |
           set -euo pipefail
           got=$(cat "$OUT_DIR/include/config/kernel.release")
@@ -424,7 +381,7 @@ jobs:
           [[ "$got" == "$WANT_RELEASE" ]] || { echo "::error::Kernel release differs from the promoted kernel."; exit 1; }
 
       - name: Build hook benchmark
-        if: inputs.bench_tool && env.BUILD_KERNEL == 'true'
+        if: inputs.bench_tool && env.BUILD_KERNEL == 'true' && matrix.first == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$BUILD_WORK/bench"
@@ -443,11 +400,20 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload build-info.txt
+      - name: Upload flashable ZIP with the Valhall GPU drivers
+        if: env.BUILD_KERNEL == 'true' && env.VALHALL_ZIP_PATH != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.VALHALL_ZIP_PATH }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build-info${{ env.SFX }}.txt
         if: env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
-          path: ${{ env.PACKAGE_DIR }}/build-info.txt
+          path: ${{ env.INFO_FILE }}
           archive: false
           retention-days: 30
 
@@ -460,17 +426,17 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload nomount-4.14.ko
+      - name: Upload nomount-4.14${{ env.SFX }}.ko
         if: env.BUILD_NOMOUNT == 'true'
         uses: actions/upload-artifact@v7
         with:
-          path: ${{ env.PACKAGE_DIR }}/nomount/nomount-4.14.ko
+          path: ${{ env.NM_KO }}
           archive: false
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload hook benchmark
-        if: inputs.bench_tool && env.BUILD_KERNEL == 'true'
+        if: inputs.bench_tool && env.BUILD_KERNEL == 'true' && matrix.first == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: hook-bench
@@ -491,9 +457,10 @@ jobs:
         if: env.BUILD_KERNEL == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: release-files
+          name: release-files${{ env.SFX }}
           path: |
             ${{ env.ZIP_PATH }}
+            ${{ env.VALHALL_ZIP_PATH }}
             ${{ env.PACKAGE_DIR }}/build-info.txt
             ${{ env.PACKAGE_DIR }}/sources.json
             ${{ env.PACKAGE_DIR }}/SHA256SUMS.txt
@@ -504,7 +471,7 @@ jobs:
         if: env.BUILD_KERNEL != 'true' && inputs.commit_mode == 'Promoted'
         uses: actions/upload-artifact@v7
         with:
-          name: promoted-nomount
+          name: promoted-nomount-${{ matrix.source }}
           path: ${{ env.PACKAGE_DIR }}/nomount/
           if-no-files-found: error
           retention-days: 30
@@ -513,7 +480,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: build-logs-${{ github.run_number }}
+          name: build-logs-${{ github.run_number }}${{ env.SFX }}
           include-hidden-files: true
           path: |
             ${{ env.BUILD_LOG }}
@@ -537,6 +504,8 @@ jobs:
     needs: [pick, build]
     if: ${{ !cancelled() && !failure() && needs.pick.outputs.promote_ok == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      SOURCES: ${{ needs.pick.outputs.sources }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -546,31 +515,45 @@ jobs:
           sparse-checkout-cone-mode: false
       - name: Download the files of the Latest run
         run: python3 scripts/promoted_source.py download "${{ needs.pick.outputs.source_run }}" source
-      - name: Download the NoMount module built now
-        if: needs.pick.outputs.build_nomount == 'true'
+      - name: Download the NoMount modules built now
+        if: needs.pick.outputs.build_any == 'true'
         uses: actions/download-artifact@v8
         with:
-          name: promoted-nomount
-          path: promoted/nomount
+          pattern: promoted-nomount-*
+          path: promoted
       - name: Put the files together
         run: |
           set -euo pipefail
-          if [[ "${{ needs.pick.outputs.build_nomount }}" == true || "$NOMOUNT_MODE" == no ]]; then
-            # Only the module built now (or none), not the one of the Latest run.
-            find source -path '*/nomount/*' -type f -delete
-          fi
-          [[ -d promoted ]] && mv promoted source/promoted
-          python3 scripts/promoted_source.py collect source release
-          if [[ "$NOMOUNT_MODE" == lkm ]]; then
-            ls release/nomount/*.ko release/nomount/NoMount-*.zip >/dev/null \
-              || { echo "::error::No NoMount module for the promoted build."; exit 1; }
-          fi
-          echo "Promoted from: ${{ needs.pick.outputs.source_url }}" >> release/build-info.txt
-      - name: Keep files for the release job
+          for src in $SOURCES; do
+            if [[ -d "promoted/promoted-nomount-$src" || "$NOMOUNT_MODE" == no ]]; then
+              # Only the module built now (or none), not the one of the Latest run.
+              find "source/$src" -path '*/nomount/*' -type f -delete
+            fi
+            if [[ -d "promoted/promoted-nomount-$src" ]]; then
+              mkdir -p "source/$src/promoted"
+              mv "promoted/promoted-nomount-$src" "source/$src/promoted/nomount"
+            fi
+            python3 scripts/promoted_source.py collect "source/$src" "release/$src"
+            if [[ "$NOMOUNT_MODE" == lkm ]]; then
+              ls "release/$src"/nomount/*.ko "release/$src"/nomount/NoMount-*.zip >/dev/null \
+                || { echo "::error::No NoMount module for the promoted $src build."; exit 1; }
+            fi
+            echo "Promoted from: ${{ needs.pick.outputs.source_url }}" >> "release/$src/build-info.txt"
+          done
+      - name: Keep the mzggr files for the release job
+        if: contains(needs.pick.outputs.sources, 'mzggr')
         uses: actions/upload-artifact@v7
         with:
           name: release-files
-          path: release/
+          path: release/mzggr/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Keep the Aigis files for the release job
+        if: contains(needs.pick.outputs.sources, 'aigis')
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files-aigis
+          path: release/aigis/
           if-no-files-found: error
           retention-days: 30
 
@@ -584,6 +567,7 @@ jobs:
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       BRANCH: ${{ github.ref_name }}
+      SOURCES: ${{ needs.pick.outputs.sources }}
     defaults:
       run:
         shell: bash
@@ -606,23 +590,37 @@ jobs:
       - name: Download release files
         uses: actions/download-artifact@v8
         with:
-          name: release-files
-          path: release
+          pattern: release-files*
+          path: files
 
-      - name: Put the NoMount files next to the kernel ZIP
+      - name: Put all files of every kernel together
         run: |
           set -euo pipefail
-          ls -lR release
-          if grep -q '^Performance tuning: true' release/build-info.txt; then
-            echo "::error::Releases are built without tuning."; exit 1
-          fi
+          ls -lR files
           shopt -s nullglob
-          files=(release/nomount/*)
-          if [[ "$NOMOUNT_MODE" == lkm ]]; then
-            ((${#files[@]})) || { echo "::error::The NoMount module was not built."; exit 1; }
-          fi
-          if ((${#files[@]})); then mv release/nomount/* release/; fi
-          rm -rf release/nomount
+          mkdir -p release
+          # The first kernel keeps the plain names (build-info.txt, sources.json,
+          # nomount-4.14.ko); the second one gets -aigis.
+          sfx=
+          for src in $SOURCES; do
+            d=files/release-files$([[ $src == mzggr ]] || echo "-$src")
+            [[ -d "$d" ]] || { echo "::error::No release files for the $src kernel."; exit 1; }
+            files=("$d"/nomount/*)
+            if [[ "$NOMOUNT_MODE" == lkm ]]; then
+              ((${#files[@]})) || { echo "::error::The NoMount module of the $src kernel was not built."; exit 1; }
+            fi
+            for f in "${files[@]}"; do
+              n=$(basename "$f")
+              [[ "$n" == *.ko ]] && n="${n%.ko}$sfx.ko"
+              mv "$f" "release/$n"
+            done
+            mv "$d"/*.zip release/
+            mv "$d/build-info.txt" "release/build-info$sfx.txt"
+            mv "$d/sources.json" "release/sources$sfx.json"
+            sfx=-aigis   # only Aigis can come second
+          done
+          (cd release && sha256sum -- *.zip *.ko > SHA256SUMS.txt)
+          ls -l release
 
       - name: Write release notes
         run: |
@@ -642,15 +640,42 @@ jobs:
             echo "No previous release with sources.json; this is the first one."
             prev_json=-
           fi
+          # Compare with the previous release only when it was built from the same kernel repo.
+          if [[ "$prev_json" != - ]] && ! python3 -c 'import json,sys; a,b=(json.load(open(p))["kernel"]["repo"] for p in sys.argv[1:]); sys.exit(a!=b)' release/sources.json "$prev_json"; then
+            echo "The previous release used another kernel; no what's new list."
+            prev_json=-
+          fi
           python3 scripts/release_notes.py notes release/sources.json "$prev_json" release/build-info.txt notes.md
+          if [[ -f release/sources-aigis.json ]]; then
+            {
+              echo
+              echo "## Kernels in this release"
+              echo "Pick one kernel ZIP and flash it. NoMount: flash the NoMount ZIP made for that kernel."
+              for z in release/*.zip; do
+                n=$(basename "$z")
+                case "$n" in
+                  NoMount-*) ;;
+                  *-Aigis-*-valhall.zip) echo "- \`$n\`: Aigis kernel with the Valhall GPU and its drivers module" ;;
+                  *-Aigis-*) echo "- \`$n\`: Aigis kernel by SlamZDank (details: build-info-aigis.txt)" ;;
+                  *) echo "- \`$n\`: mzggr0914 kernel (details: build-info.txt)" ;;
+                esac
+              done
+              for z in release/NoMount-*.zip; do echo "- \`$(basename "$z")\`: NoMount module"; done
+              echo
+              echo "Aigis sources: $(python3 -c 'import json; d=json.load(open("release/sources-aigis.json")); print(d["kernel"]["repo"] + " @ " + d["kernel"]["commit"][:12])')"
+            } >> notes.md
+          fi
 
       - name: Publish release
         run: |
           set -euo pipefail
-          zip=$(ls release/A325X-*.zip)
-          name=$(basename "$zip" .zip)
+          # Title: the kernel ZIP of the first kernel.
+          zips=(); for z in release/A325X-*.zip; do [[ "$z" == *-valhall.zip ]] || zips+=("$(basename "$z" .zip)"); done
+          name=${zips[0]}
+          for z in "${zips[@]}"; do [[ "$z" == *-Aigis-* ]] || name=$z; done
+          if [[ -f release/sources-aigis.json ]]; then name="$name + Aigis"; fi
           shopt -s nullglob
-          assets=(release/*.zip release/*.ko release/build-info.txt release/sources.json release/SHA256SUMS.txt)
+          assets=(release/*.zip release/*.ko release/build-info*.txt release/sources*.json release/SHA256SUMS.txt)
           gh release create "$TAG" "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "$name" --notes-file notes.md \
@@ -691,8 +716,8 @@ jobs:
       - name: Download the promoted sources
         uses: actions/download-artifact@v8
         with:
-          name: release-files
-          path: release
+          pattern: release-files*
+          path: files
 
       - name: Pin the commits that built
         run: |
@@ -702,7 +727,7 @@ jobs:
           for attempt in 1 2 3; do
             git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
             SOURCE_RUN_URL="${{ needs.pick.outputs.source_url }}" \
-              python3 scripts/resolve_commits.py promote release/sources.json configs/verified.json
+              python3 scripts/resolve_commits.py promote configs/verified.json files/release-files*/sources.json
             if git diff --quiet; then echo 'Verified commits already match this build.'; exit 0; fi
             git commit -q -am "Verified commits: promote run ${GITHUB_RUN_NUMBER}"
             git push -q origin "HEAD:$BRANCH" && exit 0

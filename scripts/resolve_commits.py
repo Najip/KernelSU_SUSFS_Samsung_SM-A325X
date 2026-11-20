@@ -6,11 +6,15 @@
     Writes kernel_ref, ksu_ref, susfs_ref, the matching *_branch values and
     commit_mode to $GITHUB_OUTPUT (and to stdout).
 
+    KERNEL_SOURCE=mzggr|aigis picks the kernel (default mzggr).
     Latest and Promoted use the branch tips in scripts/sources.conf.
-    Verified uses configs/verified.json and fails if a pin is missing.
+    Verified uses configs/verified.json and fails if a pin is missing: the
+    top-level kernel/xxksu/susfs entries for mzggr, the "aigis" entry for Aigis.
 
-  resolve_commits.py promote <sources.json> <configs/verified.json>
-    Rewrites the verified file from the commits that were actually built.
+  resolve_commits.py promote <configs/verified.json> <sources.json>...
+    Rewrites the verified pins from the commits that were actually built.
+    Each sources.json updates the pins of its own kernel (found by its kernel
+    repo); the pins of a kernel that was not built stay as they were.
 """
 import json
 import os
@@ -35,7 +39,10 @@ def fail(message):
     sys.exit(1)
 
 
-def load_conf():
+def load_conf(source=None):
+    env = dict(os.environ)
+    if source:
+        env["KERNEL_SOURCE"] = source
     script = (
         'set -a; . "$1"; set +a; '
         'python3 -c "import json,os,sys; keys=sys.argv[1:]; '
@@ -43,7 +50,7 @@ def load_conf():
         + " ".join(name for _, repo, ref, _, _ in SOURCES for name in (repo, ref))
         + " SUSFS_PATCH"
     )
-    raw = subprocess.check_output(["bash", "-c", script, "bash", str(ROOT / "scripts/sources.conf")], text=True)
+    raw = subprocess.check_output(["bash", "-c", script, "bash", str(ROOT / "scripts/sources.conf")], text=True, env=env)
     return json.loads(raw)
 
 
@@ -92,6 +99,11 @@ def resolve():
         if not path.exists():
             fail("No verified commits yet. Run a build with commit mode Promoted after one you have tested.")
         data = json.loads(path.read_text())
+        aigis = os.environ.get("KERNEL_SOURCE", "mzggr") == "aigis"
+        if aigis:
+            data = data.get("aigis") or {}
+            if not data:
+                fail("No verified Aigis commits yet. Run a Latest build with Kernel aigis or both, then Promoted with aigis or both.")
         missing = []
         for key, repo_var, ref_var, ref_out, branch_out in SOURCES:
             item = data.get(key) or {}
@@ -119,25 +131,8 @@ def resolve():
     emit(out)
 
 
-def promote(sources_path, verified_path):
-    src = json.loads(Path(sources_path).read_text())
-    conf = load_conf()
-    data = {
-        "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits.",
-        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "run": "",
-        "kernel": {},
-        "xxksu": {},
-        "susfs": {},
-    }
-    server = os.environ.get("GITHUB_SERVER_URL", "")
-    repo = os.environ.get("GITHUB_REPOSITORY", "")
-    run_id = os.environ.get("GITHUB_RUN_ID", "")
-    if server and repo and run_id:
-        data["run"] = f"{server}/{repo}/actions/runs/{run_id}"
-    # Promoted pins the commits of an earlier Latest run; point at that run.
-    if os.environ.get("SOURCE_RUN_URL"):
-        data["run"] = os.environ["SOURCE_RUN_URL"]
+def pins(src, conf):
+    out = {}
     for key, repo_var, ref_var, _, _ in SOURCES:
         item = src.get(key)
         if not isinstance(item, dict):
@@ -151,14 +146,49 @@ def promote(sources_path, verified_path):
         entry = {"repo": item.get("repo") or conf[repo_var], "branch": branch, "commit": commit}
         if key == "susfs":
             entry["path"] = item.get("path") or conf.get("SUSFS_PATCH", "")
-        data[key] = entry
+        out[key] = entry
     # A future root flavor added to sources.json is pinned too.
     for key, item in src.items():
-        if key in data or key == "build_repo" or not isinstance(item, dict):
+        if key in out or key == "build_repo" or not isinstance(item, dict):
             continue
         commit = (item.get("commit") or "").strip()
         if is_sha(commit):
-            data[key] = {"repo": item.get("repo", ""), "branch": item.get("branch") or item.get("ref", ""), "commit": commit}
+            out[key] = {"repo": item.get("repo", ""), "branch": item.get("branch") or item.get("ref", ""), "commit": commit}
+    return out
+
+
+def promote(verified_path, *sources_paths):
+    old = {}
+    if Path(verified_path).exists():
+        old = json.loads(Path(verified_path).read_text())
+    data = {
+        "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits.",
+        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "run": "",
+    }
+    server = os.environ.get("GITHUB_SERVER_URL", "")
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if server and repo and run_id:
+        data["run"] = f"{server}/{repo}/actions/runs/{run_id}"
+    # Promoted pins the commits of an earlier Latest run; point at that run.
+    if os.environ.get("SOURCE_RUN_URL"):
+        data["run"] = os.environ["SOURCE_RUN_URL"]
+    # Keep the pins of the kernel that was not built this time.
+    mzggr = {k: v for k, v in old.items() if k not in ("note", "updated", "run", "aigis")}
+    aigis = old.get("aigis")
+    aigis_repo = load_conf("aigis")["KERNEL_REPO"].rstrip("/")
+    for path in sources_paths:
+        src = json.loads(Path(path).read_text())
+        kernel_repo = ((src.get("kernel") or {}).get("repo") or "").rstrip("/")
+        if kernel_repo == aigis_repo:
+            aigis = pins(src, load_conf("aigis"))
+            aigis["run"] = data["run"]
+        else:
+            mzggr = pins(src, load_conf("mzggr"))
+    data.update(mzggr)
+    if aigis:
+        data["aigis"] = aigis
     Path(verified_path).write_text(json.dumps(data, indent=2) + "\n")
     print(json.dumps(data, indent=2))
 
@@ -166,7 +196,7 @@ def promote(sources_path, verified_path):
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "resolve":
         resolve()
-    elif len(sys.argv) == 4 and sys.argv[1] == "promote":
-        promote(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) >= 4 and sys.argv[1] == "promote":
+        promote(sys.argv[2], *sys.argv[3:])
     else:
         sys.exit(__doc__)
