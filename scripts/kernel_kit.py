@@ -49,7 +49,7 @@ def api(path):
 def key():
     e = os.environ
     parts = [f"kernel={e['KERNEL_REF']}", f"xxksu={e['KSU_REF']}", f"susfs={e['SUSFS_REF']}",
-             f"hook={e.get('KSU_HOOK', 'branch_link')}", f"tuning={e.get('PERF_TUNING', 'false')}",
+             f"hook={e.get('KSU_HOOK', 'manual')}", f"tuning={e.get('PERF_TUNING', 'false')}",
              f"nomount={e.get('NOMOUNT_PART', 'separate')}"]
     # Older kits were made before the network fix became optional (always on).
     if e.get("NETWORK_FIX", "true") != "true":

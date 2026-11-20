@@ -11,13 +11,13 @@ on:
         type: boolean
         default: true
       ksu_hook:
-        description: 'xxKSU hook style. branch_link = xxKSU rewrites the call instructions (default). manual = kernel calls xxKSU directly. syscall_table = xxKSU swaps the syscall table entries'
+        description: 'xxKSU hook. manual = default. branch_link is currently unstable'
         type: choice
         options:
-          - branch_link
           - manual
           - syscall_table
-        default: branch_link
+          - branch_link
+        default: manual
       perf_tuning:
         description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel)'
         type: boolean
@@ -74,7 +74,7 @@ permissions:
 env:
   PERF_TUNING: ${{ inputs.perf_tuning }}
   NETWORK_FIX: ${{ inputs.network_fix }}
-  KSU_HOOK: ${{ inputs.ksu_hook || 'branch_link' }}
+  KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
   NOMOUNT_REF: ${{ inputs.nomount_branch || 'dev' }}
   GH_TOKEN: ${{ github.token }}
