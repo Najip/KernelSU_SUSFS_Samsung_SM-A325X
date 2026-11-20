@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       kernel_source:
-        description: 'Kernel. aigis = Aigis kernel by SlamZDank (default). mzggr = mzggr0914 kernel. both = build both (all ZIPs, one release)'
+        description: 'Kernel. aigis = main kernel, Aigis by SlamZDank (default). mzggr = alternative kernel, mzggr0914. both = build both (all ZIPs, one release)'
         type: choice
         options:
           - aigis

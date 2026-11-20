@@ -71,12 +71,12 @@ on:
         type: string
         default: '-forkby-gh.Najip'
       kernel_source:
-        description: 'Kernel you flashed. mzggr = mzggr0914 kernel, aigis = Aigis kernel'
+        description: 'Kernel you flashed. aigis = main kernel (Aigis), mzggr = alternative kernel (mzggr0914)'
         type: choice
         options:
-          - mzggr
           - aigis
-        default: mzggr
+          - mzggr
+        default: aigis
       perf_tuning:
         description: 'Tick if your kernel was built with Performance tuning (mzggr only, ignored for Aigis)'
         type: boolean
