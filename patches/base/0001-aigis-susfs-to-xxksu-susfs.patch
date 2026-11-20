@@ -1026,6 +1026,33 @@ index 000000000..e8a7c60fb
 +	susfs_parse_sus_path_app_strings();
 +#endif
 +}
+diff --git a/include/linux/overflow.h b/include/linux/overflow.h
+index 99b841461..f3ea16f7b 100644
+--- a/include/linux/overflow.h
++++ b/include/linux/overflow.h
+@@ -324,22 +324,6 @@ static inline size_t __must_check size_sub(size_t minuend, size_t subtrahend)
+ 		(*_d >> _to_shift) != _a);				\
+ })
+ 
+-/**
+- * struct_size() - Calculate size of structure with trailing array.
+- * @p: Pointer to the structure.
+- * @member: Name of the array member.
+- * @n: Number of elements in the array.
+- *
+- * Calculates size of memory needed for structure @p followed by an
+- * array of @n @member elements.
+- *
+- * Return: number of bytes needed or SIZE_MAX on overflow.
+- */
+-#define struct_size(p, member, n)					\
+-	__ab_c_size(n,							\
+-		    sizeof(*(p)->member) + __must_be_array((p)->member),\
+-		    sizeof(*(p)))
+-
+ /**
+  * flex_array_size() - Calculate size of a flexible array member
+  *                     within an enclosing structure.
 diff --git a/include/linux/susfs_ksu.h b/include/linux/susfs_ksu.h
 index 43bba886a..1a605affe 100644
 --- a/include/linux/susfs_ksu.h
