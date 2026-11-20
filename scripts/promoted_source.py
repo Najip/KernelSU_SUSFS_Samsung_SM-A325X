@@ -4,10 +4,10 @@
   promoted_source.py find
     Finds the most recent successful "Build Kernel" run with commit mode
     Latest and the default kernel options (hook manual, NoMount not built in,
-    not a NoMount-only run, no Valhall GPU, Aigis compiler aigis) on $BRANCH
+    not a NoMount-only run, Aigis compiler aigis) on $BRANCH
     that built every kernel in $SOURCES ("mzggr", "aigis" or both) and whose
-    files have not expired yet. Runner, release type, tuning and whether the
-    NoMount LKM was built do not matter. Writes
+    files have not expired yet. Runner, release type, tuning, the Aigis GPU
+    (Valhall or stock) and whether the NoMount LKM was built do not matter. Writes
     source_run, source_url and source_sha to $GITHUB_OUTPUT.
 
   promoted_source.py download <run id> <artifacts folder>
@@ -16,7 +16,7 @@
 
   promoted_source.py inspect <artifacts folder>/<source>
     Reads the downloaded files of one kernel of that run. Writes the commits
-    (kernel_ref, ksu_ref, susfs_ref and *_branch), hook, tuning,
+    (kernel_ref, ksu_ref, susfs_ref and *_branch), hook, tuning, valhall_gpu,
     kernel_release, build_sha and has_nomount to $GITHUB_OUTPUT.
 
   promoted_source.py collect <artifacts folder> <output folder>
@@ -75,7 +75,7 @@ def find():
         if "(Latest)" not in title:
             continue
         if ("[manual]" not in title or "integrate" in title or "LKM only" in title
-                or "(Valhall GPU)" in title or "(main compiler)" in title):
+                or "(main compiler)" in title):
             print(f"Skipping run {run['id']} ({title}): not the default options.")
             continue
         built = built_sources(title)
@@ -98,7 +98,7 @@ def find():
         return
     kernels = " and ".join(sorted(wanted))
     message = (f"Nothing to promote: no successful Latest build of {kernels} with the default options (hook manual, "
-               f"NoMount not built in, no Valhall GPU) with files left on {branch}. Run Build Kernel with commit "
+               f"NoMount not built in, Aigis compiler aigis) with files left on {branch}. Run Build Kernel with commit "
                f"mode Latest and Kernel {'both' if len(wanted) > 1 else kernels} first, then run Promoted again.")
     print(f"::warning title=Nothing promoted::{message}")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -188,6 +188,8 @@ def inspect(folder):
         "zip_name": zip_path.stem,
         "hook": hook,
         "tuning": tuning,
+        # Aigis GPU of that run (mzggr is always the stock GPU).
+        "valhall_gpu": str(info_value(info, "GPU").startswith("Aigis Valhall")).lower(),
         "kernel_release": info_value(info, "Kernel release"),
         # Older runs had no uname tag.
         "kernel_tag": "" if info_value(info, "uname tag") in ("", "none") else info_value(info, "uname tag"),

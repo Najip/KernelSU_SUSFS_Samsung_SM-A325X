@@ -39,7 +39,7 @@ on:
         type: string
         default: '-forkby-gh.Najip'
       valhall_gpu:
-        description: 'Aigis only: Valhall GPU (Aigis r32p1 GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU'
+        description: 'Aigis only: Valhall GPU, default ticked and allowed with every release type (Aigis r32p1 GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU'
         type: boolean
         default: true
       compiler:
@@ -188,6 +188,8 @@ jobs:
       KSU_HOOK: ${{ matrix.ksu_hook }}
       PERF_TUNING: ${{ matrix.perf_tuning }}
       NETWORK_FIX: ${{ matrix.network_fix }}
+      # Promoted: the Aigis GPU (Valhall or stock) of the Latest run.
+      VALHALL_GPU: ${{ matrix.valhall_gpu }}
       # Promoted: the tag of the Latest run, so the module matches its kernel.
       KERNEL_TAG: ${{ matrix.kernel_tag }}
       BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
