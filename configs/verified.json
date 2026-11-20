@@ -1,7 +1,7 @@
 {
   "note": "Pinned by commit mode Promoted after a successful build. A full Release must use these commits.",
-  "updated": "2026-11-19T22:17:42Z",
-  "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44618208320",
+  "updated": "2026-11-20T12:46:02Z",
+  "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44728791495",
   "kernel": {
     "repo": "https://github.com/mzggr0914/android_kernel_a325x_bakasu",
     "branch": "common",
@@ -10,12 +10,31 @@
   "xxksu": {
     "repo": "https://github.com/backslashxx/KernelSU",
     "branch": "master",
-    "commit": "8e585df71a869555d3514a9c16d6776e3daebd98"
+    "commit": "f27e1f0d3192820b0964881585d764ab0f0de56f"
   },
   "susfs": {
     "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
     "branch": "mainline",
     "commit": "26f2313be61f7a8603a50b2dcd12171495a79d27",
     "path": "Patches/Patch/susfs_patch_to_4.14.patch"
+  },
+  "aigis": {
+    "kernel": {
+      "repo": "https://github.com/SlamZDank/Aigis-Kernel-A32",
+      "branch": "bpf-5.15-legion",
+      "commit": "dc0935aba4a71c0cf3d7c7fd3c38c1e5e58c86c6"
+    },
+    "xxksu": {
+      "repo": "https://github.com/backslashxx/KernelSU",
+      "branch": "master",
+      "commit": "f27e1f0d3192820b0964881585d764ab0f0de56f"
+    },
+    "susfs": {
+      "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
+      "branch": "mainline",
+      "commit": "26f2313be61f7a8603a50b2dcd12171495a79d27",
+      "path": "Patches/Patch/susfs_patch_to_4.14.patch"
+    },
+    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44728791495"
   }
 }
