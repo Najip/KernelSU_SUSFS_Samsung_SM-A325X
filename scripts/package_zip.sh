@@ -39,6 +39,9 @@ kshort=$(read_json '["kernel"]["commit"][:8]')
 xshort=$(read_json '["xxksu"]["commit"][:8]')
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
+# Kernel ID: the same for every build of this exact kernel; the NoMount module
+# built for it carries the same ID (see scripts/kernel_id.sh).
+kernel_id=$(bash "$ROOT/scripts/kernel_id.sh" "$OUT_DIR")
 date=$(date -u +%Y%m%d)
 suffix=
 case "$KSU_HOOK" in
@@ -59,6 +62,29 @@ name="${KERNEL_LABEL}-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 cp "$IMAGE" "$ak3/Image"
+
+# Flasher additions, run after the kernel is written:
+#  - every zip: NoMount check (warns when the installed NoMount LKM was not
+#    built for this kernel, by kernel ID)
+#  - mzggr zip (stock A32 GPU): deletes the Aigis Valhall GPU drivers module
+add_after_boot() {
+  python3 - "$ak3/anykernel.sh" "$1" <<'PY'
+import sys
+p, add = sys.argv[1], open(sys.argv[2]).read()
+s = open(p).read()
+for marker in ("## end boot install", "## end install"):
+    if s.count(marker) == 1:
+        open(p, "w").write(s.replace(marker, marker + "\n" + add, 1))
+        break
+else:
+    sys.exit("anykernel.sh: no single '## end boot install' or '## end install' line")
+PY
+}
+sed -e "s|@KERNEL_ID@|$kernel_id|" -e "s|@KERNEL_RELEASE@|$release|" -e "s|@NOMOUNT_MODE@|${NOMOUNT_MODE:-lkm}|" \
+  "$ROOT/anykernel/nomount-check.sh" > "$work/nomount-check.sh"
+add_after_boot "$work/nomount-check.sh"
+[[ "$KERNEL_SOURCE" == mzggr ]] && add_after_boot "$ROOT/anykernel/gpu-cleanup.sh"
+grep -q '^nomount_check;' "$ak3/anykernel.sh"
 dtb_line="not included (the phone's current dtb is kept)"
 if [[ -n "${AK3_DTB_BOOTIMG:-}" ]]; then
   bootimg="$work/dtb-source-boot.img"
@@ -75,6 +101,7 @@ fi
   echo "${KERNEL_LABEL} xxKSU + SUSFS kernel"
   echo "Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
   echo "Kernel release: $release"
+  echo "Kernel ID (NoMount match): $kernel_id"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
   echo "xxKSU: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"

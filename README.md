@@ -150,6 +150,11 @@ The module is compiled together with a kernel from the same sources in the same 
 
 The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
 
+After writing the kernel, the ZIP also checks your modules (when `/data` is mounted and decrypted):
+
+- **NoMount check** (every kernel ZIP): every kernel has a **kernel ID** (in `build-info.txt`, line "Kernel ID (NoMount match)"), made from its kernel release, `.config` and symbol checksums. A NoMount module stores the ID of the kernel it was built for (`kernelId=` in its `module.prop`, also shown in its description). A module from any build of the same kernel has the same ID, so it does not have to come from the same run. If the installed NoMount module has a different ID, the flasher shows a warning to remove it in the KernelSU manager and install the NoMount ZIP built for this kernel. It is only a warning; nothing is deleted. Older modules without an ID are compared by kernel release, and the flasher says they cannot be fully verified. With NoMount `integrate`, an installed NoMount LKM module gets a warning to remove it.
+- **GPU module cleanup** (mzggr ZIP only): the mzggr kernel uses the stock A32 GPU, so the Aigis Valhall GPU drivers module (`a32-gpu-upgrade`) is deleted if it is installed.
+
 ## Collecting logs
 
 `tools/collect-logs.sh` gathers everything needed to debug a bootloop or a root problem. It runs both in TWRP and in booted Android (as root).
@@ -195,6 +200,8 @@ After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Pow
 | `scripts/promoted_source.py` | Finds and collects the `Latest` run that `Promoted` takes its files from |
 | `scripts/build_nomount.sh` | Builds the NoMount module (after a kernel compile, or from a kernel kit) |
 | `scripts/kernel_kit.py` | Kernel kit key, lookup and download |
+| `scripts/kernel_id.sh` | Kernel ID that the flasher uses to check the NoMount module |
+| `anykernel/nomount-check.sh`, `anykernel/gpu-cleanup.sh` | Flasher checks added after the kernel is written |
 | `configs/nomount-integrate.config` | Turns on NoMount built into the kernel (`integrate`) |
 | `tools/hook-bench.c`, `tools/hook-bench.sh` | Benchmark for comparing hook styles |
 | `configs/` | Config fragments merged after the tree's own fragments |

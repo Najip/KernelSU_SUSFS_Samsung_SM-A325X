@@ -74,6 +74,10 @@ case "$vermagic" in
   "vermagic=$release "*) ;;
   *) echo "vermagic does not match kernel.release" >&2; exit 1 ;;
 esac
+# Kernel ID of the kernel this module was built against (same for every
+# build of that kernel); the kernel zip warns when it does not match.
+kernel_id=$(bash "$ROOT/scripts/kernel_id.sh" "$OUT_DIR")
+echo "Kernel ID: $kernel_id"
 artifacts=$work/artifacts
 mkdir -p "$artifacts"
 install -m644 "$mod_src/nomount.ko" "$artifacts/nomount-$KVER.ko"
@@ -114,6 +118,9 @@ nshort=${sha:0:8}
 base_ver=$(sed -n 's/^version=//p' "$mod/module.prop" | tr -d '\r ' | head -n1)
 sed -i "s/^versionCode=.*/versionCode=${count}/" "$mod/module.prop"
 sed -i "s/^version=.*/version=${base_ver} (${count}-${nshort}, LKM ${KVER})/" "$mod/module.prop"
+sed -i "s/^description=.*/& Built for kernel ID ${kernel_id}./" "$mod/module.prop"
+sed -i '/^kernelId=/d' "$mod/module.prop"
+echo "kernelId=$kernel_id" >> "$mod/module.prop"
 suffix=
 [[ "${PERF_TUNING:-false}" == true ]] && suffix=-tuning
 name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-k${kshort}-n${nshort}${suffix}"
@@ -122,6 +129,7 @@ name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-k${kshort}-n${nshort}${suff
   echo "NoMount: $NOMOUNT_REPO branch $NOMOUNT_REF @ $sha ($count commits)"
   echo "lkmloader: $LKMLOADER_REPO @ $lkm_sha"
   echo "Built for kernel release: $release"
+  echo "Built for kernel ID: $kernel_id"
   echo "xxKSU hook style: ${KSU_HOOK:-}"
   echo "Performance tuning kernel: ${PERF_TUNING:-false}"
   echo "Kernel sources used:"
