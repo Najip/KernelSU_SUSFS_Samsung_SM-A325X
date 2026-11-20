@@ -109,7 +109,7 @@ jobs:
               echo "### No new upstream commits"
             fi
             echo
-            python3 -c 'import json,sys; [print(f"- {v[\"name\"]}: {v[\"repo\"]} `{v[\"branch\"]}` @ `{v[\"commit\"][:12]}` ({v[\"date\"]})") for v in json.load(open(sys.argv[1]))["sources"].values()]' "$STATE"
+            cat sources.md
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save the commits seen
