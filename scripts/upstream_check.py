@@ -14,7 +14,8 @@ Watched (NoMount is not watched):
 The state file keeps the newest commit seen of each source and a short
 history of the changes found. The first check only saves the commits
 (nothing to compare with yet). Writes changed=true|false and first=true|false
-to $GITHUB_OUTPUT and a summary of the new commits to changes.md.
+to $GITHUB_OUTPUT, the new commits to changes.md and the commits seen to
+sources.md.
 """
 import json
 import os
@@ -141,6 +142,8 @@ def main(conf_path, state_path):
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(json.dumps(state, indent=2) + "\n")
     Path("changes.md").write_text("\n".join(report) + "\n" if report else "")
+    Path("sources.md").write_text("".join(
+        f"- {v['name']}: {v['repo']} `{v['branch']}` @ `{v['commit'][:12]}` ({v['date']})\n" for v in sources.values()))
     emit({"changed": str(bool(changed)).lower(), "first": str(first).lower(), "changed_list": " ".join(changed)})
 
 
