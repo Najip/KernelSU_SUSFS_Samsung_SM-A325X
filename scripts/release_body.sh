@@ -38,6 +38,7 @@ if [[ -f "$dir/sources-aigis.json" ]]; then
       case "$n" in
         NoMount-*) ;;
         *-Aigis-*-valhall.zip) echo "- \`$n\`: Aigis kernel with the Valhall GPU and its drivers module" ;;
+        *-Aigis-*-vgpu*.zip) echo "- \`$n\`: Aigis kernel by SlamZDank with the Valhall GPU, drivers module included (details: build-info-aigis.txt)" ;;
         *-Aigis-*) echo "- \`$n\`: Aigis kernel by SlamZDank (details: build-info-aigis.txt)" ;;
         *) echo "- \`$n\`: mzggr0914 kernel (details: build-info.txt)" ;;
       esac

@@ -142,8 +142,9 @@ unzip -p "$zip_path" Image | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
 
-# Second ZIP: the same kernel + the Valhall GPU drivers module, installed
-# into /data/adb/modules by the zip itself (one flash instead of two).
+# Valhall GPU: the ZIP is replaced by the bundle, the same kernel + the Valhall
+# GPU drivers module installed into /data/adb/modules by the zip itself (one
+# flash). There is no kernel-only ZIP for Valhall builds.
 rm -f "$PACKAGE_DIR"/*-valhall.zip "$PACKAGE_DIR/zip-name-valhall.txt"
 if [[ -n "${VALHALL_DRIVERS_URL:-}" ]]; then
   vzip="$work/valhall-module.zip"
@@ -164,25 +165,23 @@ marker = "## end boot install"
 assert s.count(marker) == 1, "anykernel.sh: no single '## end boot install' line"
 open(p, "w").write(s.replace(marker, marker + "\n" + add, 1))
 PY
-  sed -i "s|^kernel\.string=.*|&-valhall|" "$vak3/anykernel.sh"
-  sed -i "s|^Valhall GPU drivers module.*|Valhall GPU drivers module: included in ${name}-valhall.zip (installed to /data/adb/modules/a32-gpu-upgrade); the plain zip leaves it out: $VALHALL_DRIVERS_URL|" "$work/build-info.txt" "$vak3/build-info.txt" "$ak3/build-info.txt"
-  vzip_path="$PACKAGE_DIR/$name-valhall.zip"
+  sed -i "s|^kernel\.string=.*|& + Valhall drivers|" "$vak3/anykernel.sh"
+  sed -i "s|^Valhall GPU drivers module.*|Valhall GPU drivers module: included in this zip (installed to /data/adb/modules/a32-gpu-upgrade): $VALHALL_DRIVERS_URL|" "$work/build-info.txt" "$vak3/build-info.txt"
+  vzip_path=$zip_path
+  rm -f "$vzip_path"
   (cd "$vak3" && zip -qr9 "$vzip_path" . -x '*~')
   unzip -tq "$vzip_path"
   unzip -p "$vzip_path" Image | cmp - "$IMAGE"
   unzip -p "$vzip_path" valhall/system/vendor/lib64/egl/libGLES_mali.so | cmp - "$vak3/valhall/system/vendor/lib64/egl/libGLES_mali.so"
   unzip -p "$vzip_path" anykernel.sh | grep -q '^valhall_install;'
-  echo "$name-valhall" > "$PACKAGE_DIR/zip-name-valhall.txt"
-  # Refresh the plain zip's build-info.txt with the updated Valhall line.
-  (cd "$ak3" && zip -q9 "$zip_path" build-info.txt)
+  unzip -l "$vzip_path" | grep -q 'META-INF/com/google/android/update-binary'
 fi
 
 cp "$work/build-info.txt" "$PACKAGE_DIR/build-info.txt"
 cp "$INFO_DIR/sources.json" "$PACKAGE_DIR/sources.json"
-(cd "$PACKAGE_DIR" && sha256sum "$name".zip "$name"-valhall.zip 2>/dev/null > SHA256SUMS.txt || true)
+(cd "$PACKAGE_DIR" && sha256sum "$name".zip > SHA256SUMS.txt)
 grep -q " $name.zip$" "$PACKAGE_DIR/SHA256SUMS.txt"
 echo "$name" > "$PACKAGE_DIR/zip-name.txt"
 cat "$PACKAGE_DIR/build-info.txt"
-echo "Created flashable ZIP: $zip_path"
-[[ -f "$PACKAGE_DIR/zip-name-valhall.txt" ]] && echo "Created flashable ZIP with the Valhall drivers: $PACKAGE_DIR/$name-valhall.zip"
+echo "Created flashable ZIP: $zip_path$([[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo ' (kernel + Valhall GPU drivers module)')"
 exit 0
