@@ -37,16 +37,16 @@ if [[ -f "$dir/sources-aigis.json" ]]; then
       n=$(basename "$z")
       case "$n" in
         NoMount-*) ;;
-        *-Aigis-*-valhall.zip) echo "- \`$n\`: Aigis kernel with the Valhall GPU and its drivers module" ;;
-        *-Aigis-*-vgpu*.zip) echo "- \`$n\`: Aigis kernel by SlamZDank with the Valhall GPU, drivers module included (details: build-info-aigis.txt)" ;;
-        *-Aigis-*) echo "- \`$n\`: Aigis kernel by SlamZDank (details: build-info-aigis.txt)" ;;
-        *) echo "- \`$n\`: mzggr0914 kernel (details: build-info.txt)" ;;
+        *-Aigis-*-valhall.zip) echo "- \`$n\`: main kernel (Aigis) with the Valhall GPU and its drivers module" ;;
+        *-Aigis-*-vgpu*.zip) echo "- \`$n\`: main kernel (Aigis by SlamZDank, used daily by the repo owner) with the Valhall GPU, drivers module included (details: build-info-aigis.txt)" ;;
+        *-Aigis-*) echo "- \`$n\`: main kernel (Aigis by SlamZDank, used daily by the repo owner) (details: build-info-aigis.txt)" ;;
+        *) echo "- \`$n\`: alternative kernel (mzggr0914) (details: build-info.txt)" ;;
       esac
     done
     for z in "$dir"/NoMount-*.zip; do
       n=$(basename "$z")
-      case "$n" in *-aigis-*) k=Aigis ;; *-mzggr-*) k=mzggr ;; *) k= ;; esac
-      echo "- \`$n\`: NoMount module${k:+ for the $k kernel}"
+      case "$n" in *-aigis-*) k="main kernel (Aigis)" ;; *-mzggr-*) k="alternative kernel (mzggr)" ;; *) k= ;; esac
+      echo "- \`$n\`: NoMount module${k:+ for the $k}"
     done
     echo
     echo "Aigis sources: $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["kernel"]["repo"] + " @ " + d["kernel"]["commit"][:12])' "$dir/sources-aigis.json")"

@@ -2,55 +2,99 @@
 
 Android kernel for Samsung Galaxy A32 4G (SM-A325x, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount (as a separate LKM or built into the kernel). Target: SM-A325F on LumiROM 9 (Android 17).
 
+It builds two kernels: the main kernel **Aigis** (used every day by the repo owner) and the alternative kernel **mzggr**. Both are released.
+
 This repo stores no kernel source. The GitHub Actions workflows download every source fresh, patch it and build a flashable ZIP.
+
+## The two kernels
+
+Every build can make two kernels. Both are released, so you can pick either one.
+
+| | Main kernel: Aigis | Alternative kernel: mzggr |
+|---|---|---|
+| Who uses it | The repo owner, every day | Built and released too |
+| Kernel tree | [Aigis by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32), branch `bpf-5.15-legion` | [mzggr0914](https://github.com/mzggr0914/android_kernel_a325x_bakasu), branch `common` |
+| **Kernel** dropdown | `aigis` (default) | `mzggr` (`both` builds the two) |
+| Kernel ZIP name | `A325X-Aigis-...zip` | `A325X-xxKSU-...zip` |
+| GPU | Valhall GPU with its drivers module (ticked by default), or stock | Stock A32 GPU |
+| Tuning | Aigis' own CPU/GPU tuning | Our **Performance tuning** (ticked by default) |
+| Compiler | ZyC Clang 14 (as Aigis builds it), or AOSP Clang 14 | AOSP Clang 14 |
+| NoMount file | `NoMount-...-aigis-...zip`, `nomount-4.14-aigis.ko` | `NoMount-...-mzggr-...zip`, `nomount-4.14-mzggr.ko` |
+| Details file in a release | `build-info-aigis.txt`, `sources-aigis.json` | `build-info.txt`, `sources.json` |
+
+Flash one kernel ZIP only, and the NoMount ZIP made for that same kernel.
 
 ## Sources used
 
-The table below is refreshed automatically each time a release is published: the Aigis kernel first, then mzggr, then the xxKSU manager APK of that release.
+The tables below are refreshed automatically each time a release is published: the main kernel (Aigis) first, then the alternative kernel (mzggr), then the xxKSU manager app of that release.
 
 <!-- SOURCES:START -->
 Last release: [build-20261120-79](../../releases/tag/build-20261120-79)
 
+### Main kernel: Aigis
+
+Used every day by the repo owner.
+
+| Part | Source | Branch / version | Commit | Commit date |
+|---|---|---|---|---|
+| Kernel | [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32) | `bpf-5.15-legion`, Linux 4.14.357 | [`dc0935aba4a7`](https://github.com/SlamZDank/Aigis-Kernel-A32/commit/dc0935aba4a71c0cf3d7c7fd3c38c1e5e58c86c6) | 2026-11-19 |
+| xxKSU (root) | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1+54 | [`f27e1f0d3192`](https://github.com/backslashxx/KernelSU/commit/f27e1f0d3192820b0964881585d764ab0f0de56f) | 2026-11-20 |
+| SUSFS patch | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`26f2313be61f`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/26f2313be61f7a8603a50b2dcd12171495a79d27) | 2026-11-18 |
+
+### Alternative kernel: mzggr
+
+Also built and released.
+
 | Part | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|
 | Kernel | [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) | `common`, Linux 4.14.357-openela | [`7dd52de28d1e`](https://github.com/mzggr0914/android_kernel_a325x_bakasu/commit/7dd52de28d1ee64dddc1f3e853e214fab7578c44) | 2026-11-16 |
-| xxKSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1+54 | [`f27e1f0d3192`](https://github.com/backslashxx/KernelSU/commit/f27e1f0d3192820b0964881585d764ab0f0de56f) | 2026-11-20 |
+| xxKSU (root) | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1+54 | [`f27e1f0d3192`](https://github.com/backslashxx/KernelSU/commit/f27e1f0d3192820b0964881585d764ab0f0de56f) | 2026-11-20 |
 | SUSFS patch | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`26f2313be61f`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/26f2313be61f7a8603a50b2dcd12171495a79d27) | 2026-11-18 |
+
+### Root manager app (for both kernels)
+
+Install this app to manage root.
+
+| Part | Source | Branch / version | Commit | Commit date |
+|---|---|---|---|---|
+| xxKSU manager | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | release [v3.3.1+54](https://github.com/backslashxx/KernelSU/releases/tag/v3.3.1%2B54), `KernelSU_v3.3.1+54_32735-release.apk` | - | 2026-11-20 |
 <!-- SOURCES:END -->
 
 Other parts (pinned in this repo):
 
 | Part | Source | Version |
 |---|---|---|
-| Toolchain | AOSP Clang prebuilt | clang-r450784d (Clang 14.0.6), see `scripts/aosp_clang14.conf` |
+| Toolchain | AOSP Clang prebuilt | clang-r450784d (Clang 14.0.6), see `scripts/aosp_clang14.conf`. Used by mzggr, and by Aigis with **Compiler** `main` |
 | Flasher | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | `af770f7b16cf8f8eb7c68614b2a693b3b361c90c` |
 | NoMount LKM | [maxsteeel/nomount](https://github.com/maxsteeel/nomount) | `dev` (default) or `master`, chosen when you run the workflow |
 | LKM loader | [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader) | latest at build time |
 
 Upstream repos and branches are set in `scripts/sources.conf`.
 
-## What the kernel contains
+## What both kernels get
 
-- Kernel: mzggr0914's SLM-based Linux 4.14.357-openela tree (`4.14.357-openela-vigus-slmkernel-a32`). It carries the BPF backports and the fake `5.10` version for `netbpfload`, so newer ROMs such as LumiROM 9 (Android 17) boot.
-- The tree's own BakaSU and in-tree NoMount are removed at build time and replaced by xxKSU and upstream NoMount (a separate LKM by default, or built in with the `integrate` option). The conversion is the same as the booting [Najip/android_kernel_a325F_bakasu `xxksu`](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu) branch, stored here as `patches/base/0001-mzggr-common-to-xxksu-susfs.patch`.
+- xxKSU for root, replacing the tree's own root module (ReSukiSU in Aigis, BakaSU in mzggr) at build time.
 - xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default is `manual` (`branch_link` is currently unstable). No LSM hooking in any style.
-- SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
-- Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
+- SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
+- Upstream NoMount, replacing the tree's own NoMount: a separate LKM by default, or built in with the `integrate` option.
 - Network fix (UDP-only GSO for IPv4 and IPv6). A tick, ticked by default, allowed with every release type (and with `Promoted`, which keeps the setting of the build it takes).
-- Performance tuning (ticked by default, mzggr kernel only), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
-- Toolchain: AOSP Clang 14 with ld.lld and GNU as. No LTO.
+- No LTO.
 - Built by `Najip@github`: shown in `/proc/version`, `uname -a` and About phone. The **uname tag** (default `-forkby-gh.Najip`) is added to `uname -r`.
 
-### Aigis kernel (Kernel dropdown)
+### Main kernel: Aigis
 
-The **Kernel** dropdown picks the kernel tree: `aigis` (default), `mzggr` (everything above), or `both` (both kernels in one run, all ZIPs, and one release holding all of them so users can choose).
+- The [Aigis kernel by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32) from its default branch `bpf-5.15-legion`, with the SUSFS hooks of its `bpf-5.15-legion-susfs` branch.
+- Aigis keeps its own CPU/GPU tuning. Our **Performance tuning** does not fit its tree, so for Aigis it is ignored with a warning (with `both`, only the mzggr ZIP gets the tuning).
+- **Valhall GPU** (Aigis only, ticked by default, allowed with every release type): ticked = the Aigis Valhall r32p1 setup with their GPU tuning. There is one ZIP, which writes the r32p1 dtb and also installs their [Valhall drivers module](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/download/GPU-Update/A32-Mali-Valhall-Drivers-KSU-Module.zip) (no kernel-only ZIP). ZIP names get `-vgpu`. Unticked = stock A32 GPU (`patches/base/0002-aigis-stock-gpu.patch`).
+- **Compiler** (Aigis only): `aigis` (default) = ZyC Clang 14.0.6 the way the Aigis CI builds it; `main` = AOSP Clang 14 as for mzggr (ZIP names get `-aospclang`).
 
-- `aigis` builds the [Aigis kernel by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32) from its default branch `bpf-5.15-legion`, with the SUSFS hooks of its `bpf-5.15-legion-susfs` branch, then the same xxKSU, SUSFS core, hook styles, network fix and NoMount options. Zips are named `A325X-Aigis-...`.
-- Aigis keeps its own CPU/GPU tuning. Our **Performance tuning** does not fit its tree, so for Aigis it is ignored with a warning and that kernel is built without it (with `both`, only the mzggr ZIP gets the tuning).
-- **Valhall GPU** (Aigis only, ticked by default, allowed with every release type): unticked = stock A32 GPU (`patches/base/0002-aigis-stock-gpu.patch`). Ticked = the Aigis Valhall r32p1 setup with their GPU tuning: there is one zip, which writes the r32p1 dtb and also installs their [Valhall drivers module](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/download/GPU-Update/A32-Mali-Valhall-Drivers-KSU-Module.zip) (no kernel-only zip). Zip names get `-vgpu`.
-- **Compiler** (Aigis only): `aigis` (default) = ZyC Clang 14.0.6 the way the Aigis CI builds it; `main` = AOSP Clang 14 as for mzggr (zip names get `-aospclang`).
-- NoMount files always name their kernel: `NoMount-...-lkm-4.14-aigis-....zip` / `nomount-4.14-aigis.ko` and `NoMount-...-lkm-4.14-mzggr-....zip` / `nomount-4.14-mzggr.ko`. Flash the NoMount ZIP made for the kernel you flashed.
-- In a release with both kernels, the mzggr `build-info.txt` and `sources.json` keep their names and the Aigis ones get `-aigis` (`build-info-aigis.txt`, `sources-aigis.json`).
+### Alternative kernel: mzggr
+
+- mzggr0914's SLM-based Linux 4.14.357-openela tree (`4.14.357-openela-vigus-slmkernel-a32`). It carries the BPF backports and the fake `5.10` version for `netbpfload`, so newer ROMs such as LumiROM 9 (Android 17) boot.
+- The tree's BakaSU and in-tree NoMount are swapped the same way as the booting [Najip/android_kernel_a325F_bakasu `xxksu`](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu) branch, stored here as `patches/base/0001-mzggr-common-to-xxksu-susfs.patch`. The SUSFS hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree.
+- Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
+- Performance tuning (ticked by default, mzggr only), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
+- Toolchain: AOSP Clang 14 with ld.lld and GNU as.
 
 ## How to build
 
@@ -59,7 +103,7 @@ The **Kernel** dropdown picks the kernel tree: `aigis` (default), `mzggr` (every
 3. Choose the options and press the green **Run workflow** button:
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
    - **xxKSU hook style**: `manual` by default, then `syscall_table`, then `branch_link` (currently unstable). See [Hook styles](#hook-styles).
-   - **Kernel**: `aigis` by default, or `mzggr`, or `both` (see [Aigis kernel](#aigis-kernel-kernel-dropdown)).
+   - **Kernel**: `aigis` by default, or `mzggr`, or `both` (see [The two kernels](#the-two-kernels)).
    - **Performance tuning**: ticked by default (mzggr only, ignored for Aigis). Allowed with every release type.
    - **Valhall GPU** and **Compiler**: Aigis only, ignored for mzggr.
    - **uname tag**: `-forkby-gh.Najip` by default, added to the end of `uname -r` on both kernels (for example `4.14.357-openela-vigus-slmkernel-a32-forkby-gh.Najip`). Letters, digits, space and `. _ + -` only (no `/`, the release name is also a folder name). Clear it for the kernel's own name. `bpfloader`, `netbpfload` and `netd` still see the fixed fake version, so networking is not affected. A NoMount module must be built with the same tag (the **NoMount LKM** workflow has the same box).
