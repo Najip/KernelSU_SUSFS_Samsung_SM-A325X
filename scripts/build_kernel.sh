@@ -61,14 +61,25 @@ if [[ "$KERNEL_TOOLCHAIN" == zyc ]]; then
   export KCPPFLAGS=' -O3'
   export CONFIG_SECTION_MISMATCH_WARN_ONLY=y
   # Same make arguments as the Aigis CI.
-  kmake() { make "$@" KCFLAGS=' -w -pipe -O3' CONFIG_SECTION_MISMATCH_WARN_ONLY=y; }
+  # KERNEL_LINKER=lld (default) links with ZyC's ld.lld, as the published
+  # Aigis kernels are ("LLD 14.0.6" in their version string). It must be a
+  # make argument: the kernel Makefile overrides LD from the environment.
+  # KERNEL_LINKER=gnu keeps $(CROSS_COMPILE)ld (the Aigis CI default).
+  ld_args=()
+  case "${KERNEL_LINKER:-lld}" in
+    lld) ld_args=(LD="$TOOLCHAIN/bin/ld.lld") ;;
+    gnu) ;;
+    *) echo "KERNEL_LINKER must be lld or gnu" >&2; exit 1 ;;
+  esac
+  kmake() { make "$@" "${ld_args[@]}" KCFLAGS=' -w -pipe -O3' CONFIG_SECTION_MISMATCH_WARN_ONLY=y; }
   {
     cat "$TOOLCHAIN/zyc-source.txt"
     "$TOOLCHAIN/bin/clang" --version
     "$TOOLCHAIN/bin/ld.lld" --version
     "${CROSS_COMPILE}ld" --version | head -n1
   } > "$OUT_DIR/toolchain-source.txt"
-  echo "Toolchain: ZyC Clang (Aigis CI setup), CC=${CROSS_COMPILE}gcc"
+  echo "Linker: ${KERNEL_LINKER:-lld}" >> "$OUT_DIR/toolchain-source.txt"
+  echo "Toolchain: ZyC Clang (Aigis CI setup), CC=${CROSS_COMPILE}gcc, linker ${KERNEL_LINKER:-lld}"
 else
 kmake() { make "$@"; }
 for tool in aarch64-linux-gnu-as aarch64-linux-gnu-elfedit; do
