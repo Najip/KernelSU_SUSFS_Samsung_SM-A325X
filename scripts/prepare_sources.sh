@@ -74,6 +74,11 @@ applied=()
 log "Converting the tree to the xxKSU + SUSFS layout"
 git apply --whitespace=nowarn "$ROOT/patches/$KERNEL_BASE_PATCH"
 applied+=("$KERNEL_BASE_PATCH")
+if [[ -n "${KERNEL_GPU_PATCH:-}" ]]; then
+  log "GPU: stock A32 stack (Bifrost r25p0, as on main)"
+  git apply --whitespace=nowarn "$ROOT/patches/$KERNEL_GPU_PATCH"
+  applied+=("$KERNEL_GPU_PATCH")
+fi
 
 log "SUSFS core: $SUSFS_REPO ($SUSFS_REF)"
 susfs_sha=$(git ls-remote "$SUSFS_REPO" "refs/heads/$SUSFS_REF" | cut -f1)
