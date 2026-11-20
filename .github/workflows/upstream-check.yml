@@ -1,0 +1,133 @@
+name: Upstream check
+run-name: Upstream check${{ github.event_name == 'workflow_dispatch' && ' (manual)' || '' }}
+
+# Three times a day: did the mzggr kernel, the Aigis kernel, xxKSU or Jack's
+# SUSFS 4.14 patch get new commits since the last check? (NoMount is not
+# watched.) The newest commits seen are saved in configs/upstream-state.json
+# on the default branch. When something is new, a Build Kernel run starts:
+# Kernel both, commit mode Latest, release type CI (no release).
+on:
+  schedule:
+    # 07:00, 15:00 and 23:00 in Jakarta (UTC+7)
+    - cron: '0 0,8,16 * * *'
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Start the CI build when something changed (untick = only check and save)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: upstream-check
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  # Branch the CI build runs on (it needs the Kernel "both" option). Set the
+  # repo variable UPSTREAM_BUILD_REF to change it; when that branch no longer
+  # exists, the default branch is used.
+  BUILD_REF: ${{ vars.UPSTREAM_BUILD_REF || 'kernel-choice' }}
+  STATE: configs/upstream-state.json
+
+jobs:
+  check:
+    name: Check upstream sources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ${{ github.event.repository.default_branch }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - name: Use the sources of the build branch
+        run: |
+          set -euo pipefail
+          if ! git fetch -q --depth=1 origin "$BUILD_REF" 2>/dev/null; then
+            echo "::notice::Branch $BUILD_REF not found, using ${{ github.event.repository.default_branch }}."
+            BUILD_REF=${{ github.event.repository.default_branch }}
+            git fetch -q --depth=1 origin "$BUILD_REF"
+          fi
+          echo "BUILD_REF=$BUILD_REF" >> "$GITHUB_ENV"
+          git show FETCH_HEAD:scripts/sources.conf > "$RUNNER_TEMP/sources.conf"
+          git show FETCH_HEAD:scripts/upstream_check.py > "$RUNNER_TEMP/upstream_check.py" 2>/dev/null \
+            || cp scripts/upstream_check.py "$RUNNER_TEMP/upstream_check.py"
+          echo "Build branch: $BUILD_REF"
+
+      - name: Compare with the last check
+        id: check
+        run: python3 "$RUNNER_TEMP/upstream_check.py" "$RUNNER_TEMP/sources.conf" "$STATE"
+
+      - name: Start the CI build of both kernels
+        id: build
+        if: steps.check.outputs.changed == 'true' && (github.event_name == 'schedule' || inputs.build)
+        run: |
+          set -euo pipefail
+          before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run kernel.yml --repo "$GITHUB_REPOSITORY" --ref "$BUILD_REF" \
+            -f kernel_source=both -f commit_mode=Latest -f release_type=CI
+          url=
+          for _ in 1 2 3 4 5 6; do
+            sleep 5
+            url=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow kernel.yml --branch "$BUILD_REF" \
+              --event workflow_dispatch --limit 5 --json url,createdAt \
+              --jq "[.[] | select(.createdAt >= \"$before\")][-1].url // \"\"")
+            [[ -n "$url" ]] && break
+          done
+          echo "Build Kernel run: ${url:-started}"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          python3 - "$STATE" "$url" <<'EOF'
+          import json, sys
+          path, url = sys.argv[1], sys.argv[2]
+          s = json.load(open(path))
+          if s.get("history"):
+              s["history"][0]["build"] = url or "started"
+          json.dump(s, open(path, "w"), indent=2)
+          open(path, "a").write("\n")
+          EOF
+
+      - name: Summary
+        run: |
+          {
+            if [[ "${{ steps.check.outputs.first }}" == true ]]; then
+              echo "### First check: commits saved, nothing to compare yet"
+            elif [[ "${{ steps.check.outputs.changed }}" == true ]]; then
+              echo "## New upstream commits"
+              cat changes.md
+              if [[ -n "${{ steps.build.outputs.url }}" ]]; then
+                echo "CI build of both kernels (no release): ${{ steps.build.outputs.url }}"
+              elif [[ "${{ steps.build.conclusion }}" == success ]]; then
+                echo "CI build of both kernels started on $BUILD_REF (no release)."
+              else
+                echo "No build started (manual check with Build unticked)."
+              fi
+            else
+              echo "### No new upstream commits"
+            fi
+            echo
+            python3 -c 'import json,sys; [print(f"- {v[\"name\"]}: {v[\"repo\"]} `{v[\"branch\"]}` @ `{v[\"commit\"][:12]}` ({v[\"date\"]})") for v in json.load(open(sys.argv[1]))["sources"].values()]' "$STATE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save the commits seen
+        if: steps.check.outputs.changed == 'true' || steps.check.outputs.first == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          cp "$STATE" "$RUNNER_TEMP/state.json"
+          branch=${{ github.event.repository.default_branch }}
+          for attempt in 1 2 3; do
+            git fetch -q origin "$branch" && git reset -q --hard FETCH_HEAD
+            mkdir -p "$(dirname "$STATE")"
+            cp "$RUNNER_TEMP/state.json" "$STATE"
+            git add "$STATE"
+            if git diff --cached --quiet; then echo 'State already saved.'; exit 0; fi
+            git commit -q -m "Upstream check: ${{ steps.check.outputs.changed_list || 'first check' }}"
+            git push -q origin "HEAD:$branch" && exit 0
+            sleep 5
+          done
+          echo '::error::Could not save the upstream state.'; exit 1
