@@ -1,0 +1,40 @@
+{
+  "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
+  "checked": "2026-11-20T10:09:37Z",
+  "sources": {
+    "mzggr": {
+      "commit": "7dd52de28d1ee64dddc1f3e853e214fab7578c44",
+      "date": "2026-11-16T22:15:20Z",
+      "subject": "kernelsu: update BakaSU to 7b65bde0",
+      "name": "mzggr kernel",
+      "repo": "https://github.com/mzggr0914/android_kernel_a325x_bakasu",
+      "branch": "common"
+    },
+    "aigis": {
+      "commit": "dc0935aba4a71c0cf3d7c7fd3c38c1e5e58c86c6",
+      "date": "2026-11-19T20:28:01Z",
+      "subject": "chore: bump NoMount to dcd77d0 [skip ci]",
+      "name": "Aigis kernel",
+      "repo": "https://github.com/SlamZDank/Aigis-Kernel-A32",
+      "branch": "bpf-5.15-legion"
+    },
+    "xxksu": {
+      "commit": "f27e1f0d3192820b0964881585d764ab0f0de56f",
+      "date": "2026-11-20T00:59:53Z",
+      "subject": "KernelSU v3.3.1+",
+      "name": "xxKSU",
+      "repo": "https://github.com/backslashxx/KernelSU",
+      "branch": "master"
+    },
+    "susfs": {
+      "commit": "26f2313be61f7a8603a50b2dcd12171495a79d27",
+      "date": "2026-11-18T10:31:45Z",
+      "subject": "Merge pull request #221 from sakuya-izayoi-c/fix/sus-path-i-state",
+      "name": "Jack's SUSFS (4.14 patch)",
+      "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
+      "branch": "mainline",
+      "path": "Patches/Patch/susfs_patch_to_4.14.patch"
+    }
+  },
+  "history": []
+}
