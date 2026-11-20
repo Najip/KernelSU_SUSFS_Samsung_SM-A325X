@@ -20,6 +20,9 @@ on:
       kernel_source:
         type: string
         default: mzggr
+      uname_tag:
+        type: string
+        default: '-forkby-gh.Najip'
       perf_tuning:
         type: boolean
         default: true
@@ -63,6 +66,10 @@ on:
           - master
           - dev
         default: dev
+      uname_tag:
+        description: 'uname tag of the kernel you flashed (end of uname -r). Empty = none'
+        type: string
+        default: '-forkby-gh.Najip'
       kernel_source:
         description: 'Kernel you flashed. mzggr = mzggr0914 kernel, aigis = Aigis kernel'
         type: choice
@@ -109,6 +116,7 @@ permissions:
 
 env:
   KERNEL_SOURCE: ${{ inputs.kernel_source || 'mzggr' }}
+  KERNEL_TAG: ${{ inputs.uname_tag }}
   # sources.conf ignores tuning for Aigis (it keeps its own tuning).
   PERF_TUNING: ${{ inputs.perf_tuning }}
   VALHALL_GPU: ${{ inputs.valhall_gpu }}

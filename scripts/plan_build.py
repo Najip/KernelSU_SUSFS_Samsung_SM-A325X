@@ -102,6 +102,7 @@ def main():
                 "source": src, **{k: info.get(k, "") for k in REF_KEYS},
                 "ksu_hook": info.get("hook", "manual"), "perf_tuning": info.get("tuning", "false"),
                 "network_fix": info.get("network_fix", "true"), "kernel_release": info.get("kernel_release", ""),
+                "kernel_tag": info.get("kernel_tag", ""),
                 "kit_id": kit, "build_nomount": str(build_nm).lower(),
             })
             summary(f"{src}: NoMount {'built now' + (' from the saved kernel kit' if kit else '') if build_nm else ('not included' if nomount_mode == 'no' else 'taken from that run')}")
@@ -130,6 +131,7 @@ def main():
                 "ksu_hook": e.get("KSU_HOOK", "manual"),
                 "perf_tuning": e.get("PERF_TUNING", "false") if src == "mzggr" else "false",
                 "network_fix": e.get("NETWORK_FIX", "true"), "kernel_release": "",
+                "kernel_tag": e.get("KERNEL_TAG", ""),
                 "kit_id": kit, "build_nomount": str(nomount_mode == "lkm").lower(),
             })
 

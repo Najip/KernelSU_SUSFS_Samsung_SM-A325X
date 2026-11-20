@@ -102,6 +102,7 @@ fi
   echo "Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
   echo "Kernel release: $release"
   echo "Kernel ID (NoMount match): $kernel_id"
+  echo "uname tag: ${KERNEL_TAG:-none}"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
   echo "xxKSU: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"
