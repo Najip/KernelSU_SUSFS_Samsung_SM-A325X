@@ -107,9 +107,47 @@ unzip -p "$zip_path" Image | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
 
+# Second ZIP: the same kernel + the Valhall GPU drivers module, installed
+# into /data/adb/modules by the zip itself (one flash instead of two).
+rm -f "$PACKAGE_DIR"/*-valhall.zip "$PACKAGE_DIR/zip-name-valhall.txt"
+if [[ -n "${VALHALL_DRIVERS_URL:-}" ]]; then
+  vzip="$work/valhall-module.zip"
+  curl -fsSL --retry 3 -o "$vzip" "$VALHALL_DRIVERS_URL"
+  echo "$VALHALL_DRIVERS_SHA256  $vzip" | sha256sum -c --quiet - \
+    || { echo "Valhall drivers module checksum changed: $VALHALL_DRIVERS_URL" >&2; exit 1; }
+  vak3="$work/AnyKernel3-valhall"
+  cp -a "$ak3" "$vak3"
+  mkdir "$vak3/valhall"
+  unzip -q "$vzip" -d "$vak3/valhall"
+  grep -q '^id=a32-gpu-upgrade$' "$vak3/valhall/module.prop"
+  # Run after write_boot, so the kernel is flashed first.
+  python3 - "$vak3/anykernel.sh" "$ROOT/anykernel/valhall-install.sh" <<'PY'
+import sys
+p, add = sys.argv[1], open(sys.argv[2]).read()
+s = open(p).read()
+marker = "## end boot install"
+assert s.count(marker) == 1, "anykernel.sh: no single '## end boot install' line"
+open(p, "w").write(s.replace(marker, marker + "\n" + add, 1))
+PY
+  sed -i "s|^kernel\.string=.*|&-valhall|" "$vak3/anykernel.sh"
+  sed -i "s|^Valhall GPU drivers module.*|Valhall GPU drivers module: included in ${name}-valhall.zip (installed to /data/adb/modules/a32-gpu-upgrade); the plain zip leaves it out: $VALHALL_DRIVERS_URL|" "$work/build-info.txt" "$vak3/build-info.txt" "$ak3/build-info.txt"
+  vzip_path="$PACKAGE_DIR/$name-valhall.zip"
+  (cd "$vak3" && zip -qr9 "$vzip_path" . -x '*~')
+  unzip -tq "$vzip_path"
+  unzip -p "$vzip_path" Image | cmp - "$IMAGE"
+  unzip -p "$vzip_path" valhall/system/vendor/lib64/egl/libGLES_mali.so | cmp - "$vak3/valhall/system/vendor/lib64/egl/libGLES_mali.so"
+  unzip -p "$vzip_path" anykernel.sh | grep -q '^valhall_install;'
+  echo "$name-valhall" > "$PACKAGE_DIR/zip-name-valhall.txt"
+  # Refresh the plain zip's build-info.txt with the updated Valhall line.
+  (cd "$ak3" && zip -q9 "$zip_path" build-info.txt)
+fi
+
 cp "$work/build-info.txt" "$PACKAGE_DIR/build-info.txt"
 cp "$INFO_DIR/sources.json" "$PACKAGE_DIR/sources.json"
-(cd "$PACKAGE_DIR" && sha256sum "$name.zip" > SHA256SUMS.txt)
+(cd "$PACKAGE_DIR" && sha256sum "$name".zip "$name"-valhall.zip 2>/dev/null > SHA256SUMS.txt || true)
+grep -q " $name.zip$" "$PACKAGE_DIR/SHA256SUMS.txt"
 echo "$name" > "$PACKAGE_DIR/zip-name.txt"
 cat "$PACKAGE_DIR/build-info.txt"
 echo "Created flashable ZIP: $zip_path"
+[[ -f "$PACKAGE_DIR/zip-name-valhall.txt" ]] && echo "Created flashable ZIP with the Valhall drivers: $PACKAGE_DIR/$name-valhall.zip"
+exit 0

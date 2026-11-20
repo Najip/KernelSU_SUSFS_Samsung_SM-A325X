@@ -374,6 +374,10 @@ jobs:
           bash scripts/package_zip.sh 2>&1 | tee -a "$BUILD_LOG"
           name=$(cat "$PACKAGE_DIR/zip-name.txt")
           echo "ZIP_PATH=$PACKAGE_DIR/$name.zip" >> "$GITHUB_ENV"
+          if [[ -f "$PACKAGE_DIR/zip-name-valhall.txt" ]]; then
+            echo "VALHALL_ZIP_PATH=$PACKAGE_DIR/$(cat "$PACKAGE_DIR/zip-name-valhall.txt").zip" >> "$GITHUB_ENV"
+            echo "### Flashable ZIP with the Valhall GPU drivers: \`$(cat "$PACKAGE_DIR/zip-name-valhall.txt").zip\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
           {
             echo "### Flashable ZIP: \`$name.zip\`"
             echo '```'
@@ -446,6 +450,15 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: ${{ env.ZIP_PATH }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload flashable ZIP with the Valhall GPU drivers
+        if: env.BUILD_KERNEL == 'true' && env.VALHALL_ZIP_PATH != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.VALHALL_ZIP_PATH }}
           archive: false
           if-no-files-found: error
           retention-days: 30
