@@ -17,11 +17,21 @@ test -s "$IMAGE"
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 ak3="$work/AnyKernel3"
-git init -q "$ak3"
-git -C "$ak3" fetch -q --depth=1 "$AK3_REPO" "$AK3_COMMIT"
-git -C "$ak3" checkout -q --detach FETCH_HEAD
-rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/README.md"
-cp "$ROOT/anykernel/anykernel.sh" "$ak3/anykernel.sh"
+if [[ -n "${AK3_FROM_TREE:-}" ]]; then
+  # The kernel tree's own AnyKernel folder (its anykernel.sh, tools and
+  # device names), as the Aigis CI packages it: only Image is added.
+  [[ -f "$KERNEL_DIR/$AK3_FROM_TREE/anykernel.sh" ]] || { echo "No $AK3_FROM_TREE/anykernel.sh in the kernel tree" >&2; exit 1; }
+  cp -a "$KERNEL_DIR/$AK3_FROM_TREE" "$ak3"
+  rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/dtbo.img" "$ak3/README.md"
+  ak3_line="$AK3_FROM_TREE folder of the kernel tree (Image only)"
+else
+  git init -q "$ak3"
+  git -C "$ak3" fetch -q --depth=1 "$AK3_REPO" "$AK3_COMMIT"
+  git -C "$ak3" checkout -q --detach FETCH_HEAD
+  rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/README.md"
+  cp "$ROOT/anykernel/anykernel.sh" "$ak3/anykernel.sh"
+  ak3_line="$AK3_REPO @ $AK3_COMMIT"
+fi
 
 read_json() { python3 -c "import json,sys; d=json.load(open('$INFO_DIR/sources.json')); print(d$1)"; }
 susfs=$(read_json '["susfs"]["version"]')
@@ -29,6 +39,9 @@ kshort=$(read_json '["kernel"]["commit"][:8]')
 xshort=$(read_json '["xxksu"]["commit"][:8]')
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
+# Kernel ID: the same for every build of this exact kernel; the NoMount module
+# built for it carries the same ID (see scripts/kernel_id.sh).
+kernel_id=$(bash "$ROOT/scripts/kernel_id.sh" "$OUT_DIR")
 date=$(date -u +%Y%m%d)
 suffix=
 case "$KSU_HOOK" in
@@ -36,6 +49,8 @@ case "$KSU_HOOK" in
   branch_link) suffix=-bl ;;
 esac
 [[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
+[[ "${VALHALL_GPU:-false}" == true ]] && suffix=$suffix-vgpu
+[[ "$KERNEL_SOURCE" == aigis && "$KERNEL_TOOLCHAIN" == aosp ]] && suffix=$suffix-aospclang
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in
@@ -43,22 +58,67 @@ case "$NOMOUNT_MODE" in
   lkm) nomount_line="separate LKM (${NOMOUNT_REF:-dev})" ;;
   *) nomount_line="not included" ;;
 esac
-name="A325X-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
+name="${KERNEL_LABEL}-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
 
-sed -i "s|^kernel\.string=.*|kernel.string=A325X ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
+sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 cp "$IMAGE" "$ak3/Image"
-gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
+
+# Flasher additions, run after the kernel is written:
+#  - every zip: NoMount check (warns when the installed NoMount LKM was not
+#    built for this kernel, by kernel ID)
+#  - mzggr zip (stock A32 GPU): deletes the Aigis Valhall GPU drivers module
+add_after_boot() {
+  python3 - "$ak3/anykernel.sh" "$1" <<'PY'
+import sys
+p, add = sys.argv[1], open(sys.argv[2]).read()
+s = open(p).read()
+for marker in ("## end boot install", "## end install"):
+    if s.count(marker) == 1:
+        open(p, "w").write(s.replace(marker, marker + "\n" + add, 1))
+        break
+else:
+    sys.exit("anykernel.sh: no single '## end boot install' or '## end install' line")
+PY
+}
+sed -e "s|@KERNEL_ID@|$kernel_id|" -e "s|@KERNEL_RELEASE@|$release|" -e "s|@NOMOUNT_MODE@|${NOMOUNT_MODE:-lkm}|" \
+  "$ROOT/anykernel/nomount-check.sh" > "$work/nomount-check.sh"
+add_after_boot "$work/nomount-check.sh"
+[[ "$KERNEL_SOURCE" == mzggr ]] && add_after_boot "$ROOT/anykernel/gpu-cleanup.sh"
+grep -q '^nomount_check;' "$ak3/anykernel.sh"
+dtb_line="not included (the phone's current dtb is kept)"
+if [[ -n "${AK3_DTB_BOOTIMG:-}" ]]; then
+  bootimg="$work/dtb-source-boot.img"
+  curl -fsSL --retry 3 -o "$bootimg" "$AK3_DTB_BOOTIMG"
+  echo "$AK3_DTB_BOOTIMG_SHA256  $bootimg" | sha256sum -c --quiet - \
+    || { echo "dtb source boot image checksum changed: $AK3_DTB_BOOTIMG" >&2; exit 1; }
+  python3 "$ROOT/scripts/bootimg_dtb.py" "$bootimg" "$ak3/dtb"
+  echo "$AK3_DTB_SHA256  $ak3/dtb" | sha256sum -c --quiet -
+  dtb_line="$(basename "$AK3_DTB_BOOTIMG") (sha256 ${AK3_DTB_SHA256:0:16}...), written to the boot partition with the kernel"
+fi
+[[ -z "${AK3_FROM_TREE:-}" ]] && gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
 
 {
-  echo "A325X xxKSU + SUSFS kernel"
+  echo "${KERNEL_LABEL} xxKSU + SUSFS kernel"
   echo "Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
   echo "Kernel release: $release"
+  echo "Kernel ID (NoMount match): $kernel_id"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
   echo "xxKSU: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"
   echo "Build repo commit: $repo_sha"
-  echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
-  echo "AnyKernel3: $AK3_REPO @ $AK3_COMMIT"
+  if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then
+    echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") (ZyC, Aigis CI setup: gcc wrappers, no LLVM=1, -w -pipe -O3, linker: ${KERNEL_LINKER:-lld})"
+  else
+    echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
+  fi
+  echo "AnyKernel3: $ak3_line"
+  if [[ "$KERNEL_SOURCE" == aigis ]]; then
+    echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 with Aigis GPU tuning' || echo 'stock A32 Bifrost r25p0 (same as the mzggr kernel)')"
+  else
+    echo "GPU: stock A32 Bifrost r25p0"
+  fi
+  echo "dtb: $dtb_line"
+  [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
   echo "xxKSU hook style: $KSU_HOOK"
   echo "Performance tuning: $PERF_TUNING"
@@ -76,13 +136,52 @@ rm -f "$zip_path"
 (cd "$ak3" && zip -qr9 "$zip_path" . -x '*.zip' '*~')
 unzip -tq "$zip_path"
 unzip -p "$zip_path" Image | cmp - "$IMAGE"
-unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
+[[ -z "${AK3_DTB_BOOTIMG:-}" ]] || unzip -p "$zip_path" dtb | sha256sum | grep -q "^$AK3_DTB_SHA256 "
+[[ -n "${AK3_FROM_TREE:-}" ]] || unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
 
+# Second ZIP: the same kernel + the Valhall GPU drivers module, installed
+# into /data/adb/modules by the zip itself (one flash instead of two).
+rm -f "$PACKAGE_DIR"/*-valhall.zip "$PACKAGE_DIR/zip-name-valhall.txt"
+if [[ -n "${VALHALL_DRIVERS_URL:-}" ]]; then
+  vzip="$work/valhall-module.zip"
+  curl -fsSL --retry 3 -o "$vzip" "$VALHALL_DRIVERS_URL"
+  echo "$VALHALL_DRIVERS_SHA256  $vzip" | sha256sum -c --quiet - \
+    || { echo "Valhall drivers module checksum changed: $VALHALL_DRIVERS_URL" >&2; exit 1; }
+  vak3="$work/AnyKernel3-valhall"
+  cp -a "$ak3" "$vak3"
+  mkdir "$vak3/valhall"
+  unzip -q "$vzip" -d "$vak3/valhall"
+  grep -q '^id=a32-gpu-upgrade$' "$vak3/valhall/module.prop"
+  # Run after write_boot, so the kernel is flashed first.
+  python3 - "$vak3/anykernel.sh" "$ROOT/anykernel/valhall-install.sh" <<'PY'
+import sys
+p, add = sys.argv[1], open(sys.argv[2]).read()
+s = open(p).read()
+marker = "## end boot install"
+assert s.count(marker) == 1, "anykernel.sh: no single '## end boot install' line"
+open(p, "w").write(s.replace(marker, marker + "\n" + add, 1))
+PY
+  sed -i "s|^kernel\.string=.*|&-valhall|" "$vak3/anykernel.sh"
+  sed -i "s|^Valhall GPU drivers module.*|Valhall GPU drivers module: included in ${name}-valhall.zip (installed to /data/adb/modules/a32-gpu-upgrade); the plain zip leaves it out: $VALHALL_DRIVERS_URL|" "$work/build-info.txt" "$vak3/build-info.txt" "$ak3/build-info.txt"
+  vzip_path="$PACKAGE_DIR/$name-valhall.zip"
+  (cd "$vak3" && zip -qr9 "$vzip_path" . -x '*~')
+  unzip -tq "$vzip_path"
+  unzip -p "$vzip_path" Image | cmp - "$IMAGE"
+  unzip -p "$vzip_path" valhall/system/vendor/lib64/egl/libGLES_mali.so | cmp - "$vak3/valhall/system/vendor/lib64/egl/libGLES_mali.so"
+  unzip -p "$vzip_path" anykernel.sh | grep -q '^valhall_install;'
+  echo "$name-valhall" > "$PACKAGE_DIR/zip-name-valhall.txt"
+  # Refresh the plain zip's build-info.txt with the updated Valhall line.
+  (cd "$ak3" && zip -q9 "$zip_path" build-info.txt)
+fi
+
 cp "$work/build-info.txt" "$PACKAGE_DIR/build-info.txt"
 cp "$INFO_DIR/sources.json" "$PACKAGE_DIR/sources.json"
-(cd "$PACKAGE_DIR" && sha256sum "$name.zip" > SHA256SUMS.txt)
+(cd "$PACKAGE_DIR" && sha256sum "$name".zip "$name"-valhall.zip 2>/dev/null > SHA256SUMS.txt || true)
+grep -q " $name.zip$" "$PACKAGE_DIR/SHA256SUMS.txt"
 echo "$name" > "$PACKAGE_DIR/zip-name.txt"
 cat "$PACKAGE_DIR/build-info.txt"
 echo "Created flashable ZIP: $zip_path"
+[[ -f "$PACKAGE_DIR/zip-name-valhall.txt" ]] && echo "Created flashable ZIP with the Valhall drivers: $PACKAGE_DIR/$name-valhall.zip"
+exit 0
