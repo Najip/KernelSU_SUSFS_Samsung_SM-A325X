@@ -57,6 +57,16 @@ name="${KERNEL_LABEL}-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 cp "$IMAGE" "$ak3/Image"
+dtb_line="not included (the phone's current dtb is kept)"
+if [[ -n "${AK3_DTB_BOOTIMG:-}" ]]; then
+  bootimg="$work/dtb-source-boot.img"
+  curl -fsSL --retry 3 -o "$bootimg" "$AK3_DTB_BOOTIMG"
+  echo "$AK3_DTB_BOOTIMG_SHA256  $bootimg" | sha256sum -c --quiet - \
+    || { echo "dtb source boot image checksum changed: $AK3_DTB_BOOTIMG" >&2; exit 1; }
+  python3 "$ROOT/scripts/bootimg_dtb.py" "$bootimg" "$ak3/dtb"
+  echo "$AK3_DTB_SHA256  $ak3/dtb" | sha256sum -c --quiet -
+  dtb_line="$(basename "$AK3_DTB_BOOTIMG") (sha256 ${AK3_DTB_SHA256:0:16}...), written to the boot partition with the kernel"
+fi
 [[ -z "${AK3_FROM_TREE:-}" ]] && gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
 
 {
@@ -73,6 +83,8 @@ cp "$IMAGE" "$ak3/Image"
     echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
   fi
   echo "AnyKernel3: $ak3_line"
+  echo "dtb: $dtb_line"
+  [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
   echo "xxKSU hook style: $KSU_HOOK"
   echo "Performance tuning: $PERF_TUNING"
@@ -90,6 +102,7 @@ rm -f "$zip_path"
 (cd "$ak3" && zip -qr9 "$zip_path" . -x '*.zip' '*~')
 unzip -tq "$zip_path"
 unzip -p "$zip_path" Image | cmp - "$IMAGE"
+[[ -z "${AK3_DTB_BOOTIMG:-}" ]] || unzip -p "$zip_path" dtb | sha256sum | grep -q "^$AK3_DTB_SHA256 "
 [[ -n "${AK3_FROM_TREE:-}" ]] || unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
