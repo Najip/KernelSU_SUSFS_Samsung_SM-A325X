@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && ' (tuning)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
@@ -19,9 +19,13 @@ on:
           - syscall_table
         default: branch_link
       perf_tuning:
-        description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel). The network fix is always applied'
+        description: 'Performance tuning (GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel)'
         type: boolean
         default: false
+      network_fix:
+        description: 'Network fix (UDP-only GSO for IPv4 and IPv6). Allowed with every release type'
+        type: boolean
+        default: true
       nomount:
         description: 'NoMount. lkm = separate module (ZIP + .ko) built for this kernel (default). integrate = built into the kernel. no = not included'
         type: choice
@@ -69,6 +73,7 @@ permissions:
 
 env:
   PERF_TUNING: ${{ inputs.perf_tuning }}
+  NETWORK_FIX: ${{ inputs.network_fix }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'branch_link' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
   NOMOUNT_REF: ${{ inputs.nomount_branch || 'dev' }}
@@ -217,6 +222,7 @@ jobs:
       checkout_sha: ${{ steps.promoted.outputs.build_sha || github.sha }}
       ksu_hook: ${{ steps.promoted.outputs.hook || inputs.ksu_hook }}
       perf_tuning: ${{ steps.promoted.outputs.tuning || inputs.perf_tuning }}
+      network_fix: ${{ steps.promoted.outputs.network_fix || inputs.network_fix }}
       kernel_release: ${{ steps.promoted.outputs.kernel_release }}
       kernel_ref: ${{ steps.commits.outputs.kernel_ref || steps.promoted.outputs.kernel_ref }}
       ksu_ref: ${{ steps.commits.outputs.ksu_ref || steps.promoted.outputs.ksu_ref }}
@@ -235,6 +241,7 @@ jobs:
       # Promoted: same hook style and tuning as the Latest run it takes the kernel from.
       KSU_HOOK: ${{ needs.pick.outputs.ksu_hook }}
       PERF_TUNING: ${{ needs.pick.outputs.perf_tuning }}
+      NETWORK_FIX: ${{ needs.pick.outputs.network_fix }}
       BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
       BUILD_NOMOUNT: ${{ needs.pick.outputs.build_nomount }}
       KIT_ID: ${{ needs.pick.outputs.kit_id }}

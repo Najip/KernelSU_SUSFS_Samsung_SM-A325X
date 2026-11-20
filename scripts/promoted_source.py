@@ -181,6 +181,7 @@ def inspect(folder):
         "kernel_release": info_value(info, "Kernel release"),
         "build_sha": (src.get("build_repo") or {}).get("commit", ""),
         "has_nomount": str(has_ko and has_nm_zip).lower(),
+        "network_fix": "false" if info_value(info, "Network fix (UDP GSO)") == "not applied" else "true",
         "nomount_branch": nm_branch,
     })
     emit(out)

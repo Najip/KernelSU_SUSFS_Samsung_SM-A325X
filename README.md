@@ -36,7 +36,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default is `branch_link`. No LSM hooking in any style.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
-- Network fix (UDP-only GSO for IPv4 and IPv6). Always applied.
+- Network fix (UDP-only GSO for IPv4 and IPv6). A tick, ticked by default, allowed with every release type (and with `Promoted`, which keeps the setting of the build it takes).
 - Optional performance tuning (only when ticked), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
 - Toolchain: AOSP Clang 14 with ld.lld and GNU as. No LTO.
 
@@ -48,6 +48,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
    - **xxKSU hook style**: `branch_link` by default, then `manual`, then `syscall_table`. See [Hook styles](#hook-styles).
    - **Performance tuning**: unticked by default.
+   - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both attach the NoMount module built in the same run (see below).
    - **NoMount**: `lkm` by default, a separate module (`NoMount-....zip` and `nomount-4.14.ko`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.

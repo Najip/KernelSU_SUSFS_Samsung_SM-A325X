@@ -51,6 +51,9 @@ def key():
     parts = [f"kernel={e['KERNEL_REF']}", f"xxksu={e['KSU_REF']}", f"susfs={e['SUSFS_REF']}",
              f"hook={e.get('KSU_HOOK', 'branch_link')}", f"tuning={e.get('PERF_TUNING', 'false')}",
              f"nomount={e.get('NOMOUNT_PART', 'separate')}"]
+    # Older kits were made before the network fix became optional (always on).
+    if e.get("NETWORK_FIX", "true") != "true":
+        parts.append("network_fix=false")
     for path in TRACKED:
         oid = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{path}"], text=True).strip()
         parts.append(f"{path}={oid}")
