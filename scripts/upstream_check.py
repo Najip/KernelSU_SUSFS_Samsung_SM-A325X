@@ -6,6 +6,12 @@
 Watched (NoMount is not watched):
   mzggr kernel  KERNEL_REPO / KERNEL_REF of KERNEL_SOURCE=mzggr
   aigis kernel  KERNEL_REPO / KERNEL_REF of KERNEL_SOURCE=aigis
+                Both kernels: commits that only touch their root module or
+                NoMount (the KernelSU / BakaSU / KSUN / SukiSU / NoMount
+                submodules or folders, .gitmodules) or only docs (README,
+                *.md, docs/, .github/) are ignored. The build replaces the
+                root module with xxKSU and builds NoMount itself, so those do
+                not change our kernel. Every other kernel change counts.
   xxksu         KSU_REPO / KSU_REF
   susfs         SUSFS_REPO / SUSFS_REF, only commits that touched SUSFS_PATCH
                 (the 4.14 patch the build uses; the rest of that repo is
@@ -14,11 +20,13 @@ Watched (NoMount is not watched):
 The state file keeps the newest commit seen of each source and a short
 history of the changes found. The first check only saves the commits
 (nothing to compare with yet). Writes changed=true|false and first=true|false
-to $GITHUB_OUTPUT, the new commits to changes.md and the commits seen to
-sources.md.
+to $GITHUB_OUTPUT (moved=true when any commit is new, even if all were
+ignored), the new commits to changes.md, the ignored ones to ignored.md and
+the commits seen to sources.md.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -85,6 +93,43 @@ def new_commits(repo, old, new, path=None):
     return lines, total
 
 
+# A path segment with one of these names is a root module or NoMount.
+IGNORED_SEGMENTS = re.compile(r"^(kernelsu([-_].*)?|ksu|ksun|kernelsu-next|bakasu|sukisu.*|resukisu|"
+                              r"apatch|magisk|nomount)$", re.I)
+
+
+def ignored_path(path):
+    """True for files that do not change our kernel build."""
+    parts = path.split("/")
+    if path == ".gitmodules" or parts[0] in (".github", "docs"):
+        return True
+    if path.lower().endswith(".md") or parts[-1].upper().startswith("README"):
+        return True
+    return any(IGNORED_SEGMENTS.match(p) for p in parts)
+
+
+def kernel_commits(repo, old, new):
+    """Split the commits in old..new into (relevant, ignored) commit lists,
+    or None when they cannot be listed (rewritten branch, too many)."""
+    try:
+        data = api(f"repos/{repo}/compare/{old}...{new}")
+    except subprocess.CalledProcessError:
+        return None
+    commits = list(reversed(data.get("commits", [])))
+    if data.get("total_commits", len(commits)) > len(commits) or len(commits) > 100:
+        return None
+    relevant, ignored = [], []
+    for c in commits:
+        files = [f["filename"] for f in api(f"repos/{repo}/commits/{c['sha']}").get("files", [])]
+        # A commit with no files listed (for example a merge) counts.
+        (ignored if files and all(ignored_path(f) for f in files) else relevant).append(c)
+    return relevant, ignored
+
+
+def commit_line(repo, c):
+    return f"- [`{c['sha'][:8]}`](https://github.com/{repo}/commit/{c['sha']}) {c['commit']['message'].splitlines()[0]}"
+
+
 def emit(pairs):
     path = os.environ.get("GITHUB_OUTPUT")
     lines = "".join(f"{k}={v}\n" for k, v in pairs.items())
@@ -107,7 +152,7 @@ def main(conf_path, state_path):
     old = state.get("sources", {})
     first = not old
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    sources, report, changed = {}, [], []
+    sources, report, changed, ignored_report = {}, [], [], []
     for key, (label, repo, ref, path) in watched.items():
         cur = head(repo, ref, path)
         cur.update({"name": label, "repo": f"https://github.com/{repo}", "branch": ref})
@@ -122,6 +167,21 @@ def main(conf_path, state_path):
                 changed.append(key)
                 report += [f"### {label}: now watching {repo} `{ref}`", f"- `{cur['commit'][:8]}` {cur['subject']}", ""]
             print(f"{label}: {repo}@{ref} {cur['commit'][:12]} (saved)")
+        elif prev["commit"] != cur["commit"] and key in ("mzggr", "aigis") and \
+                (split := kernel_commits(repo, prev["commit"], cur["commit"])) is not None:
+            relevant, ignored = split
+            skipped = [commit_line(repo, c) + " (ignored: root module, NoMount or docs only)" for c in ignored]
+            if relevant:
+                changed.append(key)
+                n = len(relevant)
+                report += [f"### {label}: {n} new commit{'s' if n != 1 else ''} on `{ref}`"] + \
+                    [commit_line(repo, c) for c in relevant[:MAX_LIST]] + \
+                    ([f"- ... and {n - MAX_LIST} more"] if n > MAX_LIST else []) + skipped[:MAX_LIST] + [""]
+                print(f"{label}: {prev['commit'][:12]} -> {cur['commit'][:12]} ({n} kernel commits, {len(ignored)} ignored)")
+            else:
+                ignored_report.append(f"### {label}: only root module / NoMount / docs commits, ignored")
+                ignored_report += skipped[:MAX_LIST] + [""]
+                print(f"{label}: {prev['commit'][:12]} -> {cur['commit'][:12]}, ignored ({len(ignored)} root module, NoMount or docs commits)")
         elif prev["commit"] != cur["commit"]:
             lines, total = new_commits(repo, prev["commit"], cur["commit"], path)
             changed.append(key)
@@ -142,9 +202,13 @@ def main(conf_path, state_path):
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(json.dumps(state, indent=2) + "\n")
     Path("changes.md").write_text("\n".join(report) + "\n" if report else "")
+    Path("ignored.md").write_text("\n".join(ignored_report) + "\n" if ignored_report else "")
     Path("sources.md").write_text("".join(
         f"- {v['name']}: {v['repo']} `{v['branch']}` @ `{v['commit'][:12]}` ({v['date']})\n" for v in sources.values()))
-    emit({"changed": str(bool(changed)).lower(), "first": str(first).lower(), "changed_list": " ".join(changed)})
+    # moved: some commit is new, even when every new commit was ignored (saved, no build).
+    moved = any(old.get(k, {}).get("commit") != v["commit"] for k, v in sources.items())
+    emit({"changed": str(bool(changed)).lower(), "first": str(first).lower(), "changed_list": " ".join(changed),
+          "moved": str(moved).lower()})
 
 
 if __name__ == "__main__":

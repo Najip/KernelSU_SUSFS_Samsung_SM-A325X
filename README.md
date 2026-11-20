@@ -149,6 +149,8 @@ The **Upstream check** workflow runs three times a day (07:00, 15:00 and 23:00 J
 
 NoMount is not watched. The newest commits it has seen are saved in `configs/upstream-state.json` on the default branch, with a short history of what changed. The first check only saves them. When a later check finds a new commit, it starts **Build Kernel** with Kernel `both`, commit mode `Latest` and release type `CI` (never a release), and lists the new commits in the run summary. The build runs on the branch in the repo variable `UPSTREAM_BUILD_REF` (default: the default branch, `main`). Run it by hand from the Actions tab to check now; untick **Build** to only check and save.
 
+For the mzggr and Aigis kernels, a new commit only counts when it changes the kernel itself. Commits that only touch the tree's own root module (BakaSU, KSUN, ReSukiSU or any other KernelSU fork, as a submodule or folder), NoMount, `.gitmodules`, `.github/` or docs (`docs/`, README, `*.md`) are ignored: they do not start a build, since the build replaces those with xxKSU and upstream NoMount anyway. They are still saved and listed under **Ignored kernel commits** in the run summary. Any other file (sources, defconfig, build scripts, SUSFS) counts.
+
 ## NoMount without a kernel compile
 
 A module only needs three files from the kernel it is built for: `.config`, `Module.symvers` (this kernel has `CONFIG_MODVERSIONS=y`, so the module must carry the symbol versions of the real kernel) and the kernel release string. Every full kernel build saves these as a `kernel-kit-...` artifact (kept 30 days). Module signing is off in this kernel, so nothing else is needed.

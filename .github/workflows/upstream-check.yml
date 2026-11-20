@@ -108,12 +108,17 @@ jobs:
             else
               echo "### No new upstream commits"
             fi
+            if [[ -s ignored.md ]]; then
+              echo
+              echo "## Ignored kernel commits (root module, NoMount or docs only, no build)"
+              cat ignored.md
+            fi
             echo
             cat sources.md
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save the commits seen
-        if: steps.check.outputs.changed == 'true' || steps.check.outputs.first == 'true'
+        if: steps.check.outputs.changed == 'true' || steps.check.outputs.moved == 'true' || steps.check.outputs.first == 'true'
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
@@ -126,7 +131,7 @@ jobs:
             cp "$RUNNER_TEMP/state.json" "$STATE"
             git add "$STATE"
             if git diff --cached --quiet; then echo 'State already saved.'; exit 0; fi
-            git commit -q -m "Upstream check: ${{ steps.check.outputs.changed_list || 'first check' }}"
+            git commit -q -m "Upstream check: ${{ steps.check.outputs.changed_list || (steps.check.outputs.first == 'true' && 'first check' || 'only ignored kernel commits') }}"
             git push -q origin "HEAD:$branch" && exit 0
             sleep 5
           done
