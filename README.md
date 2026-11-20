@@ -9,7 +9,7 @@ This repo stores no kernel source. The GitHub Actions workflows download every s
 The table below is refreshed automatically each time a release is published.
 
 <!-- SOURCES:START -->
-Last release: [build-20261120-78](../../releases/tag/build-20261120-78)
+Last release: [build-20261120-79](../../releases/tag/build-20261120-79)
 
 | Part | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|
