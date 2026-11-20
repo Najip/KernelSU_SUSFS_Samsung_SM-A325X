@@ -37,7 +37,7 @@ on:
       valhall_gpu:
         description: 'Aigis only: Valhall GPU (Aigis r32p1 GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU'
         type: boolean
-        default: false
+        default: true
       compiler:
         description: 'Aigis only: compiler. aigis = ZyC Clang 14.0.6 the Aigis CI way (default). main = AOSP Clang 14 as used for mzggr'
         type: choice
