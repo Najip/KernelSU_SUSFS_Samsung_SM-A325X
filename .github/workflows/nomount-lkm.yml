@@ -365,7 +365,7 @@ jobs:
           sed -i "s/^version=.*/version=${base_ver} (${NOMOUNT_COUNT}-${nshort}, LKM ${KVER})/" "$mod/module.prop"
           suffix=
           [[ "$PERF_TUNING" == true ]] && suffix=-tuning
-          name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-k${kshort}-n${nshort}${suffix}"
+          name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-${KERNEL_SOURCE}-k${kshort}-n${nshort}${suffix}"
           {
             echo "NoMount LKM for A325X xxKSU + SUSFS kernel"
             echo "NoMount: $NOMOUNT_REPO branch $NOMOUNT_REF @ $NOMOUNT_SHA ($NOMOUNT_COUNT commits)"
@@ -385,6 +385,9 @@ jobs:
           unzip -l "$zip_path" | grep -q 'module.prop'
           cat "$ARTIFACTS/build-info.txt"
           echo "ZIP_PATH=$zip_path" >> "$GITHUB_ENV"
+          # The .ko file name says which kernel it is for (aigis or mzggr).
+          cp "$ARTIFACTS/nomount-$KVER.ko" "$ARTIFACTS/nomount-$KVER-$KERNEL_SOURCE.ko"
+          echo "KO_PATH=$ARTIFACTS/nomount-$KVER-$KERNEL_SOURCE.ko" >> "$GITHUB_ENV"
           {
             echo "### NoMount module ZIP: \`$name.zip\`"
             echo '```'
@@ -403,7 +406,7 @@ jobs:
       - name: Upload nomount.ko
         uses: actions/upload-artifact@v7
         with:
-          path: ${{ env.ARTIFACTS }}/nomount-4.14.ko
+          path: ${{ env.KO_PATH }}
           archive: false
           retention-days: 30
 
@@ -421,7 +424,7 @@ jobs:
           name: nomount-release-files
           path: |
             ${{ env.ZIP_PATH }}
-            ${{ env.ARTIFACTS }}/nomount-4.14.ko
+            ${{ env.KO_PATH }}
           retention-days: 3
 
       - name: Upload logs for troubleshooting

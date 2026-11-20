@@ -6,7 +6,7 @@ This repo stores no kernel source. The GitHub Actions workflows download every s
 
 ## Sources used
 
-The table below is refreshed automatically each time a release is published.
+The table below is refreshed automatically each time a release is published: the Aigis kernel first, then mzggr, then the xxKSU manager APK of that release.
 
 <!-- SOURCES:START -->
 Last release: [build-20261120-79](../../releases/tag/build-20261120-79)
@@ -43,13 +43,14 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 ### Aigis kernel (Kernel dropdown)
 
-The **Kernel** dropdown picks the kernel tree: `mzggr` (default, everything above), `aigis`, or `both` (both kernels in one run, all ZIPs, and one release holding all of them so users can choose).
+The **Kernel** dropdown picks the kernel tree: `aigis` (default), `mzggr` (everything above), or `both` (both kernels in one run, all ZIPs, and one release holding all of them so users can choose).
 
 - `aigis` builds the [Aigis kernel by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32) from its default branch `bpf-5.15-legion`, with the SUSFS hooks of its `bpf-5.15-legion-susfs` branch, then the same xxKSU, SUSFS core, hook styles, network fix and NoMount options. Zips are named `A325X-Aigis-...`.
 - Aigis keeps its own CPU/GPU tuning. Our **Performance tuning** does not fit its tree, so for Aigis it is ignored with a warning and that kernel is built without it (with `both`, only the mzggr ZIP gets the tuning).
 - **Valhall GPU** (Aigis only, ticked by default, allowed with every release type): unticked = stock A32 GPU (`patches/base/0002-aigis-stock-gpu.patch`). Ticked = the Aigis Valhall r32p1 setup with their GPU tuning: there is one zip, which writes the r32p1 dtb and also installs their [Valhall drivers module](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/download/GPU-Update/A32-Mali-Valhall-Drivers-KSU-Module.zip) (no kernel-only zip). Zip names get `-vgpu`.
 - **Compiler** (Aigis only): `aigis` (default) = ZyC Clang 14.0.6 the way the Aigis CI builds it; `main` = AOSP Clang 14 as for mzggr (zip names get `-aospclang`).
-- In a release with both kernels, the mzggr files keep their names (`build-info.txt`, `sources.json`, `nomount-4.14.ko`) and the Aigis ones get `-aigis` (`build-info-aigis.txt`, `sources-aigis.json`, `nomount-4.14-aigis.ko`). Flash the NoMount ZIP made for the kernel you flashed.
+- NoMount files always name their kernel: `NoMount-...-lkm-4.14-aigis-....zip` / `nomount-4.14-aigis.ko` and `NoMount-...-lkm-4.14-mzggr-....zip` / `nomount-4.14-mzggr.ko`. Flash the NoMount ZIP made for the kernel you flashed.
+- In a release with both kernels, the mzggr `build-info.txt` and `sources.json` keep their names and the Aigis ones get `-aigis` (`build-info-aigis.txt`, `sources-aigis.json`).
 
 ## How to build
 
@@ -58,21 +59,22 @@ The **Kernel** dropdown picks the kernel tree: `mzggr` (default, everything abov
 3. Choose the options and press the green **Run workflow** button:
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
    - **xxKSU hook style**: `manual` by default, then `syscall_table`, then `branch_link` (currently unstable). See [Hook styles](#hook-styles).
-   - **Kernel**: `mzggr` by default, or `aigis`, or `both` (see [Aigis kernel](#aigis-kernel-kernel-dropdown)).
+   - **Kernel**: `aigis` by default, or `mzggr`, or `both` (see [Aigis kernel](#aigis-kernel-kernel-dropdown)).
    - **Performance tuning**: ticked by default (mzggr only, ignored for Aigis). Allowed with every release type.
    - **Valhall GPU** and **Compiler**: Aigis only, ignored for mzggr.
    - **uname tag**: `-forkby-gh.Najip` by default, added to the end of `uname -r` on both kernels (for example `4.14.357-openela-vigus-slmkernel-a32-forkby-gh.Najip`). Letters, digits, space and `. _ + -` only (no `/`, the release name is also a folder name). Clear it for the kernel's own name. `bpfloader`, `netbpfload` and `netd` still see the fixed fake version, so networking is not affected. A NoMount module must be built with the same tag (the **NoMount LKM** workflow has the same box).
    - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, `Release` publishes a full release, and `Release from last pre-release` turns the newest pre-release into the full Release without building. Both attach the NoMount module built in the same run (see below).
-   - **NoMount**: `lkm` by default, a separate module (`NoMount-....zip` and `nomount-4.14.ko`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.
+   - **NoMount**: `lkm` by default, a separate module (`NoMount-...-aigis-....zip` and `nomount-4.14-aigis.ko`, or `mzggr`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.
    - **NoMount branch**: `dev` by default, or `master`. Used for both `lkm` and `integrate`.
    - **NoMount only**: unticked by default. Tick it to build only the NoMount module, no kernel ZIP (see [NoMount without a kernel compile](#nomount-without-a-kernel-compile)).
    - **Build hook benchmark**: unticked by default. Tick it only when you want the `hook-bench` tool; the kernel does not need it.
 4. When the run is green, open it and download from **Artifacts**:
    - `A325X-xxKSU-SUSFS-....zip`: the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
    - `build-info.txt`: what was built (also inside the ZIP).
-   - `NoMount-....zip` and `nomount-4.14.ko`: with NoMount `lkm`. The ZIP is flashed as a module in the KernelSU manager.
+   - `NoMount-...-<kernel>-....zip` and `nomount-4.14-<kernel>.ko` (`<kernel>` = `aigis` or `mzggr`): with NoMount `lkm`. The ZIP is flashed as a module in the KernelSU manager.
+   - `xxksu-manager`: the xxKSU manager APK of the latest [xxKSU release](https://github.com/backslashxx/KernelSU/releases/latest) (the **List manager APK** job, every run). The artifact downloads as a ZIP with the `.apk` inside; releases attach the `.apk` itself.
    - `hook-bench`: the benchmark tool and its script, only when **Build hook benchmark** was ticked (see below).
 
 No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.
@@ -135,7 +137,7 @@ It stops with "Release must use Verified" when that pre-release was not built fr
 
 "What's new" in a full Release always compares with the previous full Release; a pre-release compares with the previous release of any kind. A previous release of another kernel repo makes it a "First release".
 
-With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14.ko` built in the same run to the release page. The README sources table is updated only by a full `Release`.
+With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14-<kernel>.ko` built in the same run to the release page, plus the xxKSU manager `.apk`. The README sources table is updated only by a full `Release`.
 
 ## Upstream check
 
