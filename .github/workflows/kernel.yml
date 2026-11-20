@@ -123,6 +123,7 @@ jobs:
             scripts/promoted_source.py
             scripts/kernel_kit.py
             scripts/sources.conf
+            configs/verified.json
           sparse-checkout-cone-mode: false
       - name: Check the options fit together
         env:
