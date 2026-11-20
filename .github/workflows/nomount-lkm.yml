@@ -1,5 +1,5 @@
 name: NoMount LKM
-run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.perf_tuning && ' for tuning kernel' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.kernel_source == 'aigis' && ' for Aigis' || '' }}${{ inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' for tuning kernel' || '' }}${{ inputs.kernel_source == 'aigis' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.kernel_source == 'aigis' && inputs.compiler == 'main' && ' (main compiler)' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Builds nomount-4.14.ko and the flashable NoMount module ZIP (flash it in the
 # KernelSU manager). The kernel is compiled in the same run with the same
@@ -17,9 +17,18 @@ on:
       nomount_ref:
         type: string
         default: dev
+      kernel_source:
+        type: string
+        default: mzggr
       perf_tuning:
         type: boolean
+        default: true
+      valhall_gpu:
+        type: boolean
         default: false
+      compiler:
+        type: string
+        default: aigis
       ksu_hook:
         type: string
         default: manual
@@ -54,10 +63,28 @@ on:
           - master
           - dev
         default: dev
+      kernel_source:
+        description: 'Kernel you flashed. mzggr = mzggr0914 kernel, aigis = Aigis kernel'
+        type: choice
+        options:
+          - mzggr
+          - aigis
+        default: mzggr
       perf_tuning:
-        description: 'Tick if your kernel was built with Performance tuning'
+        description: 'Tick if your kernel was built with Performance tuning (mzggr only, ignored for Aigis)'
+        type: boolean
+        default: true
+      valhall_gpu:
+        description: 'Aigis only: tick if your kernel was built with the Valhall GPU'
         type: boolean
         default: false
+      compiler:
+        description: 'Aigis only: compiler of the kernel you flashed. aigis = ZyC Clang (default), main = AOSP Clang 14'
+        type: choice
+        options:
+          - aigis
+          - main
+        default: aigis
       ksu_hook:
         description: 'Hook of the kernel you flashed. manual = default. branch_link is currently unstable'
         type: choice
@@ -81,7 +108,11 @@ permissions:
 
 
 env:
+  KERNEL_SOURCE: ${{ inputs.kernel_source || 'mzggr' }}
+  # sources.conf ignores tuning for Aigis (it keeps its own tuning).
   PERF_TUNING: ${{ inputs.perf_tuning }}
+  VALHALL_GPU: ${{ inputs.valhall_gpu }}
+  AIGIS_COMPILER: ${{ inputs.compiler || 'aigis' }}
   NOMOUNT_REF: ${{ inputs.nomount_ref }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   GH_TOKEN: ${{ github.token }}
@@ -156,6 +187,7 @@ jobs:
             cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325x-bakasu"
             mkdir -p "$cache"
             kernel_dir="$cache/nomount-kernel-tree-${GITHUB_REF_NAME//\//-}"
+            [[ "$KERNEL_SOURCE" == mzggr ]] || kernel_dir="$kernel_dir-$KERNEL_SOURCE"
           else
             kernel_dir="$work/kernel"
           fi
@@ -197,7 +229,7 @@ jobs:
             echo 'All build dependencies are already installed.'
           fi
 
-      - name: Use cached AOSP Clang 14 (own PC)
+      - name: Use cached toolchain (own PC)
         if: env.SELF_HOSTED == 'true'
         run: |
           set -euo pipefail
@@ -205,9 +237,16 @@ jobs:
           mkdir -p "$cache"
           exec 9>"$cache/.lock"
           flock 9
-          key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
-          toolchain="$cache/aosp-clang14-$key"
-          AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          . scripts/sources.conf
+          if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then
+            key=$(sha256sum scripts/fetch_zyc_clang.sh scripts/zyc_clang14.conf | sha256sum | cut -c1-16)
+            toolchain="$cache/zyc-clang14-$key"
+            ZYC_CLANG_CACHE="$cache/archives" bash scripts/fetch_zyc_clang.sh "$toolchain"
+          else
+            key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
+            toolchain="$cache/aosp-clang14-$key"
+            AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          fi
           echo "TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
 
       - name: Download NoMount (${{ inputs.nomount_ref }})
@@ -441,7 +480,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           for attempt in 1 2 3; do
             git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
-            python3 scripts/resolve_commits.py promote sources.json configs/verified.json
+            python3 scripts/resolve_commits.py promote configs/verified.json sources.json
             if git diff --quiet; then echo 'Verified commits already match this build.'; exit 0; fi
             git commit -q -am "Verified commits: promote run ${GITHUB_RUN_NUMBER}"
             git push -q origin "HEAD:$BRANCH" && exit 0

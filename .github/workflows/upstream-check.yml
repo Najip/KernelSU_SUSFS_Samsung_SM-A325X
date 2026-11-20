@@ -30,7 +30,7 @@ env:
   # Branch the CI build runs on (it needs the Kernel "both" option). Set the
   # repo variable UPSTREAM_BUILD_REF to change it; when that branch no longer
   # exists, the default branch is used.
-  BUILD_REF: ${{ vars.UPSTREAM_BUILD_REF || 'kernel-choice' }}
+  BUILD_REF: ${{ vars.UPSTREAM_BUILD_REF || github.event.repository.default_branch }}
   STATE: configs/upstream-state.json
 
 jobs:

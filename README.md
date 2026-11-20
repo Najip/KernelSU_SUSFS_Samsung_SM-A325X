@@ -37,8 +37,18 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
 - Network fix (UDP-only GSO for IPv4 and IPv6). A tick, ticked by default, allowed with every release type (and with `Promoted`, which keeps the setting of the build it takes).
-- Optional performance tuning (only when ticked), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
+- Performance tuning (ticked by default, mzggr kernel only), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
 - Toolchain: AOSP Clang 14 with ld.lld and GNU as. No LTO.
+
+### Aigis kernel (Kernel dropdown)
+
+The **Kernel** dropdown picks the kernel tree: `mzggr` (default, everything above), `aigis`, or `both` (both kernels in one run, all ZIPs, and one release holding all of them so users can choose).
+
+- `aigis` builds the [Aigis kernel by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32) from its default branch `bpf-5.15-legion`, with the SUSFS hooks of its `bpf-5.15-legion-susfs` branch, then the same xxKSU, SUSFS core, hook styles, network fix and NoMount options. Zips are named `A325X-Aigis-...`.
+- Aigis keeps its own CPU/GPU tuning. Our **Performance tuning** does not fit its tree, so for Aigis it is ignored with a warning and that kernel is built without it (with `both`, only the mzggr ZIP gets the tuning).
+- **Valhall GPU** (Aigis only, unticked by default): unticked = stock A32 GPU (`patches/base/0002-aigis-stock-gpu.patch`). Ticked = the Aigis Valhall r32p1 setup with their GPU tuning: the zip writes the r32p1 dtb, and a second `-valhall` zip also installs their [Valhall drivers module](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/download/GPU-Update/A32-Mali-Valhall-Drivers-KSU-Module.zip). Zip names get `-vgpu`.
+- **Compiler** (Aigis only): `aigis` (default) = ZyC Clang 14.0.6 the way the Aigis CI builds it; `main` = AOSP Clang 14 as for mzggr (zip names get `-aospclang`).
+- In a release with both kernels, the mzggr files keep their names (`build-info.txt`, `sources.json`, `nomount-4.14.ko`) and the Aigis ones get `-aigis` (`build-info-aigis.txt`, `sources-aigis.json`, `nomount-4.14-aigis.ko`). Flash the NoMount ZIP made for the kernel you flashed.
 
 ## How to build
 
@@ -47,7 +57,9 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 3. Choose the options and press the green **Run workflow** button:
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
    - **xxKSU hook style**: `manual` by default, then `syscall_table`, then `branch_link` (currently unstable). See [Hook styles](#hook-styles).
-   - **Performance tuning**: unticked by default.
+   - **Kernel**: `mzggr` by default, or `aigis`, or `both` (see [Aigis kernel](#aigis-kernel-kernel-dropdown)).
+   - **Performance tuning**: ticked by default (mzggr only, ignored for Aigis). Allowed with every release type.
+   - **Valhall GPU** and **Compiler**: Aigis only, ignored for mzggr.
    - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both attach the NoMount module built in the same run (see below).
@@ -96,9 +108,11 @@ Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of
 | `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. A full `Release` only works in this mode. |
 | `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
 
-Releases never include tuning: a `Pre-release` or `Release` with **Performance tuning** ticked stops with "Releases are built without tuning". For the same reason, `Promoted` only takes builds without tuning.
+Tuning is allowed in every release type, and `Promoted` takes builds with or without tuning.
 
-Which `Latest` runs `Promoted` accepts: hook style `manual`, **Performance tuning** unticked, NoMount `lkm` or `no` (not `integrate`), and not a **NoMount only** run. The runner (your PC or GitHub), the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
+`Verified` keeps separate pins for each kernel. The Aigis pins come from a `Promoted` run with Kernel `aigis` or `both`; before that, `Verified` with Aigis stops with "No verified Aigis commits yet".
+
+Which `Latest` runs `Promoted` accepts: hook style `manual`, NoMount `lkm` or `no` (not `integrate`), not a **NoMount only** run, no **Valhall GPU** and **Compiler** `aigis`, and it must have built every kernel you picked (Kernel `both` needs a `Latest` run with `both`; `mzggr` or `aigis` also accept a `both` run). The runner (your PC or GitHub), tuning, the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
 
 How `Promoted` gets the NoMount module:
 
@@ -114,7 +128,13 @@ With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `no
 
 ## Upstream check
 
-The **Upstream check** workflow runs three times a day (07:00, 15:00 and 23:00 Jakarta time) and looks for new commits in the mzggr kernel, the Aigis kernel, xxKSU and Jack's SUSFS (only commits that changed the 4.14 patch). NoMount is not watched. The commits it has seen are saved in `configs/upstream-state.json`; the first check only saves them. When a later check finds a new commit, it starts **Build Kernel** with Kernel `both`, commit mode `Latest` and release type `CI` (no release) on the branch in the repo variable `UPSTREAM_BUILD_REF` (default `kernel-choice`, where the Kernel dropdown is; the default branch when that branch is gone). It lives here on the default branch because GitHub only runs scheduled workflows from it.
+The **Upstream check** workflow runs three times a day (07:00, 15:00 and 23:00 Jakarta time) and looks for new commits in:
+
+- the mzggr kernel (`common`) and the Aigis kernel (`bpf-5.15-legion`)
+- xxKSU (`master`)
+- Jack's SUSFS (`mainline`), only commits that changed the 4.14 patch the build uses
+
+NoMount is not watched. The newest commits it has seen are saved in `configs/upstream-state.json` on the default branch, with a short history of what changed. The first check only saves them. When a later check finds a new commit, it starts **Build Kernel** with Kernel `both`, commit mode `Latest` and release type `CI` (never a release), and lists the new commits in the run summary. The build runs on the branch in the repo variable `UPSTREAM_BUILD_REF` (default: the default branch, `main`). Run it by hand from the Actions tab to check now; untick **Build** to only check and save.
 
 ## NoMount without a kernel compile
 
@@ -127,7 +147,7 @@ This is used by `Promoted` and by **NoMount only**. For **NoMount only**, the ki
 ## NoMount LKM
 
 1. Actions -> **NoMount LKM** -> **Run workflow**.
-2. Pick the NoMount branch (`dev` is the default, or `master`), the **xxKSU hook style** and the **commit mode**. Keep the hook style and **Performance tuning** the same as the kernel you flashed. **Build on my own PC** is unticked by default here, so it runs on a free GitHub runner.
+2. Pick the NoMount branch (`dev` is the default, or `master`), the **xxKSU hook style** and the **commit mode**. Keep the **Kernel**, hook style, **Performance tuning** (mzggr), **Valhall GPU** and **Compiler** (Aigis) the same as the kernel you flashed. **Build on my own PC** is unticked by default here, so it runs on a free GitHub runner.
 3. Download the `NoMount-....zip` artifact and flash it as a module in the KernelSU manager.
 
 The module is compiled together with a kernel from the same sources in the same run, so it matches a kernel built from the same commits. If the sources have moved on since you built your kernel, rebuild both.
@@ -139,6 +159,11 @@ The module is compiled together with a kernel from the same sources in the same 
 3. Reboot, install the xxKSU manager from [backslashxx/KernelSU releases](https://github.com/backslashxx/KernelSU/releases), and install a SUSFS userspace module if you want to configure SUSFS.
 
 The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
+
+After writing the kernel, the ZIP also checks your modules (when `/data` is mounted and decrypted):
+
+- **NoMount check** (every kernel ZIP): every kernel has a **kernel ID** (in `build-info.txt`, line "Kernel ID (NoMount match)"), made from its kernel release, `.config` and symbol checksums. A NoMount module stores the ID of the kernel it was built for (`kernelId=` in its `module.prop`, also shown in its description). A module from any build of the same kernel has the same ID, so it does not have to come from the same run. If the installed NoMount module has a different ID, the flasher shows a warning to remove it in the KernelSU manager and install the NoMount ZIP built for this kernel. It is only a warning; nothing is deleted. Older modules without an ID are compared by kernel release, and the flasher says they cannot be fully verified. With NoMount `integrate`, an installed NoMount LKM module gets a warning to remove it.
+- **GPU module cleanup** (mzggr ZIP only): the mzggr kernel uses the stock A32 GPU, so the Aigis Valhall GPU drivers module (`a32-gpu-upgrade`) is deleted if it is installed.
 
 ## Collecting logs
 
@@ -185,6 +210,8 @@ After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Pow
 | `scripts/promoted_source.py` | Finds and collects the `Latest` run that `Promoted` takes its files from |
 | `scripts/build_nomount.sh` | Builds the NoMount module (after a kernel compile, or from a kernel kit) |
 | `scripts/kernel_kit.py` | Kernel kit key, lookup and download |
+| `scripts/kernel_id.sh` | Kernel ID that the flasher uses to check the NoMount module |
+| `anykernel/nomount-check.sh`, `anykernel/gpu-cleanup.sh` | Flasher checks added after the kernel is written |
 | `configs/nomount-integrate.config` | Turns on NoMount built into the kernel (`integrate`) |
 | `tools/hook-bench.c`, `tools/hook-bench.sh` | Benchmark for comparing hook styles |
 | `configs/` | Config fragments merged after the tree's own fragments |

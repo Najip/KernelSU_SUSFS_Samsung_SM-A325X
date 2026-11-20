@@ -29,6 +29,9 @@ case "$KSU_HOOK" in
   manual|syscall_table|branch_link) ;;
   *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
 esac
+if [[ "${TUNING_IGNORED:-false}" == true ]]; then
+  echo "::warning title=Tuning ignored::Performance tuning is for the mzggr kernel only; building $KERNEL_REPO without it (it keeps its own tuning)." >&2
+fi
 mkdir -p "$INFO_DIR"
 INFO_DIR=$(cd -- "$INFO_DIR" && pwd)
 
@@ -64,12 +67,17 @@ kernel_date=$(git show -s --format=%cI HEAD)
 kernel_subject=$(git show -s --format=%s HEAD)
 # The tree ships its own KernelSU submodule and an in-tree NoMount; this build
 # uses xxKSU (fetched below) and the separate NoMount LKM instead.
-rm -rf -- out KernelSU fs/nomount .gitmodules drivers/kernelsu
+rm -rf -- out KernelSU NoMount fs/nomount .gitmodules drivers/kernelsu
 
 applied=()
 log "Converting the tree to the xxKSU + SUSFS layout"
-git apply --whitespace=nowarn "$ROOT/patches/base/0001-mzggr-common-to-xxksu-susfs.patch"
-applied+=("base/0001-mzggr-common-to-xxksu-susfs.patch")
+git apply --whitespace=nowarn "$ROOT/patches/$KERNEL_BASE_PATCH"
+applied+=("$KERNEL_BASE_PATCH")
+if [[ -n "${KERNEL_GPU_PATCH:-}" ]]; then
+  log "GPU: stock A32 stack (Bifrost r25p0, from the mzggr kernel)"
+  git apply --whitespace=nowarn "$ROOT/patches/$KERNEL_GPU_PATCH"
+  applied+=("$KERNEL_GPU_PATCH")
+fi
 
 log "SUSFS core: $SUSFS_REPO ($SUSFS_REF)"
 susfs_sha=$(git ls-remote "$SUSFS_REPO" "refs/heads/$SUSFS_REF" | cut -f1)
@@ -121,10 +129,29 @@ else
 fi
 
 log "Applying kernel patches"
+netfix="$ROOT/patches/kernel/0001-network-udp-gso.patch"
+# Some trees (Aigis) already carry the same fix; then the tick decides
+# whether it stays (ticked) or is reverted (unticked).
+netfix_files=(net/ipv4/ip_output.c net/ipv6/ip6_output.c)
+netfix_fixed='(sk->sk_type == SOCK_DGRAM && sk->sk_protocol == IPPROTO_UDP) ? ipc'
+netfix_in_tree=false
+[[ $(grep -lF "$netfix_fixed" "${netfix_files[@]}" | wc -l) == 2 ]] && netfix_in_tree=true
 if [[ "${NETWORK_FIX:-true}" == true ]]; then
-  echo "  0001-network-udp-gso.patch (network fix ticked)"
-  git apply "$ROOT/patches/kernel/0001-network-udp-gso.patch"
-  applied+=("0001-network-udp-gso.patch")
+  if [[ "$netfix_in_tree" == true ]]; then
+    echo "  0001-network-udp-gso.patch: already in the kernel tree (kept)"
+    applied+=("0001-network-udp-gso.patch (already in the tree)")
+  else
+    echo "  0001-network-udp-gso.patch (network fix ticked)"
+    git apply "$netfix"
+    applied+=("0001-network-udp-gso.patch")
+  fi
+elif [[ "$netfix_in_tree" == true ]]; then
+  echo "  network fix unticked: reverting the tree's own copy of the fix"
+  sed -i 's/(sk->sk_type == SOCK_DGRAM \&\& sk->sk_protocol == IPPROTO_UDP) ? ipc/sk->sk_type == SOCK_DGRAM ? ipc/' "${netfix_files[@]}"
+  if grep -q 'sk->sk_protocol == IPPROTO_UDP) ? ipc' "${netfix_files[@]}"; then
+    echo "Could not revert the network fix" >&2; exit 1
+  fi
+  applied+=("0001-network-udp-gso.patch reverted (unticked)")
 else
   echo "  network fix unticked: 0001-network-udp-gso.patch not applied"
 fi
