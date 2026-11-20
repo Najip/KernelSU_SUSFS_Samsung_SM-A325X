@@ -660,8 +660,16 @@ jobs:
           if [[ -f release/sources-aigis.json ]]; then name="$name + Aigis"; fi
           shopt -s nullglob
           assets=(release/*.zip release/*.ko release/build-info*.txt release/sources*.json release/SHA256SUMS.txt)
+          # Create the tag first, then the release without --target. With --target,
+          # GitHub wants the "workflows" permission (which this token cannot get)
+          # when workflow files changed on the branch after this commit: HTTP 403
+          # "Resource not accessible by integration" (cli/cli#9514).
+          if ! gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" >/dev/null; then
+            have=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+            [[ "$have" == "$GITHUB_SHA" ]] || { echo "::error::Tag $TAG already exists at $have."; exit 1; }
+          fi
           gh release create "$TAG" "${assets[@]}" \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "$name" --notes-file notes.md \
             $([[ "${{ inputs.release_type }}" == Release ]] || echo --prerelease)
 
