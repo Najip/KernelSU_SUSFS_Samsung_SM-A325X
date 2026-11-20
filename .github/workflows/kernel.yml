@@ -39,7 +39,7 @@ on:
         type: string
         default: '-forkby-gh.Najip'
       valhall_gpu:
-        description: 'Aigis only: Valhall GPU, default ticked and allowed with every release type (Aigis r32p1 GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU'
+        description: 'Aigis only: Valhall GPU, default ticked and allowed with every release type (Aigis r32p1 GPU code, r32p1 dtb, one zip with the kernel and the drivers module bundled). Unticked = stock A32 GPU'
         type: boolean
         default: true
       compiler:
