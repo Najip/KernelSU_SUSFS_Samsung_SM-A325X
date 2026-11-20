@@ -13,6 +13,7 @@ Every build can make two kernels. Both are released, so you can pick either one.
 | | Main kernel: Aigis | Alternative kernel: mzggr |
 |---|---|---|
 | Who uses it | The repo owner, every day | Built and released too |
+| Root in the upstream tree | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU |
 | Kernel tree | [Aigis by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32), branch `bpf-5.15-legion` | [mzggr0914](https://github.com/mzggr0914/android_kernel_a325x_bakasu), branch `common` |
 | **Kernel** dropdown | `aigis` (default) | `mzggr` (`both` builds the two) |
 | Kernel ZIP name | `A325X-Aigis-...zip` | `A325X-xxKSU-...zip` |
@@ -73,7 +74,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 ## What both kernels get
 
-- xxKSU for root, replacing the tree's own root module (ReSukiSU in Aigis, BakaSU in mzggr) at build time.
+- xxKSU for root, replacing the tree's own root module at build time. Both upstream kernels ship [BakaSU](https://github.com/Baka-SU/BakaSU) by default, as the `KernelSU` submodule (Aigis' `.gitmodules` still uses BakaSU's old name, ReSukiSU, which now leads to the same repo).
 - xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default is `manual` (`branch_link` is currently unstable). No LSM hooking in any style.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Upstream NoMount, replacing the tree's own NoMount: a separate LKM by default, or built in with the `integrate` option.
@@ -193,7 +194,7 @@ The **Upstream check** workflow runs three times a day (07:00, 15:00 and 23:00 J
 
 NoMount is not watched. The newest commits it has seen are saved in `configs/upstream-state.json` on the default branch, with a short history of what changed. The first check only saves them. When a later check finds a new commit, it starts **Build Kernel** with Kernel `both` (always both kernels, main Aigis and alternative mzggr, whatever the Kernel dropdown default is; the check fails if the started build is not `both`), commit mode `Latest` and release type `CI` (never a release), and lists the new commits in the run summary. The build runs on the branch in the repo variable `UPSTREAM_BUILD_REF` (default: the default branch, `main`). Run it by hand from the Actions tab to check now; untick **Build** to only check and save.
 
-For the mzggr and Aigis kernels, a new commit only counts when it changes the kernel itself. Commits that only touch the tree's own root module (BakaSU, KSUN, ReSukiSU or any other KernelSU fork, as a submodule or folder), NoMount, `.gitmodules`, `.github/` or docs (`docs/`, README, `*.md`) are ignored: they do not start a build, since the build replaces those with xxKSU and upstream NoMount anyway. They are still saved and listed under **Ignored kernel commits** in the run summary. Any other file (sources, defconfig, build scripts, SUSFS) counts.
+For the mzggr and Aigis kernels, a new commit only counts when it changes the kernel itself. Commits that only touch the tree's own root module (BakaSU by default, formerly named ReSukiSU, or KSUN or any other KernelSU fork, as a submodule or folder), NoMount, `.gitmodules`, `.github/` or docs (`docs/`, README, `*.md`) are ignored: they do not start a build, since the build replaces those with xxKSU and upstream NoMount anyway. They are still saved and listed under **Ignored kernel commits** in the run summary. Any other file (sources, defconfig, build scripts, SUSFS) counts.
 
 ## NoMount without a kernel compile
 
