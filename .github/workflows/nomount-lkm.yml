@@ -139,6 +139,7 @@ jobs:
             scripts/pick_runner.py
             scripts/resolve_commits.py
             scripts/sources.conf
+            configs/verified.json
           sparse-checkout-cone-mode: false
       - name: Choose self-hosted PC or GitHub runner
         id: pick
