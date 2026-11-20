@@ -94,6 +94,7 @@ def new_commits(repo, old, new, path=None):
 
 
 # A path segment with one of these names is a root module or NoMount.
+# resukisu is BakaSU's old name (still in the Aigis .gitmodules).
 IGNORED_SEGMENTS = re.compile(r"^(kernelsu([-_].*)?|ksu|ksun|kernelsu-next|bakasu|sukisu.*|resukisu|"
                               r"apatch|magisk|nomount)$", re.I)
 
