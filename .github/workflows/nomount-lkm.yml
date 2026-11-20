@@ -71,7 +71,7 @@ on:
         type: string
         default: '-forkby-gh.Najip'
       kernel_source:
-        description: 'Kernel you flashed. aigis = main kernel (Aigis), mzggr = alternative kernel (mzggr0914)'
+        description: 'Kernel you flashed. aigis = main kernel (Aigis), mzggr = Alt. kernel (mzggr0914)'
         type: choice
         options:
           - aigis
