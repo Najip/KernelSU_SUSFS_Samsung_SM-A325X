@@ -46,6 +46,7 @@ case "$KSU_HOOK" in
   branch_link) suffix=-bl ;;
 esac
 [[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
+[[ "${VALHALL_GPU:-false}" == true ]] && suffix=$suffix-vgpu
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in
@@ -83,6 +84,7 @@ fi
     echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
   fi
   echo "AnyKernel3: $ak3_line"
+  echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 (experiment)' || echo 'stock A32 Bifrost r25p0 (same as main)')"
   echo "dtb: $dtb_line"
   [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"

@@ -55,6 +55,8 @@ def key():
     # Older kits were made before the network fix became optional (always on).
     if e.get("NETWORK_FIX", "true") != "true":
         parts.append("network_fix=false")
+    if e.get("VALHALL_GPU", "false") == "true":
+        parts.append("gpu=valhall")
     for path in TRACKED:
         oid = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{path}"], text=True).strip()
         parts.append(f"{path}={oid}")

@@ -141,9 +141,11 @@ fi
 
 sh scripts/kconfig/merge_config.sh -m -O "$OUT_DIR" "${base[@]}" "${fragments[@]}"
 kmake O="$OUT_DIR" olddefconfig
-if [[ -n "${KERNEL_GPU_PATCH:-}" ]]; then
-  grep -qx 'CONFIG_MTK_GPU_VERSION="mali bifrost r25p0"' "$OUT_DIR/.config" \
-    || { echo "GPU is not the stock Bifrost r25p0: $(grep MTK_GPU_VERSION "$OUT_DIR/.config")" >&2; exit 1; }
+if [[ "${VALHALL_GPU:-false}" == true ]]; then want_gpu='mali valhall r32p1'; else want_gpu='mali bifrost r25p0'; fi
+if [[ -n "${KERNEL_GPU_PATCH:-}" || "${VALHALL_GPU:-false}" == true ]]; then
+  grep -qx "CONFIG_MTK_GPU_VERSION=\"$want_gpu\"" "$OUT_DIR/.config" \
+    || { echo "GPU is not $want_gpu: $(grep MTK_GPU_VERSION "$OUT_DIR/.config")" >&2; exit 1; }
+  echo "GPU: $want_gpu"
 fi
 
 # Make sure every requested option really ended up in .config.

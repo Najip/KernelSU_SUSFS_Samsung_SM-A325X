@@ -20,6 +20,9 @@ on:
       perf_tuning:
         type: boolean
         default: false
+      valhall_gpu:
+        type: boolean
+        default: false
       ksu_hook:
         type: string
         default: branch_link
@@ -58,6 +61,10 @@ on:
         description: 'Tick if your kernel was built with Performance tuning'
         type: boolean
         default: false
+      valhall_gpu:
+        description: 'Tick if your kernel was built with the Valhall GPU'
+        type: boolean
+        default: false
       ksu_hook:
         description: 'Match the hook style of the kernel you flashed'
         type: choice
@@ -82,6 +89,7 @@ permissions:
 
 env:
   PERF_TUNING: ${{ inputs.perf_tuning }}
+  VALHALL_GPU: ${{ inputs.valhall_gpu }}
   NOMOUNT_REF: ${{ inputs.nomount_ref }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'branch_link' }}
   GH_TOKEN: ${{ github.token }}

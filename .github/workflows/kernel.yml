@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.valhall_gpu && ' (Valhall GPU)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
@@ -26,6 +26,10 @@ on:
         description: 'Network fix (UDP-only GSO for IPv4 and IPv6). Allowed with every release type'
         type: boolean
         default: true
+      valhall_gpu:
+        description: 'Valhall GPU (Aigis r32p1 experiment: Aigis GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU as on main'
+        type: boolean
+        default: false
       nomount:
         description: 'NoMount. lkm = separate module (ZIP + .ko) built for this kernel (default). integrate = built into the kernel. no = not included'
         type: choice
@@ -74,6 +78,7 @@ permissions:
 env:
   PERF_TUNING: ${{ inputs.perf_tuning }}
   NETWORK_FIX: ${{ inputs.network_fix }}
+  VALHALL_GPU: ${{ inputs.valhall_gpu }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'branch_link' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
   NOMOUNT_REF: ${{ inputs.nomount_branch || 'dev' }}
