@@ -43,9 +43,30 @@ if [[ -f "$dir/sources-aigis.json" ]]; then
         *) echo "- \`$n\`: mzggr0914 kernel (details: build-info.txt)" ;;
       esac
     done
-    for z in "$dir"/NoMount-*.zip; do echo "- \`$(basename "$z")\`: NoMount module"; done
+    for z in "$dir"/NoMount-*.zip; do
+      n=$(basename "$z")
+      case "$n" in *-aigis-*) k=Aigis ;; *-mzggr-*) k=mzggr ;; *) k= ;; esac
+      echo "- \`$n\`: NoMount module${k:+ for the $k kernel}"
+    done
     echo
     echo "Aigis sources: $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["kernel"]["repo"] + " @ " + d["kernel"]["commit"][:12])' "$dir/sources-aigis.json")"
+  } >> "$out"
+fi
+shopt -s nullglob
+apks=("$dir"/*.apk)
+if ((${#apks[@]})); then
+  {
+    echo
+    echo "## xxKSU manager"
+    if [[ -f "$dir/manager.json" ]]; then
+      python3 - "$dir/manager.json" <<'PY2'
+import json, sys
+m = json.load(open(sys.argv[1]))
+print(f"- `{m['apk']}`: from the latest xxKSU release [{m['tag']}]({m['url']}). Install it to manage root.")
+PY2
+    else
+      for a in "${apks[@]}"; do echo "- \`$(basename "$a")\`: xxKSU manager. Install it to manage root."; done
+    fi
   } >> "$out"
 fi
 rm -rf "$tmp"

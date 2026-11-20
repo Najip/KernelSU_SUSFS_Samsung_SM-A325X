@@ -123,7 +123,7 @@ sed -i '/^kernelId=/d' "$mod/module.prop"
 echo "kernelId=$kernel_id" >> "$mod/module.prop"
 suffix=
 [[ "${PERF_TUNING:-false}" == true ]] && suffix=-tuning
-name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-k${kshort}-n${nshort}${suffix}"
+name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-${KERNEL_SOURCE:-mzggr}-k${kshort}-n${nshort}${suffix}"
 {
   echo "NoMount LKM for A325X xxKSU + SUSFS kernel"
   echo "NoMount: $NOMOUNT_REPO branch $NOMOUNT_REF @ $sha ($count commits)"
@@ -144,6 +144,9 @@ unzip -l "$artifacts/$name.zip" | grep -q 'bin/lkmloader-arm64'
 unzip -l "$artifacts/$name.zip" | grep -q 'module.prop'
 
 mkdir -p "$dest"
-cp -v "$artifacts/$name.zip" "$artifacts/nomount-$KVER.ko" "$dest/"
-[[ -s "$dest/$name.zip" && -s "$dest/nomount-$KVER.ko" ]] || { echo "Copy into $dest failed" >&2; ls -l "$dest"; exit 1; }
+# File names say which kernel they are for (aigis or mzggr).
+ko_name="nomount-$KVER-${KERNEL_SOURCE:-mzggr}.ko"
+cp -v "$artifacts/$name.zip" "$dest/"
+cp -v "$artifacts/nomount-$KVER.ko" "$dest/$ko_name"
+[[ -s "$dest/$name.zip" && -s "$dest/$ko_name" ]] || { echo "Copy into $dest failed" >&2; ls -l "$dest"; exit 1; }
 echo "NoMount module: $dest/$name.zip"

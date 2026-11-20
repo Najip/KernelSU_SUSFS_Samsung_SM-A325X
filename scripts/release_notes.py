@@ -2,7 +2,7 @@
 """Release helper: writes release notes and refreshes the README sources table.
 
   release_notes.py notes  <sources.json> <previous-sources.json|-> <build-info.txt> <out.md>
-  release_notes.py readme <sources.json> <README.md> <release-tag>
+  release_notes.py readme <README.md> <release-tag> <sources.json>...
 
 "What's new" lists, for every upstream source, the commits added since the
 sources.json that was attached to the previous release. For the SUSFS repo only
@@ -106,8 +106,9 @@ def notes(cur_path, prev_path, info_path, out_path):
     print("\n".join(md))
 
 
-def readme(cur_path, readme_path, tag):
-    cur = json.load(open(cur_path))
+def readme(readme_path, tag, *paths):
+    """Sources table: the Aigis kernel first, then mzggr, then the xxKSU manager
+    APK (manager.json next to the first sources.json, when the release has it)."""
     rows = ["| Part | Source | Branch / version | Commit | Commit date |", "|---|---|---|---|---|"]
 
     def row(name, s, version):
@@ -119,10 +120,22 @@ def readme(cur_path, readme_path, tag):
     def ref_of(s):
         return s.get("branch") or s.get("ref") or ""
 
-    k, x, f = cur["kernel"], cur["xxksu"], cur["susfs"]
-    row("Kernel", k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
-    row("xxKSU", x, f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}")
-    row("SUSFS patch", f, f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`")
+    kernels = []
+    for path in paths:
+        cur = json.load(open(path))
+        aigis = "aigis" in cur["kernel"]["repo"].lower()
+        kernels.append((0 if aigis else 1, "Aigis" if aigis else "mzggr", cur))
+    for _, label, cur in sorted(kernels, key=lambda k: k[0]):
+        k, x, f = cur["kernel"], cur["xxksu"], cur["susfs"]
+        row(f"{label} kernel", k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
+        row(f"{label} xxKSU", x, f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}")
+        row(f"{label} SUSFS patch", f, f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`")
+    manager = os.path.join(os.path.dirname(paths[0]), "manager.json")
+    if os.path.exists(manager):
+        m = json.load(open(manager))
+        repo = slug(m["repo"])
+        rows.append(f"| xxKSU manager | [{repo}](https://github.com/{repo}) | release [{m['tag']}]({m['url']}), "
+                    f"`{m['apk']}` | - | {m.get('date', '')[:10]} |")
     block = ["<!-- SOURCES:START -->",
              f"Last release: [{tag}](../../releases/tag/{tag})", ""] + rows + ["<!-- SOURCES:END -->"]
     text = open(readme_path).read()
@@ -135,6 +148,6 @@ if __name__ == "__main__":
     if sys.argv[1] == "notes":
         notes(*sys.argv[2:6])
     elif sys.argv[1] == "readme":
-        readme(*sys.argv[2:5])
+        readme(*sys.argv[2:])
     else:
         sys.exit(__doc__)

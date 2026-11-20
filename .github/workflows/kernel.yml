@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       kernel_source:
-        description: 'Kernel. mzggr = mzggr0914 kernel (default). aigis = Aigis kernel by SlamZDank. both = build both (all ZIPs, one release)'
+        description: 'Kernel. aigis = Aigis kernel by SlamZDank (default). mzggr = mzggr0914 kernel. both = build both (all ZIPs, one release)'
         type: choice
         options:
-          - mzggr
           - aigis
+          - mzggr
           - both
         default: aigis
       self_hosted:
@@ -177,6 +177,46 @@ jobs:
       source_run: ${{ steps.plan.outputs.source_run }}
       source_url: ${{ steps.plan.outputs.source_url }}
       checkout_sha: ${{ steps.plan.outputs.checkout_sha }}
+
+  manager:
+    name: List manager APK
+    needs: pick
+    if: inputs.release_type != 'Release from last pre-release'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      MANAGER_REPO: backslashxx/KernelSU
+    steps:
+      - name: Get the xxKSU manager APK of the latest xxKSU release
+        run: |
+          set -euo pipefail
+          # The latest release (not a pre-release) of xxKSU always has the manager APK.
+          rel=$(gh release view --repo "$MANAGER_REPO" --json tagName,url,publishedAt,assets)
+          tag=$(jq -r .tagName <<<"$rel")
+          apk=$(jq -r '[.assets[].name | select(endswith(".apk"))] | (map(select(endswith("-release.apk"))) + .)[0] // ""' <<<"$rel")
+          [[ -n "$apk" ]] || { echo "::error::The latest xxKSU release $tag has no .apk."; exit 1; }
+          mkdir manager
+          gh release download "$tag" --repo "$MANAGER_REPO" --pattern "$apk" --dir manager
+          unzip -l "manager/$apk" | grep -q AndroidManifest.xml || { echo "::error::$apk is not an Android app."; exit 1; }
+          sha=$(sha256sum "manager/$apk" | cut -d' ' -f1)
+          jq -n --arg repo "https://github.com/$MANAGER_REPO" --arg tag "$tag" --arg url "$(jq -r .url <<<"$rel")" \
+            --arg date "$(jq -r .publishedAt <<<"$rel")" --arg apk "$apk" --arg sha "$sha" \
+            '{repo: $repo, tag: $tag, url: $url, date: $date, apk: $apk, sha256: $sha}' > manager/manager.json
+          cat manager/manager.json
+          {
+            echo "### xxKSU manager: \`$apk\`"
+            echo "From the latest xxKSU release [$tag]($(jq -r .url <<<"$rel")), SHA256 \`$sha\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the manager APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: xxksu-manager
+          path: manager/
+          if-no-files-found: error
+          retention-days: 30
 
   build:
     name: ${{ matrix.source }} - ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build the NoMount module' }}
@@ -384,8 +424,7 @@ jobs:
           fi
           ls -l "$PACKAGE_DIR/nomount"
           echo "NM_ZIP=$(ls "$PACKAGE_DIR"/nomount/NoMount-*.zip)" >> "$GITHUB_ENV"
-          cp "$PACKAGE_DIR/nomount/nomount-4.14.ko" "$BUILD_WORK/nomount-4.14$SFX.ko"
-          echo "NM_KO=$BUILD_WORK/nomount-4.14$SFX.ko" >> "$GITHUB_ENV"
+          echo "NM_KO=$PACKAGE_DIR/nomount/nomount-4.14-$KERNEL_SOURCE.ko" >> "$GITHUB_ENV"
 
       - name: Check the module matches the promoted kernel
         if: env.BUILD_KERNEL != 'true' && matrix.kernel_release != ''
@@ -443,7 +482,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload nomount-4.14${{ env.SFX }}.ko
+      - name: Upload nomount-4.14-${{ matrix.source }}.ko
         if: env.BUILD_NOMOUNT == 'true'
         uses: actions/upload-artifact@v7
         with:
@@ -576,7 +615,7 @@ jobs:
 
   release:
     name: Publish release and update README
-    needs: [pick, build, collect]
+    needs: [pick, manager, build, collect]
     if: ${{ !cancelled() && !failure() && inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode != 'Promoted' || needs.pick.outputs.promote_ok == 'true') }}
     runs-on: ubuntu-latest
     permissions:
@@ -610,14 +649,20 @@ jobs:
           pattern: release-files*
           path: files
 
+      - name: Download the xxKSU manager APK
+        uses: actions/download-artifact@v8
+        with:
+          name: xxksu-manager
+          path: release
+
       - name: Put all files of every kernel together
         run: |
           set -euo pipefail
           ls -lR files
           shopt -s nullglob
           mkdir -p release
-          # The first kernel keeps the plain names (build-info.txt, sources.json,
-          # nomount-4.14.ko); the second one gets -aigis.
+          # The first kernel keeps the plain names (build-info.txt, sources.json);
+          # the second one gets -aigis. NoMount files always name their kernel.
           sfx=
           for src in $SOURCES; do
             d=files/release-files$([[ $src == mzggr ]] || echo "-$src")
@@ -628,7 +673,9 @@ jobs:
             fi
             for f in "${files[@]}"; do
               n=$(basename "$f")
-              [[ "$n" == *.ko ]] && n="${n%.ko}$sfx.ko"
+              # Older runs: nomount-4.14.ko without the kernel in the name.
+              [[ "$n" == *.ko && "$n" != *-"$src".ko ]] && n="${n%.ko}-$src.ko"
+              [[ "$n" == NoMount-*.zip && "$n" != *-"$src"-* ]] && n="${n/-lkm-4.14-/-lkm-4.14-$src-}"
               mv "$f" "release/$n"
             done
             mv "$d"/*.zip release/
@@ -636,7 +683,8 @@ jobs:
             mv "$d/sources.json" "release/sources$sfx.json"
             sfx=-aigis   # only Aigis can come second
           done
-          (cd release && sha256sum -- *.zip *.ko > SHA256SUMS.txt)
+          ls release/*.apk >/dev/null || { echo "::error::No xxKSU manager APK."; exit 1; }
+          (cd release && sha256sum -- *.zip *.ko *.apk > SHA256SUMS.txt)
           ls -l release
 
       - name: Write release notes
@@ -659,7 +707,7 @@ jobs:
           for z in "${zips[@]}"; do [[ "$z" == *-Aigis-* ]] || name=$z; done
           if [[ -f release/sources-aigis.json ]]; then name="$name + Aigis"; fi
           shopt -s nullglob
-          assets=(release/*.zip release/*.ko release/build-info*.txt release/sources*.json release/SHA256SUMS.txt)
+          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt)
           # Create the tag first, then the release without --target. With --target,
           # GitHub wants the "workflows" permission (which this token cannot get)
           # when workflow files changed on the branch after this commit: HTTP 403
@@ -681,7 +729,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           for attempt in 1 2 3; do
             git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
-            python3 scripts/release_notes.py readme release/sources.json README.md "$TAG"
+            python3 scripts/release_notes.py readme README.md "$TAG" release/sources*.json
             if git diff --quiet; then echo 'README already up to date.'; exit 0; fi
             git commit -q -am "README: sources for release $TAG"
             git push -q origin "HEAD:$BRANCH" && exit 0
@@ -722,7 +770,7 @@ jobs:
           mkdir release
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir release --pattern 'sources*.json' --pattern 'build-info*.txt'
           # Only the names of the ZIPs are needed for the notes.
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(endswith(".zip"))' \
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(endswith(".zip") or endswith(".apk"))' \
             | while read -r n; do : > "release/$n"; done
           ls -l release
 
@@ -744,7 +792,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           for attempt in 1 2 3; do
             git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
-            python3 scripts/release_notes.py readme release/sources.json README.md "$TAG"
+            python3 scripts/release_notes.py readme README.md "$TAG" release/sources*.json
             if git diff --quiet; then echo 'README already up to date.'; exit 0; fi
             git commit -q -am "README: sources for release $TAG"
             git push -q origin "HEAD:$BRANCH" && exit 0
