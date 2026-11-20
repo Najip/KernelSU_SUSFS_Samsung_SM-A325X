@@ -314,7 +314,7 @@ jobs:
             echo 'All build dependencies are already installed.'
           fi
 
-      - name: Use cached AOSP Clang 14 (own PC)
+      - name: Use cached toolchain (own PC)
         if: env.SELF_HOSTED == 'true'
         run: |
           set -euo pipefail
@@ -322,9 +322,16 @@ jobs:
           mkdir -p "$cache"
           exec 9>"$cache/.lock"
           flock 9
-          key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
-          toolchain="$cache/aosp-clang14-$key"
-          AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          . scripts/sources.conf
+          if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then
+            key=$(sha256sum scripts/fetch_zyc_clang.sh scripts/zyc_clang14.conf | sha256sum | cut -c1-16)
+            toolchain="$cache/zyc-clang14-$key"
+            ZYC_CLANG_CACHE="$cache/archives" bash scripts/fetch_zyc_clang.sh "$toolchain"
+          else
+            key=$(sha256sum scripts/fetch_aosp_clang.sh scripts/aosp_clang14.conf | sha256sum | cut -c1-16)
+            toolchain="$cache/aosp-clang14-$key"
+            AOSP_CLANG_CACHE="$cache/archives" sh scripts/fetch_aosp_clang.sh "$toolchain"
+          fi
           echo "TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
 
       - name: Download sources and apply patches

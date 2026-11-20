@@ -17,11 +17,21 @@ test -s "$IMAGE"
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 ak3="$work/AnyKernel3"
-git init -q "$ak3"
-git -C "$ak3" fetch -q --depth=1 "$AK3_REPO" "$AK3_COMMIT"
-git -C "$ak3" checkout -q --detach FETCH_HEAD
-rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/README.md"
-cp "$ROOT/anykernel/anykernel.sh" "$ak3/anykernel.sh"
+if [[ -n "${AK3_FROM_TREE:-}" ]]; then
+  # The kernel tree's own AnyKernel folder (its anykernel.sh, tools and
+  # device names), as the Aigis CI packages it: only Image is added.
+  [[ -f "$KERNEL_DIR/$AK3_FROM_TREE/anykernel.sh" ]] || { echo "No $AK3_FROM_TREE/anykernel.sh in the kernel tree" >&2; exit 1; }
+  cp -a "$KERNEL_DIR/$AK3_FROM_TREE" "$ak3"
+  rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/dtbo.img" "$ak3/README.md"
+  ak3_line="$AK3_FROM_TREE folder of the kernel tree (Image only)"
+else
+  git init -q "$ak3"
+  git -C "$ak3" fetch -q --depth=1 "$AK3_REPO" "$AK3_COMMIT"
+  git -C "$ak3" checkout -q --detach FETCH_HEAD
+  rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/README.md"
+  cp "$ROOT/anykernel/anykernel.sh" "$ak3/anykernel.sh"
+  ak3_line="$AK3_REPO @ $AK3_COMMIT"
+fi
 
 read_json() { python3 -c "import json,sys; d=json.load(open('$INFO_DIR/sources.json')); print(d$1)"; }
 susfs=$(read_json '["susfs"]["version"]')
@@ -47,7 +57,7 @@ name="${KERNEL_LABEL}-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 cp "$IMAGE" "$ak3/Image"
-gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
+[[ -z "${AK3_FROM_TREE:-}" ]] && gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
 
 {
   echo "${KERNEL_LABEL} xxKSU + SUSFS kernel"
@@ -57,8 +67,12 @@ gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
   echo "xxKSU: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"
   echo "Build repo commit: $repo_sha"
-  echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
-  echo "AnyKernel3: $AK3_REPO @ $AK3_COMMIT"
+  if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then
+    echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") (ZyC, Aigis CI setup: gcc wrappers, no LLVM=1, -w -pipe -O3)"
+  else
+    echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
+  fi
+  echo "AnyKernel3: $ak3_line"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
   echo "xxKSU hook style: $KSU_HOOK"
   echo "Performance tuning: $PERF_TUNING"
@@ -76,7 +90,7 @@ rm -f "$zip_path"
 (cd "$ak3" && zip -qr9 "$zip_path" . -x '*.zip' '*~')
 unzip -tq "$zip_path"
 unzip -p "$zip_path" Image | cmp - "$IMAGE"
-unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
+[[ -n "${AK3_FROM_TREE:-}" ]] || unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
 

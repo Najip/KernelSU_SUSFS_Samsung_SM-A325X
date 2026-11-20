@@ -30,7 +30,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 # Build-repo paths that change the compiled kernel.
 TRACKED = ("patches", "configs", "scripts/prepare_sources.sh", "scripts/build_kernel.sh",
-           "scripts/sources.conf", "scripts/aosp_clang14.conf")
+           "scripts/sources.conf", "scripts/aosp_clang14.conf",
+           "scripts/zyc_clang14.conf", "scripts/fetch_zyc_clang.sh")
 
 
 def emit(pairs):
