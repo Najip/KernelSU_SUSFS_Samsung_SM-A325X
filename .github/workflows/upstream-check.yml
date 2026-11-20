@@ -68,17 +68,24 @@ jobs:
         run: |
           set -euo pipefail
           before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          # Always both kernels (main Aigis and alternative mzggr), whatever the
+          # Kernel dropdown default of Build Kernel is.
           gh workflow run kernel.yml --repo "$GITHUB_REPOSITORY" --ref "$BUILD_REF" \
             -f kernel_source=both -f commit_mode=Latest -f release_type=CI
           url=
           for _ in 1 2 3 4 5 6; do
             sleep 5
             url=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow kernel.yml --branch "$BUILD_REF" \
-              --event workflow_dispatch --limit 5 --json url,createdAt \
-              --jq "[.[] | select(.createdAt >= \"$before\")][-1].url // \"\"")
+              --event workflow_dispatch --limit 5 --json url,createdAt,displayTitle \
+              --jq "[.[] | select(.createdAt >= \"$before\")][-1] // {} | \"\\(.url // \"\")\\t\\(.displayTitle // \"\")\"")
+            title=${url#*$'\t'}; url=${url%%$'\t'*}
             [[ -n "$url" ]] && break
           done
           echo "Build Kernel run: ${url:-started}"
+          if [[ -n "$url" && "$title" != *"(mzggr + Aigis)"* ]]; then
+            echo "::error::The started build is not building both kernels: $title"
+            exit 1
+          fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
           python3 - "$STATE" "$url" <<'EOF'
           import json, sys
