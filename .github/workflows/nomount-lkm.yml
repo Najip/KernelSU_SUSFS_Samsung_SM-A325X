@@ -28,7 +28,7 @@ on:
         default: true
       valhall_gpu:
         type: boolean
-        default: false
+        default: true
       compiler:
         type: string
         default: aigis
@@ -82,9 +82,9 @@ on:
         type: boolean
         default: true
       valhall_gpu:
-        description: 'Aigis only: tick if your kernel was built with the Valhall GPU'
+        description: 'Aigis only: tick if your kernel was built with the Valhall GPU (default ticked, like Build Kernel)'
         type: boolean
-        default: false
+        default: true
       compiler:
         description: 'Aigis only: compiler of the kernel you flashed. aigis = ZyC Clang (default), main = AOSP Clang 14'
         type: choice

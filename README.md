@@ -47,7 +47,7 @@ The **Kernel** dropdown picks the kernel tree: `mzggr` (default, everything abov
 
 - `aigis` builds the [Aigis kernel by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32) from its default branch `bpf-5.15-legion`, with the SUSFS hooks of its `bpf-5.15-legion-susfs` branch, then the same xxKSU, SUSFS core, hook styles, network fix and NoMount options. Zips are named `A325X-Aigis-...`.
 - Aigis keeps its own CPU/GPU tuning. Our **Performance tuning** does not fit its tree, so for Aigis it is ignored with a warning and that kernel is built without it (with `both`, only the mzggr ZIP gets the tuning).
-- **Valhall GPU** (Aigis only, unticked by default): unticked = stock A32 GPU (`patches/base/0002-aigis-stock-gpu.patch`). Ticked = the Aigis Valhall r32p1 setup with their GPU tuning: the zip writes the r32p1 dtb, and a second `-valhall` zip also installs their [Valhall drivers module](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/download/GPU-Update/A32-Mali-Valhall-Drivers-KSU-Module.zip). Zip names get `-vgpu`.
+- **Valhall GPU** (Aigis only, ticked by default, allowed with every release type): unticked = stock A32 GPU (`patches/base/0002-aigis-stock-gpu.patch`). Ticked = the Aigis Valhall r32p1 setup with their GPU tuning: the zip writes the r32p1 dtb, and a second `-valhall` zip also installs their [Valhall drivers module](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/download/GPU-Update/A32-Mali-Valhall-Drivers-KSU-Module.zip). Zip names get `-vgpu`.
 - **Compiler** (Aigis only): `aigis` (default) = ZyC Clang 14.0.6 the way the Aigis CI builds it; `main` = AOSP Clang 14 as for mzggr (zip names get `-aospclang`).
 - In a release with both kernels, the mzggr files keep their names (`build-info.txt`, `sources.json`, `nomount-4.14.ko`) and the Aigis ones get `-aigis` (`build-info-aigis.txt`, `sources-aigis.json`, `nomount-4.14-aigis.ko`). Flash the NoMount ZIP made for the kernel you flashed.
 
@@ -114,7 +114,7 @@ Tuning is allowed in every release type, and `Promoted` takes builds with or wit
 
 `Verified` keeps separate pins for each kernel. The Aigis pins come from a `Promoted` run with Kernel `aigis` or `both`; before that, `Verified` with Aigis stops with "No verified Aigis commits yet".
 
-Which `Latest` runs `Promoted` accepts: hook style `manual`, NoMount `lkm` or `no` (not `integrate`), not a **NoMount only** run, no **Valhall GPU** and **Compiler** `aigis`, and it must have built every kernel you picked (Kernel `both` needs a `Latest` run with `both`; `mzggr` or `aigis` also accept a `both` run). The runner (your PC or GitHub), tuning, the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
+Which `Latest` runs `Promoted` accepts: hook style `manual`, NoMount `lkm` or `no` (not `integrate`), not a **NoMount only** run and **Compiler** `aigis`, and it must have built every kernel you picked (Kernel `both` needs a `Latest` run with `both`; `mzggr` or `aigis` also accept a `both` run). The runner (your PC or GitHub), tuning, **Valhall GPU** (Promoted keeps the GPU of that run), the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
 
 How `Promoted` gets the NoMount module:
 
