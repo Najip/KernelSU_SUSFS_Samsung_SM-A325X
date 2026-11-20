@@ -40,12 +40,12 @@ if [[ -f "$dir/sources-aigis.json" ]]; then
         *-Aigis-*-valhall.zip) echo "- \`$n\`: main kernel (Aigis) with the Valhall GPU and its drivers module" ;;
         *-Aigis-*-vgpu*.zip) echo "- \`$n\`: main kernel (Aigis by SlamZDank, used daily by the repo owner) with the Valhall GPU, drivers module included (details: build-info-aigis.txt)" ;;
         *-Aigis-*) echo "- \`$n\`: main kernel (Aigis by SlamZDank, used daily by the repo owner) (details: build-info-aigis.txt)" ;;
-        *) echo "- \`$n\`: alternative kernel (mzggr0914) (details: build-info.txt)" ;;
+        *) echo "- \`$n\`: Alt. kernel (mzggr0914) (details: build-info.txt)" ;;
       esac
     done
     for z in "$dir"/NoMount-*.zip; do
       n=$(basename "$z")
-      case "$n" in *-aigis-*) k="main kernel (Aigis)" ;; *-mzggr-*) k="alternative kernel (mzggr)" ;; *) k= ;; esac
+      case "$n" in *-aigis-*) k="main kernel (Aigis)" ;; *-mzggr-*) k="Alt. kernel (mzggr)" ;; *) k= ;; esac
       echo "- \`$n\`: NoMount module${k:+ for the $k}"
     done
     echo

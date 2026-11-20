@@ -68,7 +68,7 @@ jobs:
         run: |
           set -euo pipefail
           before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          # Always both kernels (main Aigis and alternative mzggr), whatever the
+          # Always both kernels (main Aigis and Alt. mzggr), whatever the
           # Kernel dropdown default of Build Kernel is.
           gh workflow run kernel.yml --repo "$GITHUB_REPOSITORY" --ref "$BUILD_REF" \
             -f kernel_source=both -f commit_mode=Latest -f release_type=CI
