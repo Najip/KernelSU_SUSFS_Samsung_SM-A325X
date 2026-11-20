@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: ${{ inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel') }}${{ inputs.kernel_source == 'aigis' && ' (Aigis)' || (inputs.kernel_source == 'both' && ' (mzggr + Aigis)' || '') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.release_type == 'Release from last pre-release' && 'A325X publish the last pre-release as Release' || '' }}${{ inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel')) || '' }}${{ inputs.kernel_source == 'aigis' && ' (Aigis)' || (inputs.kernel_source == 'both' && ' (mzggr + Aigis)' || '') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
@@ -77,12 +77,13 @@ on:
           - Promoted
         default: Latest
       release_type:
-        description: 'CI = build only, no release. Pre-release = publish as a pre-release. Release = publish a full release (only allowed with Verified) and update the README sources table'
+        description: 'CI = build only, no release. Pre-release = publish as a pre-release. Release = publish a full release (only allowed with Verified) and update the README sources table. Release from last pre-release = no build: turn the newest pre-release into the full Release (same ZIPs you tested; it must be built from the Verified commits, commit mode Verified)'
         type: choice
         options:
           - CI
           - Pre-release
           - Release
+          - Release from last pre-release
         default: CI
       bench_tool:
         description: 'Also build the hook benchmark tool (hook-bench artifact). Not needed to use the kernel'
@@ -133,8 +134,13 @@ jobs:
         run: |
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
-          if [[ "$TYPE" == Release && "$MODE" != Verified ]]; then
+          if [[ ( "$TYPE" == Release || "$TYPE" == 'Release from last pre-release' ) && "$MODE" != Verified ]]; then
             fail "Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
+          fi
+          if [[ "$TYPE" == 'Release from last pre-release' ]]; then
+            [[ "$NM_ONLY" != true ]] || fail "NoMount only builds are not released. Untick NoMount only."
+            echo "No build: the newest pre-release becomes the full Release."
+            exit 0
           fi
           if [[ "$PERF_TUNING" == true && "$KERNEL_CHOICE" != mzggr ]]; then
             echo "::warning title=Tuning ignored for Aigis::Performance tuning is for the mzggr kernel only. The Aigis kernel is built without it (Aigis keeps its own tuning)."
@@ -155,6 +161,7 @@ jobs:
         run: python3 scripts/pick_runner.py
       - name: Decide what to build
         id: plan
+        if: inputs.release_type != 'Release from last pre-release'
         env:
           COMMIT_MODE: ${{ inputs.commit_mode }}
           NM_ONLY: ${{ inputs.nomount_only }}
@@ -570,7 +577,7 @@ jobs:
   release:
     name: Publish release and update README
     needs: [pick, build, collect]
-    if: ${{ !cancelled() && !failure() && inputs.release_type != 'CI' && (inputs.commit_mode != 'Promoted' || needs.pick.outputs.promote_ok == 'true') }}
+    if: ${{ !cancelled() && !failure() && inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode != 'Promoted' || needs.pick.outputs.promote_ok == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -641,40 +648,7 @@ jobs:
           if [[ "$BRANCH" == "$DEFAULT_BRANCH" ]]; then prefix=build; else prefix=${BRANCH//\//-}; fi
           tag="$prefix-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
           echo "TAG=$tag" >> "$GITHUB_ENV"
-          prev=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 100 --json tagName \
-            --jq "[.[].tagName | select(test(\"^$prefix-[0-9]{8}-[0-9]+\$\"))][0] // \"\"")
-          if [[ -n "$prev" ]] && gh release download "$prev" --repo "$GITHUB_REPOSITORY" --pattern sources.json --dir prev 2>/dev/null; then
-            echo "Previous release: $prev"
-            prev_json=prev/sources.json
-          else
-            echo "No previous release with sources.json; this is the first one."
-            prev_json=-
-          fi
-          # Compare with the previous release only when it was built from the same kernel repo.
-          if [[ "$prev_json" != - ]] && ! python3 -c 'import json,sys; a,b=(json.load(open(p))["kernel"]["repo"] for p in sys.argv[1:]); sys.exit(a!=b)' release/sources.json "$prev_json"; then
-            echo "The previous release used another kernel; no what's new list."
-            prev_json=-
-          fi
-          python3 scripts/release_notes.py notes release/sources.json "$prev_json" release/build-info.txt notes.md
-          if [[ -f release/sources-aigis.json ]]; then
-            {
-              echo
-              echo "## Kernels in this release"
-              echo "Pick one kernel ZIP and flash it. NoMount: flash the NoMount ZIP made for that kernel."
-              for z in release/*.zip; do
-                n=$(basename "$z")
-                case "$n" in
-                  NoMount-*) ;;
-                  *-Aigis-*-valhall.zip) echo "- \`$n\`: Aigis kernel with the Valhall GPU and its drivers module" ;;
-                  *-Aigis-*) echo "- \`$n\`: Aigis kernel by SlamZDank (details: build-info-aigis.txt)" ;;
-                  *) echo "- \`$n\`: mzggr0914 kernel (details: build-info.txt)" ;;
-                esac
-              done
-              for z in release/NoMount-*.zip; do echo "- \`$(basename "$z")\`: NoMount module"; done
-              echo
-              echo "Aigis sources: $(python3 -c 'import json; d=json.load(open("release/sources-aigis.json")); print(d["kernel"]["repo"] + " @ " + d["kernel"]["commit"][:12])')"
-            } >> notes.md
-          fi
+          scripts/release_body.sh release "$prefix" "${{ inputs.release_type }}" "$tag" notes.md
 
       - name: Publish release
         run: |
@@ -693,6 +667,69 @@ jobs:
 
       - name: Update README sources table
         if: inputs.release_type == 'Release'
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
+            python3 scripts/release_notes.py readme release/sources.json README.md "$TAG"
+            if git diff --quiet; then echo 'README already up to date.'; exit 0; fi
+            git commit -q -am "README: sources for release $TAG"
+            git push -q origin "HEAD:$BRANCH" && exit 0
+            sleep 5
+          done
+          echo '::error::Could not push the README update.'; exit 1
+
+  publish_prerelease:
+    name: Publish the last pre-release as Release
+    needs: pick
+    if: inputs.release_type == 'Release from last pre-release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      BRANCH: ${{ github.ref_name }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout ${{ github.ref_name }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+
+      - name: Find the newest pre-release
+        run: |
+          set -euo pipefail
+          if [[ "$BRANCH" == "$DEFAULT_BRANCH" ]]; then prefix=build; else prefix=${BRANCH//\//-}; fi
+          echo "PREFIX=$prefix" >> "$GITHUB_ENV"
+          tag=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts --limit 100 --json tagName,isPrerelease \
+            --jq "[.[] | select(.isPrerelease) | .tagName | select(test(\"^$prefix-[0-9]{8}-[0-9]+\$\"))][0] // \"\"")
+          [[ -n "$tag" ]] || { echo "::error::No pre-release on $BRANCH to publish. Run Build Kernel with commit mode Verified and release type Pre-release first."; exit 1; }
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "Pre-release: $tag ($(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json name --jq .name))"
+          mkdir release
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir release --pattern 'sources*.json' --pattern 'build-info*.txt'
+          # Only the names of the ZIPs are needed for the notes.
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(endswith(".zip"))' \
+            | while read -r n; do : > "release/$n"; done
+          ls -l release
+
+      - name: Check it was built from the Verified commits
+        run: python3 scripts/check_verified.py configs/verified.json release/sources*.json
+
+      - name: Write release notes and publish
+        run: |
+          set -euo pipefail
+          scripts/release_body.sh release "$PREFIX" Release "$TAG" notes.md
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest --notes-file notes.md
+          echo "### Published $TAG as the full Release" >> "$GITHUB_STEP_SUMMARY"
+          echo "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update README sources table
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'

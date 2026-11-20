@@ -64,7 +64,7 @@ The **Kernel** dropdown picks the kernel tree: `mzggr` (default, everything abov
    - **uname tag**: `-forkby-gh.Najip` by default, added to the end of `uname -r` on both kernels (for example `4.14.357-openela-vigus-slmkernel-a32-forkby-gh.Najip`). Letters, digits, space and `. _ + -` only (no `/`, the release name is also a folder name). Clear it for the kernel's own name. `bpfloader`, `netbpfload` and `netd` still see the fixed fake version, so networking is not affected. A NoMount module must be built with the same tag (the **NoMount LKM** workflow has the same box).
    - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
-   - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both attach the NoMount module built in the same run (see below).
+   - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, `Release` publishes a full release, and `Release from last pre-release` turns the newest pre-release into the full Release without building. Both attach the NoMount module built in the same run (see below).
    - **NoMount**: `lkm` by default, a separate module (`NoMount-....zip` and `nomount-4.14.ko`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.
    - **NoMount branch**: `dev` by default, or `master`. Used for both `lkm` and `integrate`.
    - **NoMount only**: unticked by default. Tick it to build only the NoMount module, no kernel ZIP (see [NoMount without a kernel compile](#nomount-without-a-kernel-compile)).
@@ -125,6 +125,15 @@ How `Promoted` gets the NoMount module:
 With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The hook style and tuning options are ignored in `Promoted`; they come from the `Latest` run.
 
 A full `Release` with `Latest` or `Promoted` stops with the message "Release must use Verified". Use `Pre-release` for those, or switch to `Verified`.
+
+**Release from last pre-release** (no build): test first, then publish exactly what you flashed.
+
+1. Run Build Kernel with commit mode `Verified` and release type `Pre-release`, and flash that pre-release.
+2. When it works, run Build Kernel again with commit mode `Verified` and release type `Release from last pre-release`. The newest pre-release of this branch becomes the full Release (same ZIPs, notes rewritten as "what's new since the last Release") and the README sources table is updated. Kernel options are ignored here.
+
+It stops with "Release must use Verified" when that pre-release was not built from the commits in `configs/verified.json` (for example a `Latest` pre-release, or one made before a newer `Promoted`).
+
+"What's new" in a full Release always compares with the previous full Release; a pre-release compares with the previous release of any kind. A previous release of another kernel repo makes it a "First release".
 
 With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14.ko` built in the same run to the release page. The README sources table is updated only by a full `Release`.
 
