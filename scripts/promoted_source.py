@@ -3,19 +3,19 @@
 
   promoted_source.py find
     Finds the most recent successful "Build Kernel" run with commit mode
-    Latest and the default kernel options (hook manual, no tuning,
-    NoMount not built in, not a NoMount-only run) on $BRANCH whose files
-    have not expired yet. Runner, release type and whether the NoMount LKM
-    was built do not matter. Writes
+    Latest and the default kernel options (hook manual, NoMount not built in,
+    not a NoMount-only run, no Valhall GPU, Aigis compiler aigis) on $BRANCH
+    that built every kernel in $SOURCES ("mzggr", "aigis" or both) and whose
+    files have not expired yet. Runner, release type, tuning and whether the
+    NoMount LKM was built do not matter. Writes
     source_run, source_url and source_sha to $GITHUB_OUTPUT.
 
   promoted_source.py download <run id> <artifacts folder>
-    Downloads the kernel ZIP, build-info.txt, release-files and build logs of
-    that run. Files uploaded unarchived (the kernel ZIP, build-info.txt) are
-    kept byte for byte; the others are unpacked into a folder of their name.
+    Downloads the release-files (mzggr) and release-files-aigis artifacts of
+    that run into <folder>/mzggr and <folder>/aigis.
 
-  promoted_source.py inspect <artifacts folder>
-    Reads the downloaded artifacts of that run. Writes the commits
+  promoted_source.py inspect <artifacts folder>/<source>
+    Reads the downloaded files of one kernel of that run. Writes the commits
     (kernel_ref, ksu_ref, susfs_ref and *_branch), hook, tuning,
     kernel_release, build_sha and has_nomount to $GITHUB_OUTPUT.
 
@@ -32,6 +32,17 @@ import sys
 from pathlib import Path
 
 WORKFLOW = "kernel.yml"
+# Artifact with the release files of each kernel.
+ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis"}
+
+
+def built_sources(title):
+    """Kernels a Build Kernel run built, from its run-name (older runs: mzggr)."""
+    if "(mzggr + Aigis)" in title:
+        return {"mzggr", "aigis"}
+    if "(Aigis)" in title:
+        return {"aigis"}
+    return {"mzggr"}
 
 
 def fail(message):
@@ -57,22 +68,23 @@ def find():
     repo = os.environ["GITHUB_REPOSITORY"]
     branch = os.environ.get("BRANCH", "main")
     runs = api(f"repos/{repo}/actions/workflows/{WORKFLOW}/runs?branch={branch}&status=success&per_page=100")
+    wanted = set(os.environ.get("SOURCES", "mzggr").split())
     for run in runs.get("workflow_runs", []):
         title = run.get("display_title", "")
         # run-name contains "(Latest)" for commit mode Latest.
         if "(Latest)" not in title:
             continue
-        if "(tuning)" in title:
-            print(f"Skipping run {run['id']} ({title}): built with tuning (releases are without tuning).")
-            continue
-        if "[manual]" not in title or "integrate" in title or "LKM only" in title:
+        if ("[manual]" not in title or "integrate" in title or "LKM only" in title
+                or "(Valhall GPU)" in title or "(main compiler)" in title):
             print(f"Skipping run {run['id']} ({title}): not the default options.")
             continue
+        built = built_sources(title)
+        if not wanted <= built:
+            print(f"Skipping run {run['id']} ({title}): did not build {' and '.join(sorted(wanted - built))}.")
+            continue
         arts = api(f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100").get("artifacts", [])
-        live = [a["name"] for a in arts if not a.get("expired")]
-        has_zip = any(n.startswith("A325X-") and n.endswith(".zip") for n in live) or "release-files" in live
-        has_sources = "release-files" in live or any(n.startswith("build-logs-") for n in live)
-        if not (has_zip and has_sources):
+        live = {a["name"] for a in arts if not a.get("expired")}
+        if not all(ARTIFACT[s] in live for s in wanted):
             print(f"Skipping run {run['id']} ({title}): its files have expired.")
             continue
         print(f"Taking the files of run {run['id']}: {title}")
@@ -84,9 +96,10 @@ def find():
             "source_title": title.replace("\n", " "),
         })
         return
-    message = (f"Nothing to promote: no successful Latest build without tuning (hook manual, NoMount not "
-               f"built in) with files left on {branch}. Run Build Kernel with commit mode Latest and "
-               f"Performance tuning unticked first, then run Promoted again.")
+    kernels = " and ".join(sorted(wanted))
+    message = (f"Nothing to promote: no successful Latest build of {kernels} with the default options (hook manual, "
+               f"NoMount not built in, no Valhall GPU) with files left on {branch}. Run Build Kernel with commit "
+               f"mode Latest and Kernel {'both' if len(wanted) > 1 else kernels} first, then run Promoted again.")
     print(f"::warning title=Nothing promoted::{message}")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
@@ -100,31 +113,28 @@ def download(run_id, folder):
     repo = os.environ["GITHUB_REPOSITORY"]
     folder = Path(folder)
     arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
-    for art in arts:
-        name = art["name"]
-        if art.get("expired"):
-            continue
-        raw = name.startswith("A325X-") and name.endswith(".zip") or name == "build-info.txt"
-        if not (raw or name == "release-files" or name.startswith("build-logs-")):
+    for source, name in ARTIFACT.items():
+        art = next((a for a in arts if a["name"] == name and not a.get("expired")), None)
+        if not art:
             continue
         data = subprocess.check_output(["gh", "api", f"repos/{repo}/actions/artifacts/{art['id']}/zip"])
-        target = folder / name
+        target = folder / source / name
         target.mkdir(parents=True, exist_ok=True)
-        if raw:
-            (target / name).write_bytes(data)
-        else:
-            tmp = folder / f".{name}.zip"
-            tmp.write_bytes(data)
-            with zipfile.ZipFile(tmp) as z:
-                z.extractall(target)
-            tmp.unlink()
-        print(f"Downloaded {name} ({len(data)} bytes)")
+        tmp = folder / f".{name}.zip"
+        tmp.write_bytes(data)
+        with zipfile.ZipFile(tmp) as z:
+            z.extractall(target)
+        tmp.unlink()
+        print(f"Downloaded {name} ({len(data)} bytes) to {target}")
 
 
 def locate(folder):
     folder = Path(folder)
     # Unarchived artifacts are downloaded as <name>/<name>, so only look at files.
-    zips = sorted({p.name: p for p in folder.rglob("A325X-*.zip") if p.is_file()}.values())
+    every = sorted({p.name: p for p in folder.rglob("A325X-*.zip") if p.is_file()}.values())
+    # The Aigis Valhall build also has <name>-valhall.zip next to the kernel ZIP.
+    zips = [p for p in every if not p.name.endswith("-valhall.zip")]
+    extras = [p for p in every if p.name.endswith("-valhall.zip")]
     if not zips:
         fail("The Latest run has no kernel ZIP.")
     if len(zips) > 1:
@@ -138,7 +148,7 @@ def locate(folder):
     if not infos:
         fail("The Latest run has no build-info.txt.")
     nomount = sorted({p.name: p for p in folder.rglob("*") if p.is_file() and "nomount" in p.parts}.values())
-    return zips[0], sources[0], infos[0], nomount
+    return zips[0], sources[0], infos[0], nomount, extras
 
 
 def info_value(text, label):
@@ -149,7 +159,7 @@ def info_value(text, label):
 
 
 def inspect(folder):
-    zip_path, sources_path, info_path, nomount = locate(folder)
+    zip_path, sources_path, info_path, nomount, _ = locate(folder)
     src = json.loads(sources_path.read_text())
     info = info_path.read_text()
     out = {}
@@ -164,8 +174,8 @@ def inspect(folder):
     hook = info_value(info, "xxKSU hook style") or "manual"
     tuning = info_value(info, "Performance tuning") or "false"
     nm_line = info_value(info, "NoMount")
-    if hook != "manual" or tuning != "false" or nm_line.startswith("built into"):
-        fail(f"The Latest run does not use the default options (hook {hook}, tuning {tuning}, NoMount {nm_line or 'LKM'}).")
+    if hook != "manual" or nm_line.startswith("built into"):
+        fail(f"The Latest run does not use the default options (hook {hook}, NoMount {nm_line or 'LKM'}).")
     has_ko = any(p.suffix == ".ko" for p in nomount)
     nm_zips = [p.name for p in nomount if p.name.startswith("NoMount-") and p.suffix == ".zip"]
     has_nm_zip = bool(nm_zips)
@@ -188,17 +198,17 @@ def inspect(folder):
 
 
 def collect(folder, dest):
-    zip_path, sources_path, info_path, nomount = locate(folder)
+    zip_path, sources_path, info_path, nomount, extras = locate(folder)
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
-    for p in (zip_path, sources_path, info_path):
+    for p in (zip_path, sources_path, info_path, *extras):
         shutil.copy2(p, dest / p.name)
     if nomount:
         (dest / "nomount").mkdir(exist_ok=True)
         for p in nomount:
             shutil.copy2(p, dest / "nomount" / p.name)
-    digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
-    (dest / "SHA256SUMS.txt").write_text(f"{digest}  {zip_path.name}\n")
+    sums = "".join(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in (zip_path, *extras))
+    (dest / "SHA256SUMS.txt").write_text(sums)
     for p in sorted(dest.rglob("*")):
         print(p.relative_to(dest))
 
