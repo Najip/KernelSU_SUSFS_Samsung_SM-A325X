@@ -29,9 +29,8 @@ case "$KSU_HOOK" in
   manual|syscall_table|branch_link) ;;
   *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
 esac
-if [[ "$PERF_TUNING" == true && "${TUNING_SUPPORTED:-true}" != true ]]; then
-  echo "::error title=Tuning not available::Performance tuning is not available for this kernel source ($KERNEL_REPO), it ships its own CPU/GPU tuning. Untick Performance tuning." >&2
-  exit 1
+if [[ "${TUNING_IGNORED:-false}" == true ]]; then
+  echo "::warning title=Tuning ignored::Performance tuning is for main's kernel only; building $KERNEL_REPO without it (it keeps its own tuning)." >&2
 fi
 mkdir -p "$INFO_DIR"
 INFO_DIR=$(cd -- "$INFO_DIR" && pwd)

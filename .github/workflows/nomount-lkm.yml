@@ -1,5 +1,5 @@
 name: NoMount LKM
-run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.perf_tuning && ' for tuning kernel' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Builds nomount-4.14.ko and the flashable NoMount module ZIP (flash it in the
 # KernelSU manager). The kernel is compiled in the same run with the same
@@ -61,7 +61,7 @@ on:
           - dev
         default: dev
       perf_tuning:
-        description: 'Tick if your kernel was built with Performance tuning'
+        description: 'Main kernel only: ignored on this branch'
         type: boolean
         default: false
       valhall_gpu:
@@ -98,7 +98,8 @@ permissions:
 
 
 env:
-  PERF_TUNING: ${{ inputs.perf_tuning }}
+  # Our tuning is only for main's kernel; Aigis keeps its own tuning.
+  PERF_TUNING: 'false'
   VALHALL_GPU: ${{ inputs.valhall_gpu }}
   KERNEL_TOOLCHAIN: ${{ inputs.compiler == 'main' && 'aosp' || 'zyc' }}
   NOMOUNT_REF: ${{ inputs.nomount_ref }}
