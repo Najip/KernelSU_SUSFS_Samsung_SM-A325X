@@ -43,14 +43,14 @@ case "$NOMOUNT_MODE" in
   lkm) nomount_line="separate LKM (${NOMOUNT_REF:-dev})" ;;
   *) nomount_line="not included" ;;
 esac
-name="A325X-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
+name="${KERNEL_LABEL}-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
 
-sed -i "s|^kernel\.string=.*|kernel.string=A325X ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
+sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 cp "$IMAGE" "$ak3/Image"
 gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
 
 {
-  echo "A325X xxKSU + SUSFS kernel"
+  echo "${KERNEL_LABEL} xxKSU + SUSFS kernel"
   echo "Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
   echo "Kernel release: $release"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
