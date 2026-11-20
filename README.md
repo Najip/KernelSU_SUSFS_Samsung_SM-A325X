@@ -9,12 +9,12 @@ This repo stores no kernel source. The GitHub Actions workflows download every s
 The table below is refreshed automatically each time a release is published.
 
 <!-- SOURCES:START -->
-Last release: [build-20261119-21](../../releases/tag/build-20261119-21)
+Last release: [build-20261120-78](../../releases/tag/build-20261120-78)
 
 | Part | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|
 | Kernel | [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) | `common`, Linux 4.14.357-openela | [`7dd52de28d1e`](https://github.com/mzggr0914/android_kernel_a325x_bakasu/commit/7dd52de28d1ee64dddc1f3e853e214fab7578c44) | 2026-11-16 |
-| xxKSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1-54 | [`22b67efa772e`](https://github.com/backslashxx/KernelSU/commit/22b67efa772e961f913c4a9e674b43fa6eadf6b1) | 2026-11-19 |
+| xxKSU | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1+54 | [`f27e1f0d3192`](https://github.com/backslashxx/KernelSU/commit/f27e1f0d3192820b0964881585d764ab0f0de56f) | 2026-11-20 |
 | SUSFS patch | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`26f2313be61f`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/26f2313be61f7a8603a50b2dcd12171495a79d27) | 2026-11-18 |
 <!-- SOURCES:END -->
 
