@@ -5,7 +5,7 @@
 #   INFO_DIR     where sources.json / applied-patches.txt are written (required)
 #   PERF_TUNING  true = also apply the optional tuning patch (default false)
 #   NETWORK_FIX  true = apply the UDP GSO network fix (default true)
-#   KSU_HOOK     xxKSU hook style: branch_link (default), manual, syscall_table
+#   KSU_HOOK     xxKSU hook style: manual (default), syscall_table, branch_link (currently unstable)
 #   KERNEL_REF / KSU_REF / SUSFS_REF override scripts/sources.conf
 #   KERNEL_BRANCH / KSU_BRANCH / SUSFS_BRANCH  branch name recorded in sources.json
 #                when the ref above is a pinned commit (Verified mode)
@@ -18,7 +18,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 : "${KERNEL_DIR:?KERNEL_DIR is required}"
 : "${INFO_DIR:?INFO_DIR is required}"
 PERF_TUNING=${PERF_TUNING:-false}
-KSU_HOOK=${KSU_HOOK:-branch_link}
+KSU_HOOK=${KSU_HOOK:-manual}
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 NOMOUNT_REF=${NOMOUNT_REF:-dev}
 case "$NOMOUNT_MODE" in

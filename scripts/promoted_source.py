@@ -3,7 +3,7 @@
 
   promoted_source.py find
     Finds the most recent successful "Build Kernel" run with commit mode
-    Latest and the default kernel options (hook branch_link, no tuning,
+    Latest and the default kernel options (hook manual, no tuning,
     NoMount not built in, not a NoMount-only run) on $BRANCH whose files
     have not expired yet. Runner, release type and whether the NoMount LKM
     was built do not matter. Writes
@@ -65,7 +65,7 @@ def find():
         if "(tuning)" in title:
             print(f"Skipping run {run['id']} ({title}): built with tuning (releases are without tuning).")
             continue
-        if "[branch_link]" not in title or "integrate" in title or "LKM only" in title:
+        if "[manual]" not in title or "integrate" in title or "LKM only" in title:
             print(f"Skipping run {run['id']} ({title}): not the default options.")
             continue
         arts = api(f"repos/{repo}/actions/runs/{run['id']}/artifacts?per_page=100").get("artifacts", [])
@@ -84,7 +84,7 @@ def find():
             "source_title": title.replace("\n", " "),
         })
         return
-    message = (f"Nothing to promote: no successful Latest build without tuning (hook branch_link, NoMount not "
+    message = (f"Nothing to promote: no successful Latest build without tuning (hook manual, NoMount not "
                f"built in) with files left on {branch}. Run Build Kernel with commit mode Latest and "
                f"Performance tuning unticked first, then run Promoted again.")
     print(f"::warning title=Nothing promoted::{message}")
@@ -164,7 +164,7 @@ def inspect(folder):
     hook = info_value(info, "xxKSU hook style") or "manual"
     tuning = info_value(info, "Performance tuning") or "false"
     nm_line = info_value(info, "NoMount")
-    if hook != "branch_link" or tuning != "false" or nm_line.startswith("built into"):
+    if hook != "manual" or tuning != "false" or nm_line.startswith("built into"):
         fail(f"The Latest run does not use the default options (hook {hook}, tuning {tuning}, NoMount {nm_line or 'LKM'}).")
     has_ko = any(p.suffix == ".ko" for p in nomount)
     nm_zips = [p.name for p in nomount if p.name.startswith("NoMount-") and p.suffix == ".zip"]

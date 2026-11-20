@@ -33,7 +33,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 
 - Kernel: mzggr0914's SLM-based Linux 4.14.357-openela tree (`4.14.357-openela-vigus-slmkernel-a32`). It carries the BPF backports and the fake `5.10` version for `netbpfload`, so newer ROMs such as LumiROM 9 (Android 17) boot.
 - The tree's own BakaSU and in-tree NoMount are removed at build time and replaced by xxKSU and upstream NoMount (a separate LKM by default, or built in with the `integrate` option). The conversion is the same as the booting [Najip/android_kernel_a325F_bakasu `xxksu`](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu) branch, stored here as `patches/base/0001-mzggr-common-to-xxksu-susfs.patch`.
-- xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default is `branch_link`. No LSM hooking in any style.
+- xxKSU hook style, chosen when you run the workflow (see [Hook styles](#hook-styles)). The default is `manual` (`branch_link` is currently unstable). No LSM hooking in any style.
 - SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch; the hooks in the rest of the kernel are the 4.14 ones already in mzggr0914's tree. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
 - Network fix (UDP-only GSO for IPv4 and IPv6). A tick, ticked by default, allowed with every release type (and with `Promoted`, which keeps the setting of the build it takes).
@@ -46,7 +46,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 2. Pick **Build Kernel** on the left, then press **Run workflow**.
 3. Choose the options and press the green **Run workflow** button:
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
-   - **xxKSU hook style**: `branch_link` by default, then `manual`, then `syscall_table`. See [Hook styles](#hook-styles).
+   - **xxKSU hook style**: `manual` by default, then `syscall_table`, then `branch_link` (currently unstable). See [Hook styles](#hook-styles).
    - **Performance tuning**: unticked by default.
    - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
@@ -69,9 +69,9 @@ xxKSU needs to see a few syscalls: `execve`/`execveat` (for `su` and `ksud`), `f
 
 | Style | ZIP name ends in | How it works |
 |---|---|---|
-| `branch_link` (default) | `-bl` | Starts like `syscall_table`, then shortly after `init.rc` is handled rewrites the `bl` (call) instructions inside `sys_faccessat`, `sys_newfstatat` and `sys_execve` to jump straight to xxKSU, and removes each table hook that worked. If one cannot be patched, its table hook stays. |
-| `manual` | nothing | The kernel source calls xxKSU directly inside `fs/exec.c`, `fs/open.c`, `fs/stat.c` and `kernel/reboot.c`. Fixed at compile time. |
+| `manual` (default) | nothing | The kernel source calls xxKSU directly inside `fs/exec.c`, `fs/open.c`, `fs/stat.c` and `kernel/reboot.c`. Fixed at compile time. |
 | `syscall_table` | `-sct` | xxKSU replaces those entries in `sys_call_table` with small wrappers at boot. The `newfstat`/`read` ones are put back once `init.rc` is done. |
+| `branch_link` (currently unstable) | `-bl` | Starts like `syscall_table`, then shortly after `init.rc` is handled rewrites the `bl` (call) instructions inside `sys_faccessat`, `sys_newfstatat` and `sys_execve` to jump straight to xxKSU, and removes each table hook that worked. If one cannot be patched, its table hook stays. HMA-oss and BRENE's priority UID filter fail with it; use `manual`. |
 
 For `syscall_table` and `branch_link`, `patches/hooks/0001-hookless-skip-parent-hooks.patch` switches off the kernel's own calls for those syscalls, so nothing runs twice. The security hooks (setuid, rename, setxattr, setprocattr, file permission) stay manual in all three styles, and SUSFS is the same in all three.
 
@@ -98,7 +98,7 @@ Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of
 
 Releases never include tuning: a `Pre-release` or `Release` with **Performance tuning** ticked stops with "Releases are built without tuning". For the same reason, `Promoted` only takes builds without tuning.
 
-Which `Latest` runs `Promoted` accepts: hook style `branch_link`, **Performance tuning** unticked, NoMount `lkm` or `no` (not `integrate`), and not a **NoMount only** run. The runner (your PC or GitHub), the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
+Which `Latest` runs `Promoted` accepts: hook style `manual`, **Performance tuning** unticked, NoMount `lkm` or `no` (not `integrate`), and not a **NoMount only** run. The runner (your PC or GitHub), the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
 
 How `Promoted` gets the NoMount module:
 
