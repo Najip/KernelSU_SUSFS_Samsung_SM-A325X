@@ -4,6 +4,7 @@
 #   KERNEL_DIR   where the kernel tree goes (required). Reused if it exists.
 #   INFO_DIR     where sources.json / applied-patches.txt are written (required)
 #   PERF_TUNING  true = also apply the optional tuning patch (default false)
+#   NETWORK_FIX  true = apply the UDP GSO network fix (default true)
 #   KSU_HOOK     xxKSU hook style: branch_link (default), manual, syscall_table
 #   KERNEL_REF / KSU_REF / SUSFS_REF override scripts/sources.conf
 #   KERNEL_BRANCH / KSU_BRANCH / SUSFS_BRANCH  branch name recorded in sources.json
@@ -120,9 +121,13 @@ else
 fi
 
 log "Applying kernel patches"
-echo "  0001-network-udp-gso.patch (always)"
-git apply "$ROOT/patches/kernel/0001-network-udp-gso.patch"
-applied+=("0001-network-udp-gso.patch")
+if [[ "${NETWORK_FIX:-true}" == true ]]; then
+  echo "  0001-network-udp-gso.patch (network fix ticked)"
+  git apply "$ROOT/patches/kernel/0001-network-udp-gso.patch"
+  applied+=("0001-network-udp-gso.patch")
+else
+  echo "  network fix unticked: 0001-network-udp-gso.patch not applied"
+fi
 if [[ "$PERF_TUNING" == true ]]; then
   echo "  0002-optional-tuning.patch (tuning ticked)"
   git apply "$ROOT/patches/kernel/0002-optional-tuning.patch"
