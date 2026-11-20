@@ -47,7 +47,10 @@ export KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-builder}
 export KBUILD_BUILD_VERSION=${KBUILD_BUILD_VERSION:-1}
 KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-$(git -C "$KERNEL_DIR" show -s --format=%cD HEAD)}
 export KBUILD_BUILD_TIMESTAMP
-export KCFLAGS=${KCFLAGS:--Wno-error -Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=visibility -Wno-error=fortify-source -Wno-error=pointer-to-int-cast -Wno-error=typedef-redefinition -Wno-error=strict-prototypes -Wno-error=implicit-function-declaration}
+# KERNEL_KCFLAGS (sources.conf) adds the flags the kernel source itself builds with.
+export KCFLAGS=${KCFLAGS:-${KERNEL_KCFLAGS:+$KERNEL_KCFLAGS }-Wno-error -Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=visibility -Wno-error=fortify-source -Wno-error=pointer-to-int-cast -Wno-error=typedef-redefinition -Wno-error=strict-prototypes -Wno-error=implicit-function-declaration}
+[[ -n "${KERNEL_KCPPFLAGS:-}" ]] && export KCPPFLAGS=${KCPPFLAGS:-$KERNEL_KCPPFLAGS}
+echo "KCFLAGS: $KCFLAGS"
 mkdir -p "$OUT_DIR"
 OUT_DIR=$(cd -- "$OUT_DIR" && pwd)
 {
