@@ -13,7 +13,7 @@ on:
           - mzggr
           - aigis
           - both
-        default: mzggr
+        default: aigis
       self_hosted:
         description: 'Prefer my own PC (self-hosted). If it is busy, a GitHub runner is used when that finishes sooner. Untick = GitHub runner'
         type: boolean
