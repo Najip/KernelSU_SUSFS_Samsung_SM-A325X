@@ -31,8 +31,16 @@ JOBS=${JOBS:-$(nproc)}
 
 bash "$ROOT/scripts/fetch_toolchain.sh" "$TOOLCHAIN"
 TOOLCHAIN=$(cd -- "$TOOLCHAIN" && pwd)
-export KBUILD_BUILD_USER=${KBUILD_BUILD_USER:-xxksu}
-export KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-builder}
+# Shown in /proc/version and uname -v: "Linux version ... (Najip@github)".
+export KBUILD_BUILD_USER=${KBUILD_BUILD_USER:-Najip}
+export KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-github}
+# KERNEL_TAG (the workflow's "uname tag"): added to the end of uname -r
+# through make's LOCALVERSION. Empty = the kernel's own release name.
+if [[ -n "${KERNEL_TAG:-}" ]]; then
+  [[ "$KERNEL_TAG" =~ ^[A-Za-z0-9._+\ -]+$ ]] || {
+    echo "uname tag '$KERNEL_TAG': only letters, digits, space and . _ + - are allowed (no /)" >&2; exit 1; }
+  export LOCALVERSION=$KERNEL_TAG
+fi
 export KBUILD_BUILD_VERSION=${KBUILD_BUILD_VERSION:-1}
 KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-$(git -C "$KERNEL_DIR" show -s --format=%cD HEAD)}
 export KBUILD_BUILD_TIMESTAMP

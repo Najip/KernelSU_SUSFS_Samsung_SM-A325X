@@ -34,6 +34,10 @@ on:
         description: 'Network fix (UDP-only GSO for IPv4 and IPv6). Allowed with every release type'
         type: boolean
         default: true
+      uname_tag:
+        description: 'Text added to the end of uname -r on both kernels (letters, digits, space, . _ + -; no /). Empty = none'
+        type: string
+        default: '-forkby-gh.Najip'
       valhall_gpu:
         description: 'Aigis only: Valhall GPU (Aigis r32p1 GPU code, r32p1 dtb in the zip, extra -valhall zip with the drivers module). Unticked = stock A32 GPU'
         type: boolean
@@ -97,6 +101,7 @@ env:
   VALHALL_GPU: ${{ inputs.valhall_gpu }}
   AIGIS_COMPILER: ${{ inputs.compiler || 'aigis' }}
   NETWORK_FIX: ${{ inputs.network_fix }}
+  KERNEL_TAG: ${{ inputs.uname_tag }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
   NOMOUNT_REF: ${{ inputs.nomount_branch || 'dev' }}
@@ -183,6 +188,8 @@ jobs:
       KSU_HOOK: ${{ matrix.ksu_hook }}
       PERF_TUNING: ${{ matrix.perf_tuning }}
       NETWORK_FIX: ${{ matrix.network_fix }}
+      # Promoted: the tag of the Latest run, so the module matches its kernel.
+      KERNEL_TAG: ${{ matrix.kernel_tag }}
       BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
       BUILD_NOMOUNT: ${{ matrix.build_nomount }}
       KIT_ID: ${{ matrix.kit_id }}

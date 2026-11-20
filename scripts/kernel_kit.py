@@ -66,6 +66,9 @@ def key():
     # Older kits were made before the network fix became optional (always on).
     if e.get("NETWORK_FIX", "true") != "true":
         parts.append("network_fix=false")
+    # Older kits were made before the uname tag existed (no tag).
+    if e.get("KERNEL_TAG"):
+        parts.append(f"tag={e['KERNEL_TAG']}")
     aigis = c.get("KERNEL_SOURCE") == "aigis"
     if aigis:
         parts.append("source=aigis")

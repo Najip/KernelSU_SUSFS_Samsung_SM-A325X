@@ -39,6 +39,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - Network fix (UDP-only GSO for IPv4 and IPv6). A tick, ticked by default, allowed with every release type (and with `Promoted`, which keeps the setting of the build it takes).
 - Performance tuning (ticked by default, mzggr kernel only), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
 - Toolchain: AOSP Clang 14 with ld.lld and GNU as. No LTO.
+- Built by `Najip@github`: shown in `/proc/version`, `uname -a` and About phone. The **uname tag** (default `-forkby-gh.Najip`) is added to `uname -r`.
 
 ### Aigis kernel (Kernel dropdown)
 
@@ -60,6 +61,7 @@ The **Kernel** dropdown picks the kernel tree: `mzggr` (default, everything abov
    - **Kernel**: `mzggr` by default, or `aigis`, or `both` (see [Aigis kernel](#aigis-kernel-kernel-dropdown)).
    - **Performance tuning**: ticked by default (mzggr only, ignored for Aigis). Allowed with every release type.
    - **Valhall GPU** and **Compiler**: Aigis only, ignored for mzggr.
+   - **uname tag**: `-forkby-gh.Najip` by default, added to the end of `uname -r` on both kernels (for example `4.14.357-openela-vigus-slmkernel-a32-forkby-gh.Najip`). Letters, digits, space and `. _ + -` only (no `/`, the release name is also a folder name). Clear it for the kernel's own name. `bpfloader`, `netbpfload` and `netd` still see the fixed fake version, so networking is not affected. A NoMount module must be built with the same tag (the **NoMount LKM** workflow has the same box).
    - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](#commit-modes).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, and `Release` publishes a full release. Both attach the NoMount module built in the same run (see below).
