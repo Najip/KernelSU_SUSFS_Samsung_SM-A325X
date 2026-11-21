@@ -24,7 +24,7 @@
    - `A325X-Aigis-xxKSU-SUSFS-....zip` (main kernel) or `A325X-mzggr-xxKSU-SUSFS-....zip` (Alt. kernel): the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
    - `build-info.txt`: what was built (also inside the ZIP).
    - `NoMount-...-<kernel>-....zip` and `nomount-4.14-<kernel>.ko` (`<kernel>` = `aigis` or `mzggr`): with NoMount `lkm`. The ZIP is flashed as a module in the KernelSU manager.
-   - `xxksu-manager`: the xxKSU manager APK of the latest [xxKSU release](https://github.com/backslashxx/KernelSU/releases/latest) (the **List manager APK** job, every run). The artifact downloads as a ZIP with the `.apk` inside; releases attach the `.apk` itself.
+   - The xxKSU manager APK of the latest [xxKSU release](https://github.com/backslashxx/KernelSU/releases/latest) under its own name, for example `KernelSU_v3.3.1+54_32735-release.apk` (the **List manager APK** job, every run). Releases attach the same `.apk` with the same name. `xxksu-manager-info` only says where it came from (used for the release notes).
    - `hook-bench`: the benchmark tool and its script, only when **Build hook benchmark** was ticked (see [Comparing them](hook-styles.md#comparing-them)).
 
 No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.

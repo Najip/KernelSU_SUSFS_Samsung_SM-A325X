@@ -7,6 +7,10 @@ Environment (set by the workflow's pick job):
   KERNEL_CHOICE  mzggr, aigis or both (the "Kernel" dropdown)
   COMMIT_MODE    Latest, Verified or Promoted
   NM_ONLY        true = NoMount module only
+  REUSE          (Upstream check) JSON, per kernel {"mode": kernel|nomount|reuse,
+                 "run": <run id>}: kernel = build it; nomount = keep the kernel
+                 files of that run and build only NoMount (from its kernel
+                 kit); reuse = keep all its files
   NOMOUNT_MODE, NOMOUNT_REF, KSU_HOOK, PERF_TUNING, NETWORK_FIX,
   VALHALL_GPU, AIGIS_COMPILER, BRANCH
 
@@ -19,6 +23,8 @@ Writes to $GITHUB_OUTPUT:
   promote_ok    true for a Promoted run that found a Latest build
   sources       the kernels of this run, e.g. "aigis mzggr" (Aigis first)
   source_run, source_url, checkout_sha  (Promoted)
+  collect_sources, collect_runs  kernels whose files come from an earlier run
+                (Promoted, reuse) and that run per kernel (JSON)
 """
 import json
 import os
@@ -77,8 +83,10 @@ def main():
     nomount_mode = e.get("NOMOUNT_MODE", "lkm")
     nomount_ref = e.get("NOMOUNT_REF", "dev")
     out = {"sources": " ".join(sources), "promote_ok": "false", "source_run": "", "source_url": "",
-           "checkout_sha": e.get("GITHUB_SHA", ""), "build_kernel": "false"}
+           "checkout_sha": e.get("GITHUB_SHA", ""), "build_kernel": "false",
+           "collect_sources": "", "collect_runs": "{}"}
     entries = []
+    reuse = json.loads(e.get("REUSE") or "{}")
 
     if mode == "Promoted":
         found = run(["promoted_source.py", "find"], SOURCES=" ".join(sources))
@@ -86,7 +94,9 @@ def main():
             # find already printed the warning; nothing else runs.
             emit(dict(out, matrix="[]", build_any="false"))
             return
-        out.update(promote_ok="true", source_run=found["source_run"], source_url=found["source_url"])
+        out.update(promote_ok="true", source_run=found["source_run"], source_url=found["source_url"],
+                   collect_sources=" ".join(sources),
+                   collect_runs=json.dumps({s: str(found["source_run"]) for s in sources}, separators=(",", ":")))
         summary(f"### Promoted from {found['source_url']}\n{found.get('source_title', '')}\n")
         subprocess.check_call([sys.executable, str(SCRIPTS / "promoted_source.py"), "download",
                                found["source_run"], "source"])
@@ -104,7 +114,7 @@ def main():
                 "network_fix": info.get("network_fix", "true"), "kernel_release": info.get("kernel_release", ""),
                 "valhall_gpu": info.get("valhall_gpu", "false"),
                 "kernel_tag": info.get("kernel_tag", ""),
-                "kit_id": kit, "build_nomount": str(build_nm).lower(),
+                "kit_id": kit, "build_nomount": str(build_nm).lower(), "build_kernel": "false",
             })
             summary(f"{src}: NoMount {'built now' + (' from the saved kernel kit' if kit else '') if build_nm else ('not included' if nomount_mode == 'no' else 'taken from that run')}")
     else:
@@ -113,7 +123,31 @@ def main():
         if nm_only:
             # Tree ids for the kit key.
             subprocess.call(["git", "-C", str(ROOT), "fetch", "-q", "--depth=1", "origin", e.get("GITHUB_SHA", "HEAD")])
+        kept = {}
         for src in sources:
+            want = reuse.get(src, {"mode": "kernel"})
+            if want["mode"] in ("nomount", "reuse"):
+                # Upstream check: this kernel had no update; keep its files.
+                rid = str(want["run"])
+                subprocess.check_call([sys.executable, str(SCRIPTS / "promoted_source.py"), "download", rid, f"source-{src}"],
+                                      env=dict(os.environ, ONLY=src))
+                info = run(["promoted_source.py", "inspect", f"source-{src}/{src}"])
+                if not info.get("kernel_release"):
+                    fail(f"Run {rid} has no {src} kernel files left; build it instead.")
+                build_nm = want["mode"] == "nomount"
+                kit = run(["kernel_kit.py", "in-run", rid], KERNEL_SOURCE=src).get("kit_id", "") if build_nm else ""
+                kept[src] = rid
+                entries.append({
+                    "source": src, **{k: info.get(k, "") for k in REF_KEYS},
+                    "ksu_hook": info.get("hook", "manual"), "perf_tuning": info.get("tuning", "false"),
+                    "network_fix": info.get("network_fix", "true"), "kernel_release": info.get("kernel_release", ""),
+                    "valhall_gpu": info.get("valhall_gpu", "false"), "kernel_tag": info.get("kernel_tag", ""),
+                    "kit_id": kit, "build_nomount": str(build_nm).lower(), "build_kernel": "false",
+                    "checkout_sha": info.get("build_sha", ""),
+                })
+                summary(f"{src}: no update, kernel files kept from run {rid}; NoMount "
+                        + ("built now" + (" from its kernel kit" if kit else "") if build_nm else "kept too"))
+                continue
             refs = run(["resolve_commits.py", "resolve"], KERNEL_SOURCE=src)
             kit = ""
             if nm_only:
@@ -136,13 +170,15 @@ def main():
                 "valhall_gpu": e.get("VALHALL_GPU", "false") if src == "aigis" else "false",
                 "kernel_tag": e.get("KERNEL_TAG", ""),
                 "kit_id": kit, "build_nomount": str(nomount_mode == "lkm").lower(),
+                "build_kernel": str(kernel).lower(),
             })
+        if kept:
+            out.update(collect_sources=" ".join(kept), collect_runs=json.dumps(kept, separators=(",", ":")))
 
-    kernel = out["build_kernel"] == "true"
-    matrix = [x for x in entries if kernel or x["build_nomount"] == "true"]
+    matrix = [x for x in entries if x["build_kernel"] == "true" or x["build_nomount"] == "true"]
     for i, x in enumerate(matrix):
         x["first"] = "true" if i == 0 else "false"
-        print(f"{x['source']}: kernel ZIP {str(kernel).lower()}, NoMount LKM build {x['build_nomount']}, "
+        print(f"{x['source']}: kernel ZIP {x['build_kernel']}, NoMount LKM build {x['build_nomount']}, "
               f"kernel kit {x['kit_id'] or 'none'}")
     out["matrix"] = json.dumps(matrix, separators=(",", ":"))
     out["build_any"] = str(bool(matrix)).lower()
