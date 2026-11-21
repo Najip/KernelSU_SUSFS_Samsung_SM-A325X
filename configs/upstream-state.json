@@ -1,6 +1,6 @@
 {
   "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
-  "checked": "2026-11-21T03:28:54Z",
+  "checked": "2026-11-21T05:41:26Z",
   "sources": {
     "mzggr": {
       "commit": "7dd52de28d1ee64dddc1f3e853e214fab7578c44",
@@ -19,8 +19,8 @@
       "branch": "bpf-5.15-legion"
     },
     "xxksu": {
-      "commit": "f27e1f0d3192820b0964881585d764ab0f0de56f",
-      "date": "2026-11-20T00:59:53Z",
+      "commit": "315c7ec8d3a27bad7662c604fb6a49e3ceff2a24",
+      "date": "2026-11-21T05:27:09Z",
       "subject": "KernelSU v3.3.1+",
       "name": "xxKSU",
       "repo": "https://github.com/backslashxx/KernelSU",
@@ -44,5 +44,45 @@
       "branch": "master"
     }
   },
-  "history": []
+  "history": [
+    {
+      "found": "2026-11-21T05:41:26Z",
+      "changed": [
+        "xxksu"
+      ],
+      "commits": {
+        "xxksu": "315c7ec8d3a27bad7662c604fb6a49e3ceff2a24"
+      },
+      "builds": [
+        {
+          "build": "Kernel both",
+          "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44872049631",
+          "files": [
+            "aigis-kernel",
+            "mzggr-kernel",
+            "aigis-nomount",
+            "mzggr-nomount"
+          ]
+        }
+      ]
+    }
+  ],
+  "files": {
+    "aigis-kernel": {
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44872049631",
+      "date": "2026-11-21T05:41:29Z"
+    },
+    "mzggr-kernel": {
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44872049631",
+      "date": "2026-11-21T05:41:29Z"
+    },
+    "aigis-nomount": {
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44872049631",
+      "date": "2026-11-21T05:41:29Z"
+    },
+    "mzggr-nomount": {
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/44872049631",
+      "date": "2026-11-21T05:41:29Z"
+    }
+  }
 }
