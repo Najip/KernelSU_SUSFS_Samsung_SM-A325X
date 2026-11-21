@@ -80,6 +80,7 @@ Kernel-specific details: [Kernel details](docs/kernels.md).
 | [Upstream check](docs/upstream-check.md) | The automatic check for new upstream commits, and which commits it ignores |
 | [Flashing and logs](docs/flashing.md) | Flashing, the NoMount and GPU checks in the flasher, and collecting logs |
 | [Repo layout](docs/repo-layout.md) | What each file and folder in this repo is |
+| [Licenses](docs/licenses.md) | This repo's license and the license of every upstream part |
 
 ## Credits
 
@@ -92,3 +93,7 @@ Kernel-specific details: [Kernel details](docs/kernels.md).
 - [maxsteeel/nomount](https://github.com/maxsteeel/nomount) and [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader): NoMount LKM.
 - [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3): flashable ZIP.
 - [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu): the xxKSU + SUSFS conversion this repo reproduces.
+
+## License
+
+[GPL-2.0-only](LICENSE), the same license as the Linux kernel. You may fork, build, change and share this repo under the same license. Upstream parts keep their own licenses, see [Licenses](docs/licenses.md).
