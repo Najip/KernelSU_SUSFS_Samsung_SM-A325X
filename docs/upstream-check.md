@@ -9,18 +9,18 @@ The **Upstream check** workflow runs three times a day (07:00, 15:00 and 23:00 J
 - Jack's SUSFS (`mainline`), only commits that changed the 4.14 patch the build uses
 - NoMount (`master` only; the `dev` branch is not watched)
 
-The newest commits it has seen are saved in `configs/upstream-state.json` on the default branch, with a short history of what changed. The first check only saves them, and so does the first check after a new source is added to the list. When a later check finds a new commit, it starts **Build Kernel** with commit mode `Latest`, release type `CI` (never a release) and NoMount branch `master`, and lists the new commits in the run summary.
+The newest commits it has seen are saved in `configs/upstream-state.json` on the default branch, with a short history of what changed. The first check only saves them, and so does the first check after a new source is added to the list. When a later check finds a new commit, it starts one **Build Kernel** run with Kernel `both`, commit mode `Latest`, NoMount branch `master` and release type **Pre-release**, so every upstream update is published as a pre-release with all files (both kernel ZIPs, both NoMount modules, the manager APK). The new commits are listed in the run summary.
 
-Only what changed is rebuilt:
+Only what changed is rebuilt. The rest is taken from an earlier automatic run and put in the same pre-release:
 
-| New commit in | What is built | Files rebuilt |
+| New commit in | Aigis | mzggr |
 |---|---|---|
-| xxKSU or SUSFS patch | Kernel `both` (Aigis first, then mzggr) | all kernel ZIPs and both NoMount modules |
-| Aigis kernel | Kernel `aigis` | Aigis ZIPs and the Aigis NoMount module |
-| mzggr kernel | Kernel `mzggr` | mzggr ZIP and the mzggr NoMount module |
-| NoMount only | **NoMount only**, for the kernels not already rebuilt | the NoMount module(s) |
+| xxKSU or SUSFS patch | built | built |
+| Aigis kernel | built | kept from the earlier run |
+| mzggr kernel | kept from the earlier run | built |
+| NoMount only | kernel kept, NoMount module built (from the saved kernel kit, no kernel compile) | same |
 
-If more than one source changed, the plans are joined (for example mzggr and NoMount: a full mzggr build plus a NoMount-only build for Aigis). Each started run is checked against its plan by its title; the check fails if it does not match. Files with no update are not rebuilt: the state file keeps, for each file, the run that last built it, and the run summary has a **File / From run** table that links the new runs and marks the others as reused from their older run. These are CI builds (no release); a Release still comes only from **Verified** commits.
+If more than one source changed, the rules are joined (for example mzggr and NoMount: mzggr is built, and Aigis keeps its kernel ZIP and gets a new NoMount module). The check passes this to Build Kernel in its `reuse` box (leave it empty in manual runs). A kept kernel comes from the last automatic run, or from the run that last built it; if that run failed or its files have expired (30 days), the kernel is built instead. Each kept kernel's `build-info.txt` names the run its ZIP was taken from. The run summary of the check has a **File / Built in run** table that marks each file as a new build or reused. The started run is checked by its title; the check fails if it is not the planned one. A full Release still comes only from **Verified** commits.
 
 Manual **Build Kernel** runs keep NoMount branch `dev` as the default. The build runs on the branch in the repo variable `UPSTREAM_BUILD_REF` (default: the default branch, `main`). Run the check by hand from the Actions tab to check now; untick **Build** to only check and save.
 

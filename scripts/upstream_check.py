@@ -21,12 +21,14 @@ Watched:
                 to dev). Commits that only touch docs (README, *.md, docs/,
                 .github/) are ignored.
 
-Only what changed is rebuilt (written as plan= to $GITHUB_OUTPUT, a JSON list
-of Build Kernel runs). xxKSU or SUSFS: both kernels. One kernel tree: only that
-kernel. NoMount: only the NoMount modules (NoMount only, from the saved kernel
-kits) of the kernels that are not rebuilt anyway. Every automatic build uses
-NoMount master. Unchanged files are taken from the earlier run listed in the
-state file ("files").
+Only what changed is rebuilt, in one Build Kernel run (Kernel both, Latest,
+NoMount master) that publishes a Pre-release with every file. The plan
+(plan= in $GITHUB_OUTPUT) says per kernel: kernel = build it (xxKSU or SUSFS
+changed: both; one kernel tree changed: that one), nomount = keep its kernel
+ZIP from the last automatic run and build only NoMount (NoMount changed),
+reuse = keep all its files. "start" picks the earlier run (the last
+automatic run, or the one that last built that kernel) and builds the kernel
+anyway when that run did not succeed or its files have expired.
 
 The state file keeps the newest commit seen of each source and a short
 history of the changes found. The first check only saves the commits
@@ -236,8 +238,8 @@ def main(conf_path, state_path):
     moved = any(old.get(k, {}).get("commit") != v["commit"] for k, v in sources.items())
     plan = build_plan(changed)
     Path("plan.json").write_text(json.dumps(plan, indent=2) + "\n")
-    for b in plan:
-        print(f"Build: Kernel {b['kernel']}{' (NoMount only)' if b['nomount_only'] else ''} -> {', '.join(b['files'])}")
+    for k, mode in plan.items():
+        print(f"Plan: {k} {mode}")
     emit({"changed": str(bool(changed)).lower(), "first": str(first).lower(), "changed_list": " ".join(changed),
           "moved": str(moved).lower(), "plan": json.dumps(plan, separators=(",", ":"))})
 
@@ -246,19 +248,12 @@ KERNELS = ("aigis", "mzggr")  # build order: the main kernel first
 
 
 def build_plan(changed):
-    """Build Kernel runs for what changed; everything else is reused."""
+    """Per kernel: kernel (build), nomount (keep the kernel, build NoMount) or reuse."""
     full = set(KERNELS) if {"xxksu", "susfs"} & set(changed) else set()
     full |= {k for k in KERNELS if k in changed}
-    plan = []
-    kernels = [k for k in KERNELS if k in full]
-    if kernels:
-        plan.append({"kernel": "both" if len(kernels) == 2 else kernels[0], "nomount_only": False,
-                     "files": [f"{k}-kernel" for k in kernels] + [f"{k}-nomount" for k in kernels]})
-    rest = [k for k in KERNELS if k not in full]
-    if "nomount" in changed and rest:
-        plan.append({"kernel": "both" if len(rest) == 2 else rest[0], "nomount_only": True,
-                     "files": [f"{k}-nomount" for k in rest]})
-    return plan
+    if not full and "nomount" not in changed:
+        return {}
+    return {k: "kernel" if k in full else ("nomount" if "nomount" in changed else "reuse") for k in KERNELS}
 
 
 FILE_NAMES = {
@@ -269,58 +264,94 @@ FILE_NAMES = {
 }
 
 
-def title_ok(b, title):
-    """Is this run-name the Build Kernel run that was planned?"""
-    first = "A325X NoMount master LKM only" if b["nomount_only"] else "A325X xxKSU + SUSFS kernel"
-    tag = {"both": "(Aigis + mzggr)", "aigis": "(Aigis)", "mzggr": ""}[b["kernel"]]
-    return title.startswith(first) and (tag in title if tag else "(Aigis" not in title) \
-        and "NoMount lkm-master" in title and "(Latest)" in title
+def title_ok(title):
+    """Is this run-name the Build Kernel run the upstream check starts?"""
+    return (title.startswith("A325X xxKSU + SUSFS kernel (Aigis + mzggr)") and "(Latest) (upstream)" in title
+            and "NoMount lkm-master" in title and "+ Pre-release" in title)
+
+
+def run_id(url):
+    return url.rstrip("/").rsplit("/", 1)[-1] if url and url.startswith("http") else ""
+
+
+def usable(repo, rid, kernel):
+    """Did run rid succeed and are the files of this kernel still there?"""
+    if not rid:
+        return False
+    run = json.loads(subprocess.check_output(["gh", "api", f"repos/{repo}/actions/runs/{rid}"], text=True))
+    if run.get("conclusion") != "success":
+        print(f"Run {rid}: {run.get('status')} {run.get('conclusion')}, not used for {kernel}.")
+        return False
+    arts = json.loads(subprocess.check_output(
+        ["gh", "api", f"repos/{repo}/actions/runs/{rid}/artifacts?per_page=100"], text=True)).get("artifacts", [])
+    name = "release-files-aigis" if kernel == "aigis" else "release-files"
+    ok = any(a["name"] == name and not a.get("expired") for a in arts)
+    if not ok:
+        print(f"Run {rid}: {name} has expired, not used for {kernel}.")
+    return ok
 
 
 def start(state_path, plan_path, repo, ref):
-    """Start the Build Kernel runs of plan.json, one after the other, and save
-    in the state file which run holds each file. Writes builds.md."""
+    """Start the one Build Kernel run of plan.json (a Pre-release), and save in
+    the state file which run built each file. Writes builds.md."""
     plan = json.loads(Path(plan_path).read_text())
     state = json.loads(Path(state_path).read_text())
     files = state.setdefault("files", {})
+    last = run_id((state.get("last_build") or {}).get("run", ""))
+    reuse = {}
+    for k in KERNELS:
+        mode = plan[k]
+        if mode != "kernel":
+            built = run_id((files.get(f"{k}-kernel") or {}).get("run", ""))
+            # nomount: the run that built this kernel has its kernel kit (no compile).
+            # reuse: the last run has its newest NoMount module too.
+            order = (built, last) if mode == "nomount" else (last, built)
+            rid = next((r for r in order if usable(repo, r, k)), "")
+            if not rid:
+                print(f"{k}: no earlier run with its files, building it.")
+                mode = "kernel"
+            reuse[k] = {"mode": mode, "run": rid} if rid else {"mode": "kernel"}
+        else:
+            reuse[k] = {"mode": "kernel"}
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     seen = set(subprocess.check_output(
         ["gh", "run", "list", "--repo", repo, "--workflow", "kernel.yml", "--limit", "20",
          "--json", "url", "--jq", ".[].url"], text=True).split())
-    started = []
-    for b in plan:
-        args = ["gh", "workflow", "run", "kernel.yml", "--repo", repo, "--ref", ref,
-                "-f", f"kernel_source={b['kernel']}", "-f", "commit_mode=Latest", "-f", "release_type=CI",
-                "-f", "nomount_branch=master", "-f", f"nomount_only={str(b['nomount_only']).lower()}"]
-        subprocess.check_call(args)
-        url = title = ""
-        for _ in range(12):
-            time.sleep(5)
-            runs = json.loads(subprocess.check_output(
-                ["gh", "run", "list", "--repo", repo, "--workflow", "kernel.yml", "--branch", ref,
-                 "--event", "workflow_dispatch", "--limit", "10", "--json", "url,displayTitle"], text=True))
-            new = [r for r in runs if r["url"] not in seen]
-            if new:
-                url, title = new[-1]["url"], new[-1]["displayTitle"]
-                seen.add(url)
-                break
-        what = f"Kernel {b['kernel']}" + (" (NoMount only)" if b["nomount_only"] else "")
-        print(f"{what}: {url or 'started'} {title}")
-        if url and not title_ok(b, title):
-            sys.exit(f"::error::The started build is not the one planned ({what}): {title}")
-        for f in b["files"]:
-            files[f] = {"run": url or "started", "date": now}
-        started.append({"build": what, "run": url or "started", "files": b["files"]})
+    subprocess.check_call(["gh", "workflow", "run", "kernel.yml", "--repo", repo, "--ref", ref,
+                           "-f", "kernel_source=both", "-f", "commit_mode=Latest", "-f", "release_type=Pre-release",
+                           "-f", "nomount_branch=master", "-f", "nomount_only=false",
+                           "-f", f"reuse={json.dumps(reuse, separators=(',', ':'))}"])
+    url = title = ""
+    for _ in range(12):
+        time.sleep(5)
+        runs = json.loads(subprocess.check_output(
+            ["gh", "run", "list", "--repo", repo, "--workflow", "kernel.yml", "--branch", ref,
+             "--event", "workflow_dispatch", "--limit", "10", "--json", "url,displayTitle"], text=True))
+        new = [r for r in runs if r["url"] not in seen]
+        if new:
+            url, title = new[-1]["url"], new[-1]["displayTitle"]
+            break
+    print(f"Build Kernel: {url or 'started'} {title}")
+    if url and not title_ok(title):
+        sys.exit(f"::error::The started build is not the planned upstream Pre-release: {title}")
+    rebuilt = set()
+    for k, r in reuse.items():
+        if r["mode"] == "kernel":
+            rebuilt |= {f"{k}-kernel", f"{k}-nomount"}
+        elif r["mode"] == "nomount":
+            rebuilt.add(f"{k}-nomount")
+    for f in rebuilt:
+        files[f] = {"run": url or "started", "date": now}
+    state["last_build"] = {"run": url or "started", "date": now, "plan": reuse}
     if state.get("history"):
-        state["history"][0]["builds"] = started
+        state["history"][0]["build"] = {"run": url or "started", "plan": reuse}
     Path(state_path).write_text(json.dumps(state, indent=2) + "\n")
-    new_files = {f for b in plan for f in b["files"]}
-    md = ["| File | From run | |", "|---|---|---|"]
+    md = [f"Pre-release run: {url or 'started'}", "", "| File | Built in run | |", "|---|---|---|"]
     for f, label in FILE_NAMES.items():
         info = files.get(f)
         where = f"[{info['date'][:10]}]({info['run']})" if info and info["run"].startswith("http") else \
-            (info["run"] if info else "no automatic build yet")
-        md.append(f"| {label} | {where} | {'new build' if f in new_files else 'no update, reused'} |")
+            (info["run"] if info else "-")
+        md.append(f"| {label} | {where} | {'new build' if f in rebuilt else 'no update, reused'} |")
     Path("builds.md").write_text("\n".join(md) + "\n")
 
 

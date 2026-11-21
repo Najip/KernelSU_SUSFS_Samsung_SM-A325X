@@ -12,7 +12,8 @@
 
   promoted_source.py download <run id> <artifacts folder>
     Downloads the release-files (mzggr) and release-files-aigis artifacts of
-    that run into <folder>/mzggr and <folder>/aigis.
+    that run into <folder>/mzggr and <folder>/aigis (only the kernels in $ONLY
+    when it is set).
 
   promoted_source.py inspect <artifacts folder>/<source>
     Reads the downloaded files of one kernel of that run. Writes the commits
@@ -113,7 +114,10 @@ def download(run_id, folder):
     repo = os.environ["GITHUB_REPOSITORY"]
     folder = Path(folder)
     arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
+    only = os.environ.get("ONLY", "").split()
     for source, name in ARTIFACT.items():
+        if only and source not in only:
+            continue
         art = next((a for a in arts if a["name"] == name and not a.get("expired")), None)
         if not art:
             continue

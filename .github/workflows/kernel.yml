@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: ${{ inputs.release_type == 'Release from last pre-release' && 'A325X publish the last pre-release as Release' || '' }}${{ inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel')) || '' }}${{ inputs.kernel_source == 'aigis' && ' (Aigis)' || (inputs.kernel_source == 'both' && ' (Aigis + mzggr)' || '') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.release_type == 'Release from last pre-release' && 'A325X publish the last pre-release as Release' || '' }}${{ inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X xxKSU + SUSFS kernel')) || '' }}${{ inputs.kernel_source == 'aigis' && ' (Aigis)' || (inputs.kernel_source == 'both' && ' (Aigis + mzggr)' || '') }}${{ inputs.commit_mode != 'Promoted' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.reuse != '' && ' (upstream)' || '' }}${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
@@ -89,6 +89,10 @@ on:
         description: 'Also build the hook benchmark tool (hook-bench artifact). Not needed to use the kernel'
         type: boolean
         default: false
+      reuse:
+        description: 'Leave empty (set by the Upstream check). Per kernel: kernel = build it, nomount = keep the kernel ZIP of an earlier run and build only NoMount, reuse = keep all files of an earlier run'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -131,9 +135,15 @@ jobs:
           MODE: ${{ inputs.commit_mode }}
           TYPE: ${{ inputs.release_type }}
           NM_ONLY: ${{ inputs.nomount_only }}
+          REUSE: ${{ inputs.reuse }}
         run: |
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
+          if [[ -n "$REUSE" ]]; then
+            [[ "$KERNEL_CHOICE" == both && "$MODE" == Latest && "$NM_ONLY" != true && "$NOMOUNT_MODE" == lkm ]] \
+              || fail "reuse needs Kernel both, commit mode Latest, NoMount lkm and NoMount only unticked."
+            [[ "$TYPE" == CI || "$TYPE" == Pre-release ]] || fail "reuse can only make a CI build or a Pre-release."
+          fi
           if [[ ( "$TYPE" == Release || "$TYPE" == 'Release from last pre-release' ) && "$MODE" != Verified ]]; then
             fail "Release must use Verified. Latest and Promoted can only publish a Pre-release. Choose commit mode Verified, or pick Pre-release."
           fi
@@ -165,6 +175,7 @@ jobs:
         env:
           COMMIT_MODE: ${{ inputs.commit_mode }}
           NM_ONLY: ${{ inputs.nomount_only }}
+          REUSE: ${{ inputs.reuse }}
           BRANCH: ${{ github.ref_name }}
         run: python3 scripts/plan_build.py
     outputs:
@@ -177,10 +188,14 @@ jobs:
       source_run: ${{ steps.plan.outputs.source_run }}
       source_url: ${{ steps.plan.outputs.source_url }}
       checkout_sha: ${{ steps.plan.outputs.checkout_sha }}
+      collect_runs: ${{ steps.plan.outputs.collect_runs }}
+      collect_sources: ${{ steps.plan.outputs.collect_sources }}
 
   manager:
     name: List manager APK
     needs: pick
+    outputs:
+      apk: ${{ steps.get.outputs.apk }}
     if: inputs.release_type != 'Release from last pre-release'
     runs-on: ubuntu-latest
     defaults:
@@ -190,6 +205,7 @@ jobs:
       MANAGER_REPO: backslashxx/KernelSU
     steps:
       - name: Get the xxKSU manager APK of the latest xxKSU release
+        id: get
         run: |
           set -euo pipefail
           # The latest release (not a pre-release) of xxKSU always has the manager APK.
@@ -205,21 +221,31 @@ jobs:
             --arg date "$(jq -r .publishedAt <<<"$rel")" --arg apk "$apk" --arg sha "$sha" \
             '{repo: $repo, tag: $tag, url: $url, date: $date, apk: $apk, sha256: $sha}' > manager/manager.json
           cat manager/manager.json
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
           {
             echo "### xxKSU manager: \`$apk\`"
             echo "From the latest xxKSU release [$tag]($(jq -r .url <<<"$rel")), SHA256 \`$sha\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload the manager APK
+      # The artifact has the APK's own name (archive: false, the .apk itself).
+      - name: Upload ${{ steps.get.outputs.apk }}
         uses: actions/upload-artifact@v7
         with:
-          name: xxksu-manager
-          path: manager/
+          path: manager/${{ steps.get.outputs.apk }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload manager.json (where the APK comes from)
+        uses: actions/upload-artifact@v7
+        with:
+          name: xxksu-manager-info
+          path: manager/manager.json
           if-no-files-found: error
           retention-days: 30
 
   build:
-    name: ${{ matrix.source }} - ${{ needs.pick.outputs.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build the NoMount module' }}
+    name: ${{ matrix.source }} - ${{ matrix.build_kernel == 'true' && 'Build xxKSU + SUSFS kernel' || 'Build the NoMount module' }}
     needs: pick
     if: needs.pick.outputs.build_any == 'true'
     runs-on: ${{ needs.pick.outputs.runner }}
@@ -243,7 +269,7 @@ jobs:
       VALHALL_GPU: ${{ matrix.valhall_gpu }}
       # Promoted: the tag of the Latest run, so the module matches its kernel.
       KERNEL_TAG: ${{ matrix.kernel_tag }}
-      BUILD_KERNEL: ${{ needs.pick.outputs.build_kernel }}
+      BUILD_KERNEL: ${{ matrix.build_kernel }}
       BUILD_NOMOUNT: ${{ matrix.build_nomount }}
       KIT_ID: ${{ matrix.kit_id }}
       KERNEL_REF: ${{ matrix.kernel_ref }}
@@ -261,7 +287,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           # Promoted: the same build-repo commit as the Latest run, so the module matches its kernel.
-          ref: ${{ needs.pick.outputs.checkout_sha }}
+          # reuse (nomount): the build-repo commit of the run its kernel comes from.
+          ref: ${{ matrix.checkout_sha || needs.pick.outputs.checkout_sha }}
           fetch-depth: 1
 
       - name: Prepare build folders
@@ -527,7 +554,7 @@ jobs:
           retention-days: 30
 
       - name: Keep the NoMount files for the promoted build
-        if: env.BUILD_KERNEL != 'true' && inputs.commit_mode == 'Promoted'
+        if: env.BUILD_KERNEL != 'true' && (inputs.commit_mode == 'Promoted' || inputs.reuse != '')
         uses: actions/upload-artifact@v7
         with:
           name: promoted-nomount-${{ matrix.source }}
@@ -559,12 +586,14 @@ jobs:
           fi
 
   collect:
-    name: Collect the promoted build
+    name: Collect the files of an earlier run
     needs: [pick, build]
-    if: ${{ !cancelled() && !failure() && needs.pick.outputs.promote_ok == 'true' }}
+    # Promoted, or the kernels the Upstream check keeps from an earlier run.
+    if: ${{ !cancelled() && !failure() && needs.pick.outputs.collect_sources != '' }}
     runs-on: ubuntu-latest
     env:
-      SOURCES: ${{ needs.pick.outputs.sources }}
+      SOURCES: ${{ needs.pick.outputs.collect_sources }}
+      RUNS: ${{ needs.pick.outputs.collect_runs }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -572,8 +601,12 @@ jobs:
           fetch-depth: 1
           sparse-checkout: scripts/promoted_source.py
           sparse-checkout-cone-mode: false
-      - name: Download the files of the Latest run
-        run: python3 scripts/promoted_source.py download "${{ needs.pick.outputs.source_run }}" source
+      - name: Download the files of the earlier run
+        run: |
+          set -euo pipefail
+          for src in $SOURCES; do
+            ONLY=$src python3 scripts/promoted_source.py download "$(jq -r --arg s "$src" '.[$s]' <<<"$RUNS")" source
+          done
       - name: Download the NoMount modules built now
         if: needs.pick.outputs.build_any == 'true'
         uses: actions/download-artifact@v8
@@ -597,10 +630,11 @@ jobs:
               ls "release/$src"/nomount/*.ko "release/$src"/nomount/NoMount-*.zip >/dev/null \
                 || { echo "::error::No NoMount module for the promoted $src build."; exit 1; }
             fi
-            echo "Promoted from: ${{ needs.pick.outputs.source_url }}" >> "release/$src/build-info.txt"
+            run=$(jq -r --arg s "$src" '.[$s]' <<<"$RUNS")
+            echo "${{ inputs.commit_mode == 'Promoted' && 'Promoted' || 'Kernel ZIP taken' }} from: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run" >> "release/$src/build-info.txt"
           done
       - name: Keep the mzggr files for the release job
-        if: contains(needs.pick.outputs.sources, 'mzggr')
+        if: contains(needs.pick.outputs.collect_sources, 'mzggr')
         uses: actions/upload-artifact@v7
         with:
           name: release-files
@@ -608,7 +642,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Keep the Aigis files for the release job
-        if: contains(needs.pick.outputs.sources, 'aigis')
+        if: contains(needs.pick.outputs.collect_sources, 'aigis')
         uses: actions/upload-artifact@v7
         with:
           name: release-files-aigis
@@ -652,10 +686,16 @@ jobs:
           pattern: release-files*
           path: files
 
-      - name: Download the xxKSU manager APK
+      - name: Download ${{ needs.manager.outputs.apk }}
         uses: actions/download-artifact@v8
         with:
-          name: xxksu-manager
+          name: ${{ needs.manager.outputs.apk }}
+          path: release
+
+      - name: Download manager.json
+        uses: actions/download-artifact@v8
+        with:
+          name: xxksu-manager-info
           path: release
 
       - name: Put all files of every kernel together
@@ -687,7 +727,10 @@ jobs:
             mv "$d/build-info.txt" "release/build-info$sfx.txt"
             mv "$d/sources.json" "release/sources$sfx.json"
           done
-          ls release/*.apk >/dev/null || { echo "::error::No xxKSU manager APK."; exit 1; }
+          apk="${{ needs.manager.outputs.apk }}"
+          [[ -f "release/$apk" ]] || { echo "::error::No xxKSU manager APK ($apk)."; exit 1; }
+          [[ "$(sha256sum "release/$apk" | cut -d' ' -f1)" == "$(jq -r .sha256 release/manager.json)" ]] \
+            || { echo "::error::$apk does not match manager.json."; exit 1; }
           (cd release && sha256sum -- *.zip *.ko *.apk > SHA256SUMS.txt)
           ls -l release
 
