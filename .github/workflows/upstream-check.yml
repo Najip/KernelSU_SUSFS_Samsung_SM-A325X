@@ -82,7 +82,7 @@ jobs:
             [[ -n "$url" ]] && break
           done
           echo "Build Kernel run: ${url:-started}"
-          if [[ -n "$url" && "$title" != *"(mzggr + Aigis)"* ]]; then
+          if [[ -n "$url" && "$title" != *"(Aigis + mzggr)"* ]]; then
             echo "::error::The started build is not building both kernels: $title"
             exit 1
           fi

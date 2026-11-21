@@ -38,7 +38,7 @@ ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis"}
 
 def built_sources(title):
     """Kernels a Build Kernel run built, from its run-name (older runs: mzggr)."""
-    if "(mzggr + Aigis)" in title:
+    if "(Aigis + mzggr)" in title or "(mzggr + Aigis)" in title:  # older runs: mzggr + Aigis
         return {"mzggr", "aigis"}
     if "(Aigis)" in title:
         return {"aigis"}
