@@ -225,6 +225,9 @@ jobs:
     runs-on: ${{ needs.pick.outputs.runner }}
     strategy:
       fail-fast: false
+      # My PC builds one kernel at a time anyway; one job at a time keeps the
+      # plan order (Aigis first, then mzggr). GitHub runners build in parallel.
+      max-parallel: ${{ fromJSON(needs.pick.outputs.runner == 'self-hosted' && '1' || '4') }}
       matrix:
         include: ${{ fromJSON(needs.pick.outputs.matrix) }}
     env:
@@ -702,11 +705,14 @@ jobs:
       - name: Publish release
         run: |
           set -euo pipefail
-          # Title: the kernel ZIP of the first kernel.
-          zips=(); for z in release/A325X-*.zip; do [[ "$z" == *-valhall.zip ]] || zips+=("$(basename "$z" .zip)"); done
-          name=${zips[0]}
-          for z in "${zips[@]}"; do [[ "$z" == *-Aigis-* ]] || name=$z; done
-          if [[ -f release/sources-aigis.json ]]; then name="$name + Aigis"; fi
+          # Title: the Aigis kernel ZIP first (main kernel), "+ mzggr" when both are in it.
+          aigis= mz=
+          for z in release/A325X-*.zip; do
+            b=$(basename "$z" .zip)
+            if [[ "$b" == *-Aigis-* ]]; then [[ -n "$aigis" ]] || aigis=${b%-valhall}; else mz=$b; fi
+          done
+          if [[ -n "$aigis" && -n "$mz" ]]; then name="$aigis + mzggr"; else name=${aigis:-$mz}; fi
+          [[ -n "$name" ]] || { echo "::error::No kernel ZIP in the release."; exit 1; }
           shopt -s nullglob
           assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt)
           # Create the tag first, then the release without --target. With --target,
