@@ -1,6 +1,6 @@
 # KernelSU_SUSFS_Samsung_SM-A325X
 
-Android kernel for Samsung Galaxy A32 4G (SM-A325x, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount (as a separate LKM or built into the kernel). Target: SM-A325F on LumiROM 9 (Android 17).
+Android kernel for Samsung Galaxy A32 4G (SM-A325x series, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount (as a separate LKM or built into the kernel). Tested only on: SM-A325F on LumiROM 9 (Android 17).
 
 It builds two kernels: the main kernel **Aigis** (the one I use every day) and the Alt. kernel **mzggr**. Both are released.
 
