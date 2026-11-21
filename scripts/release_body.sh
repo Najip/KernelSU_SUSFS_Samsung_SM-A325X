@@ -69,4 +69,28 @@ PY2
     fi
   } >> "$out"
 fi
+# GPL-2.0: say where the complete source of the kernels in this release is.
+python3 - "$dir" >> "$out" <<'PY3'
+import json, os, sys
+d = sys.argv[1]
+print("\n## Source code (GPL-2.0)")
+print("The kernels are built from these exact commits, with the patches and build scripts of this repo at the commit below:")
+seen = set()
+for name, label in (("sources-aigis.json", "Main kernel: Aigis"), ("sources.json", None)):
+    p = os.path.join(d, name)
+    if not os.path.exists(p):
+        continue
+    s = json.load(open(p))
+    if label is None:
+        label = "Main kernel: Aigis" if "aigis" in s["kernel"]["repo"].lower() else "Alt. kernel: mzggr"
+    parts = [(label, s["kernel"]), ("xxKSU", s["xxksu"]), ("SUSFS patch", s["susfs"]), ("This repo (patches, build scripts)", s.get("build_repo"))]
+    for what, x in parts:
+        if not x or (what, x["commit"]) in seen:
+            continue
+        seen.add((what, x["commit"]))
+        repo = x["repo"].removesuffix(".git").rstrip("/")
+        print(f"- {what}: [{repo.split('github.com/')[-1]} @ `{x['commit'][:12]}`]({repo}/tree/{x['commit']})")
+print("- NoMount: [maxsteeel/nomount](https://github.com/maxsteeel/nomount) (commit in the NoMount ZIP name after `-n`)")
+print(f"\nLicenses: see [docs/licenses.md](https://github.com/{os.environ.get('GITHUB_REPOSITORY') or 'Najip/KernelSU_SUSFS_Samsung_SM-A325X'}/blob/main/docs/licenses.md).")
+PY3
 rm -rf "$tmp"
