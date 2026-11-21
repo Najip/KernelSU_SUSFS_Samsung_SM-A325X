@@ -17,7 +17,7 @@ Writes to $GITHUB_OUTPUT:
   build_any     true when the build job has anything to do
   build_kernel  true when kernel ZIPs are built (not Promoted / NoMount only)
   promote_ok    true for a Promoted run that found a Latest build
-  sources       the kernels of this run, e.g. "mzggr aigis"
+  sources       the kernels of this run, e.g. "aigis mzggr" (Aigis first)
   source_run, source_url, checkout_sha  (Promoted)
 """
 import json
@@ -69,7 +69,7 @@ def summary(text):
 def main():
     e = os.environ
     choice = e.get("KERNEL_CHOICE", "mzggr")
-    sources = {"mzggr": ["mzggr"], "aigis": ["aigis"], "both": ["mzggr", "aigis"]}.get(choice)
+    sources = {"mzggr": ["mzggr"], "aigis": ["aigis"], "both": ["aigis", "mzggr"]}.get(choice)
     if not sources:
         fail(f"Unknown kernel '{choice}' (use mzggr, aigis or both).")
     mode = e.get("COMMIT_MODE", "Latest")
