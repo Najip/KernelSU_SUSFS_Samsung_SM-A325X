@@ -106,8 +106,8 @@ def notes(cur_path, prev_path, info_path, out_path):
     print("\n".join(md))
 
 
-# How each kernel is named in the README. Aigis is the main kernel (the one the
-# repo owner uses every day); mzggr is the Alt. kernel. Both are released.
+# How each kernel is named in the README. Aigis is the main kernel (the one I
+# use every day); mzggr is the Alt. kernel. Both are released.
 KERNEL_ROLES = [
     ("aigis", "Main kernel: Aigis"),
     ("mzggr", "Alt. kernel: mzggr"),

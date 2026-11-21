@@ -2,7 +2,7 @@
 
 Android kernel for Samsung Galaxy A32 4G (SM-A325x, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount (as a separate LKM or built into the kernel). Target: SM-A325F on LumiROM 9 (Android 17).
 
-It builds two kernels: the main kernel **Aigis** (used every day by the repo owner) and the Alt. kernel **mzggr**. Both are released.
+It builds two kernels: the main kernel **Aigis** (the one I use every day) and the Alt. kernel **mzggr**. Both are released.
 
 This repo stores no kernel source. The GitHub Actions workflows download every source fresh, patch it and build a flashable ZIP.
 
@@ -12,7 +12,7 @@ Every build can make two kernels. Both are released, so you can pick either one.
 
 | | Main kernel: Aigis | Alt. kernel: mzggr |
 |---|---|---|
-| Who uses it | The repo owner, every day | Built and released too |
+| Who uses it | Me, every day | Built and released too |
 | Root in the upstream tree | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU |
 | Kernel tree | [Aigis by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32), branch `bpf-5.15-legion` | [mzggr0914](https://github.com/mzggr0914/android_kernel_a325x_bakasu), branch `common` |
 | **Kernel** dropdown | `aigis` (default) | `mzggr` (`both` builds the two) |
