@@ -16,7 +16,7 @@ Every build can make two kernels. Both are released, so you can pick either one.
 | Root in the upstream tree | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU |
 | Kernel tree | [Aigis by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32), branch `bpf-5.15-legion` | [mzggr0914](https://github.com/mzggr0914/android_kernel_a325x_bakasu), branch `common` |
 | **Kernel** dropdown | `aigis` (default) | `mzggr` (`both` builds the two) |
-| Kernel ZIP name | `A325X-Aigis-...zip` | `A325X-xxKSU-...zip` |
+| Kernel ZIP name | `A325X-Aigis-...zip` | `A325X-mzggr-...zip` |
 | GPU | Valhall GPU with its drivers module (ticked by default), or stock | Stock A32 GPU |
 | Tuning | Aigis' own CPU/GPU tuning | Our **Performance tuning** (ticked by default) |
 | Compiler | ZyC Clang 14 (as Aigis builds it), or AOSP Clang 14 | AOSP Clang 14 |

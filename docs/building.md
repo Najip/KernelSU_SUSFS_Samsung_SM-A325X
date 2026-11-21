@@ -21,7 +21,7 @@
    - **NoMount only**: unticked by default. Tick it to build only the NoMount module, no kernel ZIP (see [NoMount without a kernel compile](building.md#nomount-without-a-kernel-compile)).
    - **Build hook benchmark**: unticked by default. Tick it only when you want the `hook-bench` tool; the kernel does not need it.
 4. When the run is green, open it and download from **Artifacts**:
-   - `A325X-xxKSU-SUSFS-....zip`: the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
+   - `A325X-Aigis-xxKSU-SUSFS-....zip` (main kernel) or `A325X-mzggr-xxKSU-SUSFS-....zip` (Alt. kernel): the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP).
    - `build-info.txt`: what was built (also inside the ZIP).
    - `NoMount-...-<kernel>-....zip` and `nomount-4.14-<kernel>.ko` (`<kernel>` = `aigis` or `mzggr`): with NoMount `lkm`. The ZIP is flashed as a module in the KernelSU manager.
    - `xxksu-manager`: the xxKSU manager APK of the latest [xxKSU release](https://github.com/backslashxx/KernelSU/releases/latest) (the **List manager APK** job, every run). The artifact downloads as a ZIP with the `.apk` inside; releases attach the `.apk` itself.
