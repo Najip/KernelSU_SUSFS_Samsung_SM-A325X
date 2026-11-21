@@ -18,7 +18,7 @@ A license that lets people build but makes them ask before reusing the `.patch` 
 
 The repo was under GPL-3.0 before. GPL-3.0 does not fit kernel patches, because the Linux kernel is GPL-2.0 **only**, so it was changed to GPL-2.0-only.
 
-What you can still ask for (a request, not a license condition): credit this repo when you reuse its work, and let the owner know.
+What I ask (a request, not a license condition): credit this repo when you reuse its work, and let me know.
 
 ## Upstream parts
 
