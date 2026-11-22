@@ -119,9 +119,19 @@ if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   # fresh copy: a reused one may hold the history of another BakaSU branch.
   bakasu_branch=${KSU_BRANCH:-main}
   [[ "$bakasu_branch" =~ ^[0-9a-f]{40}$ ]] && bakasu_branch=main
+  # Show any git setting on this PC that sends GitHub downloads somewhere else
+  # (for example to a fork with an older main), then ignore those settings.
+  redirects=$(git config --show-origin --get-regexp '^url\..*' 2>/dev/null \
+    | sed -E 's#(https?://)[^/@]+@#\1***@#g' || true)
+  if [[ -n "$redirects" ]]; then
+    echo "Note: this PC's git redirects some URLs (ignored for BakaSU):"
+    echo "$redirects"
+  fi
   bakasu_clone() {
     rm -rf -- KernelSU
-    git "$@" clone -q --no-checkout --branch "$bakasu_branch" "$KSU_REPO" KernelSU
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+      git "$@" clone -q --no-checkout --branch "$bakasu_branch" "$KSU_REPO" KernelSU
+    git -C KernelSU config --local core.hooksPath /dev/null
   }
   if ! bakasu_clone; then
     echo "BakaSU download failed, trying again with the older git protocol."
@@ -134,8 +144,10 @@ if [[ "$ROOT_FLAVOR" == bakasu ]]; then
     fi
   fi
   if [[ "$KSU_REF" =~ ^[0-9a-f]{40}$ ]]; then
-    git -C KernelSU cat-file -e "$KSU_REF^{commit}" 2>/dev/null \
-      || git -C KernelSU fetch -q --tags origin "$KSU_REF"
+    if ! git -C KernelSU cat-file -e "$KSU_REF^{commit}" 2>/dev/null; then
+      echo "Commit $KSU_REF is not in the downloaded BakaSU $bakasu_branch (its newest is $(git -C KernelSU rev-parse "origin/$bakasu_branch"))."
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C KernelSU fetch -q --tags origin "$KSU_REF"
+    fi
     git -C KernelSU checkout -q -f --detach "$KSU_REF"
   else
     git -C KernelSU checkout -q -f --detach "origin/$bakasu_branch"
