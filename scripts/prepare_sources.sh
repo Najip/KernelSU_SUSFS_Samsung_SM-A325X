@@ -10,7 +10,7 @@
 #   KERNEL_BRANCH / KSU_BRANCH / SUSFS_BRANCH  branch name recorded in sources.json
 #                when the ref above is a pinned commit (Verified mode)
 #   NOMOUNT_MODE lkm (default, separate module), no, or integrate (built into
-#                the kernel from NOMOUNT_REPO at NOMOUNT_REF, default dev)
+#                the kernel from NOMOUNT_REPO at NOMOUNT_REF, default master)
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck source=sources.conf
@@ -20,7 +20,7 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 PERF_TUNING=${PERF_TUNING:-false}
 KSU_HOOK=${KSU_HOOK:-manual}
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
-NOMOUNT_REF=${NOMOUNT_REF:-dev}
+NOMOUNT_REF=${NOMOUNT_REF:-master}
 case "$NOMOUNT_MODE" in
   no|lkm|integrate) ;;
   *) echo "Unknown NOMOUNT_MODE '$NOMOUNT_MODE' (use no, lkm or integrate)" >&2; exit 1 ;;

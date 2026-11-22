@@ -19,7 +19,7 @@
    - **Commit mode**: `Latest` by default. See [Commit modes](commit-modes.md).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, `Release` publishes a full release, and `Release from last pre-release` turns the newest pre-release into the full Release without building. Both attach the NoMount module built in the same run (see [Commit modes and releases](commit-modes.md)).
    - **NoMount**: `lkm` by default, a separate module (`NoMount-...-aigis-....zip` and `nomount-4.14-aigis.ko`, or `mzggr`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.
-   - **NoMount branch**: `dev` by default, or `master`. Used for both `lkm` and `integrate`.
+   - **NoMount branch**: `master` by default, or `dev`. Used for both `lkm` and `integrate`.
    - **NoMount only**: unticked by default. Tick it to build only the NoMount module, no kernel ZIP (see [NoMount without a kernel compile](building.md#nomount-without-a-kernel-compile)).
    - **Build hook benchmark**: unticked by default. Tick it only when you want the `hook-bench` tool; the kernel does not need it.
 4. When the run is green, open it and download from **Artifacts**:
@@ -39,7 +39,7 @@ No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.
 ## NoMount LKM workflow
 
 1. Actions -> **NoMount LKM** -> **Run workflow**.
-2. Pick the NoMount branch (`dev` is the default, or `master`), the **xxKSU hook style** and the **commit mode**. Keep the **Kernel** (`aigis-bakasu` for the BakaSU kernel), hook style, **Performance tuning** (mzggr), **Valhall GPU** and **Compiler** (Aigis) the same as the kernel you flashed. **Build on my own PC** is unticked by default here, so it runs on a free GitHub runner.
+2. Pick the NoMount branch (`master` is the default, or `dev`), the **xxKSU hook style** and the **commit mode**. Keep the **Kernel** (`aigis-bakasu` for the BakaSU kernel), hook style, **Performance tuning** (mzggr), **Valhall GPU** and **Compiler** (Aigis) the same as the kernel you flashed. **Build on my own PC** is unticked by default here, so it runs on a free GitHub runner.
 3. Download the `NoMount-....zip` artifact and flash it as a module in the KernelSU manager.
 
 The module is compiled together with a kernel from the same sources in the same run, so it matches a kernel built from the same commits. If the sources have moved on since you built your kernel, rebuild both.

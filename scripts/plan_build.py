@@ -99,7 +99,7 @@ def main():
     mode = e.get("COMMIT_MODE", "Latest")
     nm_only = e.get("NM_ONLY") == "true"
     nomount_mode = e.get("NOMOUNT_MODE", "lkm")
-    nomount_ref = e.get("NOMOUNT_REF", "dev")
+    nomount_ref = e.get("NOMOUNT_REF", "master")
     out = {"sources": " ".join(sources), "promote_ok": "false", "source_run": "", "source_url": "",
            "checkout_sha": e.get("GITHUB_SHA", ""), "build_kernel": "false",
            "collect_sources": "", "collect_runs": "{}"}

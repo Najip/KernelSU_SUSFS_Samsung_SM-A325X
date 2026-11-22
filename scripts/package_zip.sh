@@ -57,7 +57,7 @@ NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in
   integrate) nomount_line="built into the kernel ($(read_json '["nomount"]["branch"]') @ $(read_json '["nomount"]["commit"]'))" ;;
-  lkm) nomount_line="separate LKM (${NOMOUNT_REF:-dev})" ;;
+  lkm) nomount_line="separate LKM (${NOMOUNT_REF:-master})" ;;
   *) nomount_line="not included" ;;
 esac
 name="${KERNEL_LABEL}-${ROOT_NAME}-SUSFS-${susfs}-${date}-k${kshort}-${rletter}${xshort}${suffix}"
