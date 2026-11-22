@@ -180,6 +180,14 @@ ln -sfn ../KernelSU/kernel drivers/kernelsu
 if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   log "Hook style: BakaSU SUSFS inline hooks"
   applied+=("hook style: BakaSU SUSFS inline (kernel calls BakaSU directly, next to the SUSFS hooks)")
+  # BakaSU (since 2b558ca5, 16 Nov 2026) no longer has the my_* SELinux hide
+  # functions the kernel's own hooks called. On 4.14 BakaSU hooks those
+  # places itself ("auto" mode), so take the kernel's hooks out.
+  for p in "$ROOT"/patches/bakasu/*.patch; do
+    echo "  bakasu/$(basename "$p")"
+    git apply --whitespace=nowarn "$p"
+    applied+=("bakasu/$(basename "$p")")
+  done
 elif [[ "$KSU_HOOK" != manual ]]; then
   log "Hook style: $KSU_HOOK"
   # xxKSU hooks these syscalls itself; skip the kernel's own calls to it.
