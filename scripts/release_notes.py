@@ -36,19 +36,47 @@ def line(repo, c):
     return f"- [`{sha[:8]}`](https://github.com/{repo}/commit/{sha}) {msg}"
 
 
+def patch_digest(repo, sha):
+    """The code change of a commit (its added and removed lines per file, like
+    git patch-id), so the same change rebased elsewhere gives the same value."""
+    import hashlib
+    files = api(f"repos/{repo}/commits/{sha}").get("files", [])
+    h = hashlib.sha256()
+    for f in sorted(files, key=lambda f: f["filename"]):
+        h.update(f["filename"].encode() + b"\0" + f.get("status", "").encode() + b"\0")
+        # Only the added and removed lines: nearby upstream code (context) may move.
+        for ln in (f.get("patch") or "").splitlines():
+            if ln[:1] in "+-":
+                h.update(ln.encode() + b"\n")
+    return h.hexdigest()
+
+
 def drop_rebased(repo, old, new, data, commits):
     """A rewritten branch (backslashxx rebases xxKSU on every update): the
-    compare lists the whole rebased stack again under new hashes. Keep only the
-    commits whose title + author were not already in the old commit's history.
-    Returns (commits, number left out)."""
+    compare lists the whole rebased stack again under new hashes. A commit
+    whose title + author were already in the old commit's history is left out
+    when its code change is the same, or marked "updated" when it changed.
+    Returns (commits, number left out, set of updated shas)."""
     if data.get("status") != "diverged":
-        return commits, 0
+        return commits, 0, set()
     back = api(f"repos/{repo}/compare/{new}...{old}")
-    seen = {(c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"])
-            for c in back.get("commits", [])}
-    kept = [c for c in commits
-            if (c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"]) not in seen]
-    return kept, len(commits) - len(kept)
+    key = lambda c: (c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"])
+    before = {}
+    for c in back.get("commits", []):
+        before.setdefault(key(c), []).append(c["sha"])
+    kept, updated, dropped = [], set(), 0
+    for c in commits:
+        olds = before.get(key(c))
+        if not olds:
+            kept.append(c)
+            continue
+        mine = patch_digest(repo, c["sha"])
+        if any(patch_digest(repo, o) == mine for o in olds):
+            dropped += 1
+        else:
+            kept.append(c)
+            updated.add(c["sha"])
+    return kept, dropped, updated
 
 
 def new_commits(repo, old, new, path=None):
@@ -72,9 +100,10 @@ def new_commits(repo, old, new, path=None):
         return [line(repo, x) for x in out], len(out)
     data = api(f"repos/{repo}/compare/{old}...{new}")
     commits = list(reversed(data.get("commits", [])))
-    kept, dropped = drop_rebased(repo, old, new, data, commits)
+    kept, dropped, updated = drop_rebased(repo, old, new, data, commits)
     if dropped:
-        lines = [line(repo, c) for c in kept] or ["- No new commits."]
+        lines = [line(repo, c).replace(") ", ") updated: ", 1) if c["sha"] in updated else line(repo, c)
+                 for c in kept] or ["- No new commits."]
         return lines + [f"- ({dropped} older commits were only rebased and are left out.)"], len(kept)
     return [line(repo, c) for c in commits], data.get("total_commits", len(commits))
 
