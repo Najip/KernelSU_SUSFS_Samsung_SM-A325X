@@ -36,3 +36,7 @@ It stops with "Release must use Verified" when that pre-release was not built fr
 "What's new" in a full Release always compares with the previous full Release; a pre-release compares with the previous release of any kind. A previous release of another kernel repo makes it a "First release".
 
 With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14-<kernel>.ko` built in the same run to the release page, plus the xxKSU manager `.apk`. The README sources table is updated only by a full `Release`.
+
+## XDA changelog
+
+Every full Release (`Release`, or `Release from last pre-release`) also gets `XDA-changelog-<tag>.txt`: the release notes as an XDA post (BBCode), with the download link and the long build info folded into a spoiler. Download it from the release page, copy everything, and paste it at the top of the changelog post of the XDA thread. Pre-releases do not get it. The thread template is in [`docs/xda-thread.txt`](xda-thread.txt).

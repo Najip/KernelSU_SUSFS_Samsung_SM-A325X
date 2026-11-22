@@ -1,0 +1,140 @@
+XDA THREAD TEMPLATE (BBCode)
+Forum: https://xdaforums.com/f/samsung-galaxy-a32-4g.12143/
+Paste each part into the XDA editor as it is (it understands BBCode).
+Lines starting with ">>" are notes for me, do not paste them.
+
+>> TITLE (thread title box)
+[KERNEL][A325F/M/N] KernelSU (xxKSU) + SUSFS 2.4.0 kernel
+
+>> ==================== POST #1 (OP) ====================
+
+[CENTER][SIZE=7][B]KernelSU (xxKSU) + SUSFS 2.4.0 kernel[/B][/SIZE]
+[SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]
+
+[SIZE=5][B]Disclaimer[/B][/SIZE]
+[CODE]
+Your warranty is now void (if it was not already).
+I am not responsible for bricked devices, bootloops, lost data or anything else.
+You flash this at your own risk. Read this post before flashing.
+[/CODE]
+
+[SIZE=5][B]About[/B][/SIZE]
+A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
+[LIST]
+[*][B]xxKSU[/B] (KernelSU fork by backslashxx for non-GKI kernels), manual hooks
+[*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
+[*][B]NoMount[/B] by maxsteeel, as a matching module (or built in)
+[*]Network fix (UDP GSO), no LTO
+[/LIST]
+Two kernels are released, flash only one:
+[LIST]
+[*][B]Main kernel: Aigis[/B] (by SlamZDank). The one I use every day. Valhall GPU with its drivers module, Aigis' own CPU/GPU tuning.
+[*][B]Alt. kernel: mzggr[/B] (by mzggr0914). Stock A32 GPU, with my performance tuning (GPU 1100 MHz, undervolt, BORE, 250 Hz, schedutil, BBR).
+[/LIST]
+Tested on: SM-A325F, LumiROM 9 (Android 17). Other A325 models and ROMs should work but are not tested by me.
+
+Every build runs on GitHub Actions from public sources, so anyone can check and rebuild it.
+
+[SIZE=5][B]Downloads[/B][/SIZE]
+[LIST]
+[*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases/latest']Latest release[/URL] (stable)
+[*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases']All releases and pre-releases[/URL] (pre-releases = automatic test builds of new upstream commits)
+[/LIST]
+Each release has: the kernel ZIPs, the matching NoMount module ZIPs, and the xxKSU manager app ([ICODE]KernelSU_...apk[/ICODE]).
+
+[SIZE=5][B]Installation[/B][/SIZE]
+[LIST=1]
+[*]Unlocked bootloader and TWRP or OrangeFox are required.
+[*][B]Back up your current boot partition[/B] in recovery (Backup > Boot). This is your way back.
+[*]Flash ONE kernel ZIP ([ICODE]A325X-Aigis-...zip[/ICODE] or [ICODE]A325X-mzggr-...zip[/ICODE]) in recovery.
+[*]Reboot and install the xxKSU manager app from the same release.
+[*]In the manager, flash the NoMount ZIP made for the same kernel ([ICODE]...-aigis-...[/ICODE] or [ICODE]...-mzggr-...[/ICODE]) as a module, then reboot.
+[/LIST]
+Bootloop? Go back to recovery and restore the boot backup (or flash your stock boot.img).
+
+[SIZE=5][B]FAQ[/B][/SIZE]
+[B]Which kernel should I pick?[/B]
+Aigis if you want the Valhall GPU and the kernel I use daily. mzggr if you want the stock GPU with extra tuning. If mzggr freezes or reboots under load, your phone may not like the undervolt; use Aigis.
+
+[B]What is the -vgpu / -valhall ZIP?[/B]
+The Aigis kernel with the Valhall GPU. It also installs the Valhall GPU drivers module, so no extra step is needed.
+
+[B]Do I need the NoMount module?[/B]
+Recommended. Always use the NoMount ZIP from the same release and for the same kernel. The kernel ZIP warns you if the installed one does not match.
+
+[B]Can I use other KernelSU managers (official, Next, SukiSU, BakaSU)?[/B]
+No, use the xxKSU manager from the release. Other managers do not match this kernel.
+
+[B]Which SUSFS module should I use?[/B]
+Any module made for SUSFS v2.4.0 (for example BRENE). Older modules for SUSFS 1.5.x do not work.
+
+[B]Release or pre-release?[/B]
+Releases are tested by me on my phone. Pre-releases are built automatically when an upstream source changes and are not tested yet.
+
+[SIZE=5][B]Bug reports[/B][/SIZE]
+Reports without logs cannot be fixed. Please include:
+[LIST]
+[*]Your model (A325F/M/N), ROM and Android version
+[*]The exact ZIP name you flashed and the NoMount ZIP name
+[*]The logs, collected like this:
+[/LIST]
+[B]Phone logs (bootloop, root or SUSFS problem):[/B]
+[LIST=1]
+[*]Download [URL='https://raw.githubusercontent.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/main/tools/collect-logs.sh']collect-logs.sh[/URL] to [ICODE]/sdcard/Download/[/ICODE].
+[*]After a bootloop, go straight to recovery (do not power off), so the crash log is still in memory.
+[*]TWRP: Advanced > Terminal, run [ICODE]sh /sdcard/Download/collect-logs.sh[/ICODE]
+Termux (booted, rooted): run [ICODE]su -c sh /sdcard/Download/collect-logs.sh[/ICODE]
+[*]Attach the [ICODE].tar.gz[/ICODE] from [ICODE]/sdcard/kernel-logs/[/ICODE] (or at least [ICODE]summary.txt[/ICODE]).
+[/LIST]
+[B]Build problems (if you build it yourself):[/B] save the raw job log and run [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/blob/main/tools/extract_log.py']extract_log.py[/URL] on it, then attach the [ICODE]-important.txt[/ICODE] it makes.
+
+[SIZE=5][B]Source code (GPL-2.0)[/B][/SIZE]
+[LIST]
+[*]Build repo (patches, configs, build scripts): [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X']Najip/KernelSU_SUSFS_Samsung_SM-A325X[/URL]
+[*]Main kernel tree: [URL='https://github.com/SlamZDank/Aigis-Kernel-A32']SlamZDank/Aigis-Kernel-A32[/URL]
+[*]Alt. kernel tree: [URL='https://github.com/mzggr0914/android_kernel_a325x_bakasu']mzggr0914/android_kernel_a325x_bakasu[/URL]
+[*]xxKSU: [URL='https://github.com/backslashxx/KernelSU']backslashxx/KernelSU[/URL]
+[*]SUSFS: [URL='https://gitlab.com/simonpunk/susfs4ksu']simonpunk/susfs4ksu[/URL], 4.14 port: [URL='https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd']JackA1ltman/NonGKI_Kernel_Build_2nd[/URL]
+[*]NoMount: [URL='https://github.com/maxsteeel/nomount']maxsteeel/nomount[/URL]
+[/LIST]
+Every release lists the exact commits it was built from, so it can be rebuilt 1:1.
+
+[SIZE=5][B]Credits[/B][/SIZE]
+[LIST]
+[*]SlamZDank for the Aigis kernel
+[*]mzggr0914 for the A32 kernel tree, and Samsung-MT6769-Devs for the SLM base
+[*]backslashxx for xxKSU
+[*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
+[*]maxsteeel for NoMount and lkmloader
+[*]osm0sis for AnyKernel3
+[/LIST]
+
+[B]Kernel version:[/B] 4.14.357
+[B]Status:[/B] Stable
+[B]Created:[/B] (XDA fills this in)
+[B]Last updated:[/B] (XDA fills this in)
+
+>> ==================== POST #2: CHANGELOG ====================
+>> Paste the XDA-changelog-<tag>.txt from each full Release at the TOP
+>> of this post (newest first). Keep older entries below.
+
+[CENTER][SIZE=6][B]Changelog[/B][/SIZE][/CENTER]
+Newest first. Full details for each version are on its [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases']GitHub release[/URL] page.
+
+(paste XDA-changelog-<tag>.txt here)
+
+>> ==================== POST #3: UPDATES ====================
+
+[CENTER][SIZE=6][B]Updates and announcements[/B][/SIZE][/CENTER]
+Known issues, plans and news will be posted here.
+
+[B]Known issues[/B]
+[LIST]
+[*]None reported yet.
+[/LIST]
+
+>> ==================== POSTS #4 to #20: RESERVED ====================
+>> XDA shows 20 posts per page, so posts #4 to #20 fill the first page.
+>> Paste this into each one:
+
+Reserved
