@@ -83,8 +83,24 @@ def head(repo, ref, path=None):
     }
 
 
+def drop_rebased(repo, old, new, data, commits):
+    """A rewritten branch (backslashxx rebases xxKSU on every update): the
+    compare lists the whole rebased stack again under new hashes. Keep only the
+    commits whose title + author were not already in the old commit's history.
+    Returns (commits, number left out)."""
+    if data.get("status") != "diverged":
+        return commits, 0
+    back = api(f"repos/{repo}/compare/{new}...{old}")
+    seen = {(c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"])
+            for c in back.get("commits", [])}
+    kept = [c for c in commits
+            if (c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"]) not in seen]
+    return kept, len(commits) - len(kept)
+
+
 def new_commits(repo, old, new, path=None):
     """Lines for the commits in old..new (newest first) and their count."""
+    dropped = 0
     try:
         if path:
             out = []
@@ -97,6 +113,9 @@ def new_commits(repo, old, new, path=None):
             data = api(f"repos/{repo}/compare/{old}...{new}")
             out = list(reversed(data.get("commits", [])))
             total = data.get("total_commits", len(out))
+            out, dropped = drop_rebased(repo, old, new, data, out)
+            if dropped:
+                total = len(out)
     except subprocess.CalledProcessError:
         # For example a force-push removed the old commit.
         return [f"- (could not list the commits since `{old[:12]}`, the branch was probably rewritten)"], 0
@@ -104,6 +123,8 @@ def new_commits(repo, old, new, path=None):
              for c in out[:MAX_LIST]]
     if total > MAX_LIST:
         lines.append(f"- ... and {total - MAX_LIST} more")
+    if not path and dropped:
+        lines.append(f"- ({dropped} older commits were only rebased and are left out.)")
     return lines, total
 
 

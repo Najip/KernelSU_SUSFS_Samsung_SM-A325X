@@ -36,6 +36,21 @@ def line(repo, c):
     return f"- [`{sha[:8]}`](https://github.com/{repo}/commit/{sha}) {msg}"
 
 
+def drop_rebased(repo, old, new, data, commits):
+    """A rewritten branch (backslashxx rebases xxKSU on every update): the
+    compare lists the whole rebased stack again under new hashes. Keep only the
+    commits whose title + author were not already in the old commit's history.
+    Returns (commits, number left out)."""
+    if data.get("status") != "diverged":
+        return commits, 0
+    back = api(f"repos/{repo}/compare/{new}...{old}")
+    seen = {(c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"])
+            for c in back.get("commits", [])}
+    kept = [c for c in commits
+            if (c["commit"]["message"].splitlines()[0].strip(), c["commit"]["author"]["name"]) not in seen]
+    return kept, len(commits) - len(kept)
+
+
 def new_commits(repo, old, new, path=None):
     """Return (lines, total) of commits in old..new (newest first)."""
     if old == new:
@@ -57,6 +72,10 @@ def new_commits(repo, old, new, path=None):
         return [line(repo, x) for x in out], len(out)
     data = api(f"repos/{repo}/compare/{old}...{new}")
     commits = list(reversed(data.get("commits", [])))
+    kept, dropped = drop_rebased(repo, old, new, data, commits)
+    if dropped:
+        lines = [line(repo, c) for c in kept] or ["- No new commits."]
+        return lines + [f"- ({dropped} older commits were only rebased and are left out.)"], len(kept)
     return [line(repo, c) for c in commits], data.get("total_commits", len(commits))
 
 
