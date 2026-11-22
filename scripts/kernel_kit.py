@@ -8,7 +8,7 @@ LKM can be built for that exact kernel without compiling the kernel again.
     KERNEL_REF, KSU_REF, SUSFS_REF (full commits), KSU_HOOK, PERF_TUNING,
     NOMOUNT_PART (separate, or integrate@<commit>), KERNEL_SOURCE (with its
     Aigis compiler and GPU) plus the build-repo files that change the kernel.
-    Aigis keys start with "aigis-", Aigis BakaSU keys with "aigis-bakasu-".
+    Aigis keys start with "aigis-".
 
   kernel_kit.py find <key>
     Finds the newest unexpired artifact kernel-kit-<key> in this repo and
@@ -69,10 +69,9 @@ def key():
     # Older kits were made before the uname tag existed (no tag).
     if e.get("KERNEL_TAG"):
         parts.append(f"tag={e['KERNEL_TAG']}")
-    src = c.get("KERNEL_SOURCE")
-    aigis = src in ("aigis", "aigis-bakasu")
+    aigis = c.get("KERNEL_SOURCE") == "aigis"
     if aigis:
-        parts.append(f"source={src}")
+        parts.append("source=aigis")
         if c.get("VALHALL_GPU") == "true":
             parts.append("gpu=valhall")
         if c.get("KERNEL_TOOLCHAIN") == "aosp":
@@ -82,7 +81,7 @@ def key():
         parts.append(f"{path}={oid}")
     digest = hashlib.sha256("\n".join(parts).encode()).hexdigest()[:20]
     # Aigis kits are named kernel-kit-aigis-<digest>, mzggr kits kernel-kit-<digest>.
-    print(f"{src}-{digest}" if aigis else digest)
+    print(f"aigis-{digest}" if aigis else digest)
 
 
 def pick(arts, test):
@@ -104,12 +103,8 @@ def find(k):
 def in_run(run_id):
     repo = os.environ["GITHUB_REPOSITORY"]
     arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
-    src = os.environ.get("KERNEL_SOURCE", "mzggr")
-    bakasu = lambda n: n.startswith("kernel-kit-aigis-bakasu-")
-    if src == "aigis-bakasu":
-        pick(arts, bakasu)
-    elif src == "aigis":
-        pick(arts, lambda n: n.startswith("kernel-kit-aigis-") and not bakasu(n))
+    if os.environ.get("KERNEL_SOURCE", "mzggr") == "aigis":
+        pick(arts, lambda n: n.startswith("kernel-kit-aigis-"))
     else:
         pick(arts, lambda n: n.startswith("kernel-kit-") and not n.startswith("kernel-kit-aigis-"))
 
