@@ -14,6 +14,11 @@ Watched:
                 root module with xxKSU and builds NoMount itself, so those do
                 not change our kernel. Every other kernel change counts.
   xxksu         KSU_REPO / KSU_REF
+  bakasu        BakaSU (KSU_REPO / KSU_REF of KERNEL_SOURCE=aigis-bakasu, the
+                BAKASU_BRANCH of sources.conf, sync-up by default), for Aigis BakaSU. When
+                that branch is sync-up and it has been merged into BakaSU main,
+                a warning says so (switch with "Switch BakaSU branch"; nothing
+                is switched automatically).
   susfs         SUSFS_REPO / SUSFS_REF, only commits that touched SUSFS_PATCH
                 (the 4.14 patch the build uses; the rest of that repo is
                 other devices and does not change the kernel)
@@ -21,8 +26,8 @@ Watched:
                 to dev). Commits that only touch docs (README, *.md, docs/,
                 .github/) are ignored.
 
-Only what changed is rebuilt, in one Build Kernel run (Kernel both, Latest,
-NoMount master) that publishes a Pre-release with every file. The plan
+Only what changed is rebuilt, in one Build Kernel run (Kernel both, Root
+flavor All, Latest, NoMount master) that publishes a Pre-release with every file. The plan
 (plan= in $GITHUB_OUTPUT) says per kernel: kernel = build it (xxKSU or SUSFS
 changed: both; one kernel tree changed: that one), nomount = keep its kernel
 ZIP from the last automatic run and build only NoMount (NoMount changed),
@@ -211,11 +216,12 @@ def emit(pairs):
 
 
 def main(conf_path, state_path):
-    mz, ag = conf(conf_path, "mzggr"), conf(conf_path, "aigis")
+    mz, ag, bk = conf(conf_path, "mzggr"), conf(conf_path, "aigis"), conf(conf_path, "aigis-bakasu")
     watched = {
         "mzggr": ("mzggr kernel", slug(mz["KERNEL_REPO"]), mz["KERNEL_REF"], None),
         "aigis": ("Aigis kernel", slug(ag["KERNEL_REPO"]), ag["KERNEL_REF"], None),
         "xxksu": ("xxKSU", slug(mz["KSU_REPO"]), mz["KSU_REF"], None),
+        "bakasu": ("BakaSU", slug(bk["KSU_REPO"]), bk["KSU_REF"], None),
         "susfs": ("Jack's SUSFS (4.14 patch)", slug(mz["SUSFS_REPO"]), mz["SUSFS_REF"], mz["SUSFS_PATCH"]),
         # NoMount: master only (the Build Kernel default stays dev for manual builds).
         "nomount": ("NoMount", slug(mz["NOMOUNT_REPO"]), "master", None),
@@ -268,6 +274,10 @@ def main(conf_path, state_path):
             print(f"{label}: {prev['commit'][:12]} -> {cur['commit'][:12]}")
         else:
             print(f"{label}: no change ({cur['commit'][:12]})")
+    merged = bakasu_merged(slug(bk["KSU_REPO"]), bk["KSU_REF"])
+    if merged:
+        print(f"::warning title=BakaSU sync-up merged into main::{merged}")
+        Path("bakasu-merged.md").write_text(f"### BakaSU: sync-up is merged into main\n- {merged}\n")
     state["note"] = "Saved by the Upstream check workflow. Newest commit seen of each watched source."
     state["checked"] = now
     state["sources"] = sources
@@ -294,13 +304,35 @@ def main(conf_path, state_path):
           "moved": str(moved).lower(), "plan": json.dumps(plan, separators=(",", ":"))})
 
 
-KERNELS = ("aigis", "mzggr")  # build order: the main kernel first
+KERNELS = ("aigis", "aigis-bakasu", "mzggr")  # build order: the main kernel first
+
+
+def bakasu_merged(repo, ref):
+    """When the build uses BakaSU sync-up and sync-up is fully in main: a note."""
+    if ref != "sync-up":
+        return ""
+    try:
+        data = json.loads(subprocess.check_output(["gh", "api", f"repos/{repo}/compare/main...sync-up"], text=True))
+    except subprocess.CalledProcessError:
+        return ""
+    if data.get("status") in ("behind", "identical"):
+        return ("Every BakaSU sync-up commit is now in BakaSU main. Run Actions -> Switch BakaSU branch -> main "
+                "when you want Aigis BakaSU to use main (nothing is switched automatically).")
+    return ""
 
 
 def build_plan(changed):
     """Per kernel: kernel (build), nomount (keep the kernel, build NoMount) or reuse."""
-    full = set(KERNELS) if {"xxksu", "susfs"} & set(changed) else set()
-    full |= {k for k in KERNELS if k in changed}
+    c = set(changed)
+    full = set(KERNELS) if "susfs" in c else set()
+    if "xxksu" in c:
+        full |= {"aigis", "mzggr"}
+    if "bakasu" in c:
+        full.add("aigis-bakasu")
+    if "aigis" in c:
+        full |= {"aigis", "aigis-bakasu"}  # the same Aigis tree
+    if "mzggr" in c:
+        full.add("mzggr")
     if not full and "nomount" not in changed:
         return {}
     return {k: "kernel" if k in full else ("nomount" if "nomount" in changed else "reuse") for k in KERNELS}
@@ -308,15 +340,17 @@ def build_plan(changed):
 
 FILE_NAMES = {
     "aigis-kernel": "Main kernel ZIP (Aigis)",
+    "aigis-bakasu-kernel": "Main kernel ZIP with BakaSU (Aigis BakaSU)",
     "mzggr-kernel": "Alt. kernel ZIP (mzggr)",
     "aigis-nomount": "NoMount module for Aigis",
+    "aigis-bakasu-nomount": "NoMount module for Aigis BakaSU",
     "mzggr-nomount": "NoMount module for mzggr",
 }
 
 
 def title_ok(title):
     """Is this run-name the Build Kernel run the upstream check starts?"""
-    return (title.startswith("A325X xxKSU + SUSFS kernel (Aigis + mzggr)") and "(Latest) (upstream)" in title
+    return (title.startswith("A325X xxKSU + SUSFS kernel (Aigis + mzggr) (root All)") and "(Latest) (upstream)" in title
             and "NoMount lkm-master" in title and "+ Pre-release" in title)
 
 
@@ -334,7 +368,7 @@ def usable(repo, rid, kernel):
         return False
     arts = json.loads(subprocess.check_output(
         ["gh", "api", f"repos/{repo}/actions/runs/{rid}/artifacts?per_page=100"], text=True)).get("artifacts", [])
-    name = "release-files-aigis" if kernel == "aigis" else "release-files"
+    name = "release-files" if kernel == "mzggr" else f"release-files-{kernel}"
     ok = any(a["name"] == name and not a.get("expired") for a in arts)
     if not ok:
         print(f"Run {rid}: {name} has expired, not used for {kernel}.")
@@ -350,7 +384,7 @@ def start(state_path, plan_path, repo, ref):
     last = run_id((state.get("last_build") or {}).get("run", ""))
     reuse = {}
     for k in KERNELS:
-        mode = plan[k]
+        mode = plan.get(k, "kernel")
         if mode != "kernel":
             built = run_id((files.get(f"{k}-kernel") or {}).get("run", ""))
             # nomount: the run that built this kernel has its kernel kit (no compile).
@@ -368,7 +402,7 @@ def start(state_path, plan_path, repo, ref):
         ["gh", "run", "list", "--repo", repo, "--workflow", "kernel.yml", "--limit", "20",
          "--json", "url", "--jq", ".[].url"], text=True).split())
     subprocess.check_call(["gh", "workflow", "run", "kernel.yml", "--repo", repo, "--ref", ref,
-                           "-f", "kernel_source=both", "-f", "commit_mode=Latest", "-f", "release_type=Pre-release",
+                           "-f", "kernel_source=both", "-f", "root_flavor=All", "-f", "commit_mode=Latest", "-f", "release_type=Pre-release",
                            "-f", "nomount_branch=master", "-f", "nomount_only=false",
                            "-f", f"reuse={json.dumps(reuse, separators=(',', ':'))}"])
     url = title = ""

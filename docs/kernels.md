@@ -18,3 +18,15 @@ What is special about each kernel. What they share is listed in the README under
 - Config as the tree ships it: `mt6768_slm_defconfig` + `a32.config` + `battery.config` (CPU undervolt, conservative governor, 100 Hz) + `ksu-a325n-common.config` + `a325n-release.config`.
 - Performance tuning (ticked by default, mzggr only), taken from [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu): GPU 1100 MHz @ 1.035 V, CCI overclock, CPU/CCI undervolt, DDR DVFS tweaks, BORE scheduler, 250 Hz, schedutil governor, fast charging with the screen on, zram default `zstd`, GPU frequency meter at `/sys/kernel/gpu/gpu_fmeter`, USB autosuspend off, BBR TCP and fq_codel. The undervolt was tuned on one phone; if yours freezes or reboots under load, build without tuning.
 - Toolchain: AOSP Clang 14 with ld.lld and GNU as.
+
+## Aigis with BakaSU
+
+Built with **Root flavor** `BakaSU` or `All`. It is the same Aigis kernel (same tree, Valhall GPU and Compiler options, same SUSFS v2.4.0 from Jack's 4.14 patch), with [BakaSU](https://github.com/Baka-SU/BakaSU) for root instead of xxKSU.
+
+- BakaSU branch: `sync-up` by default (where BakaSU's newest work lands). The **Switch BakaSU branch** workflow changes it to `main` and back; it edits one line in `scripts/sources.conf`.
+- Hook style: SUSFS inline hooks, always. BakaSU has three styles: tracepoint (GKI 2 kernels only, not this phone), manual, and SUSFS inline. With SUSFS, BakaSU only allows the inline style, which is the same idea as xxKSU's `manual` (the hooks are calls compiled into the kernel, no run-time patching) and the fastest one. The **xxKSU hook style** box is ignored for this kernel; `syscall_table` and `branch_link` exist only in xxKSU. The build fails if BakaSU's own check reports a missing or wrong hook.
+- The base patch `patches/base/0001-aigis-legion-to-bakasu-susfs.patch` puts the 4.14 SUSFS inline hooks into the Aigis tree in the places BakaSU expects. BakaSU itself is not patched (its build refuses a changed copy).
+- Version: BakaSU counts it from its git history (for example version code 35284, `v4.2.0-rc3-a049dee8`), so the manager shows the kernel as matching.
+- Manager app: taken from the BakaSU **Build Manager** run made from the same BakaSU commit (the `arm64-v8a` APK, under its original name). If that commit has no manager build (BakaSU only builds the manager when the app or kernel code changes), the newest earlier one is used and the run shows a warning.
+- NoMount: its own module, `NoMount-...-aigis-bakasu-...zip`, built for this kernel. The xxKSU Aigis NoMount module does not fit it, and the flasher warns if the wrong one is installed.
+- Config: `a32_slamzdank_defconfig` + `bakasu-aigis.config` (the Aigis BakaSU setup) + the Valhall fragment, then checked against `configs/a325x-bakasu-susfs.config`.

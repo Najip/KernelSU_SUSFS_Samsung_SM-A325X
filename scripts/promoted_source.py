@@ -34,16 +34,25 @@ from pathlib import Path
 
 WORKFLOW = "kernel.yml"
 # Artifact with the release files of each kernel.
-ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis"}
+ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis",
+            "aigis-bakasu": "release-files-aigis-bakasu"}
 
 
 def built_sources(title):
     """Kernels a Build Kernel run built, from its run-name (older runs: mzggr)."""
     if "(Aigis + mzggr)" in title or "(mzggr + Aigis)" in title:  # older runs: mzggr + Aigis
-        return {"mzggr", "aigis"}
-    if "(Aigis)" in title:
-        return {"aigis"}
-    return {"mzggr"}
+        built = {"mzggr", "aigis"}
+    elif "(Aigis)" in title:
+        built = {"aigis"}
+    else:
+        built = {"mzggr"}
+    # Root flavor (newer runs): "(root BakaSU)" = Aigis BakaSU only,
+    # "(root All)" = the xxKSU kernels plus Aigis BakaSU.
+    if "(root BakaSU)" in title:
+        return {"aigis-bakasu"} if "aigis" in built else set()
+    if "(root All)" in title and "aigis" in built:
+        built.add("aigis-bakasu")
+    return built
 
 
 def fail(message):

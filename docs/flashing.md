@@ -23,6 +23,8 @@ After writing the kernel, the ZIP also checks your modules (when `/data` is moun
 2. Run it:
    - TWRP: Advanced > Terminal, then `sh /sdcard/Download/collect-logs.sh`
    - Termux: `su -c sh /sdcard/Download/collect-logs.sh`
-3. Logs are saved to `/sdcard/kernel-logs/<date-time>-twrp` (or `-android`), plus a `.tar.gz` of the same folder. Start with `summary.txt`.
+3. Logs are saved to `/sdcard/kernel-logs/<date-time>-twrp` (or `-android`), plus a `.tar.gz` of the same folder. Start with `summary.txt`: it shows which root (xxKSU or BakaSU) and SUSFS version the kernel reports, whether NoMount is loaded, the installed modules and manager apps, and the root/SUSFS/NoMount kernel messages. Send the `.tar.gz`, or `summary.txt` if it is too big.
 
 After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Power, without powering off) so the crash log of the failed boot is still in memory. If `/sdcard` is not writable in TWRP, the script falls back to the SD card or `/data/local/tmp`.
+
+For a failed build on GitHub (not the phone), see [Build log too long](building.md#build-log-too-long).

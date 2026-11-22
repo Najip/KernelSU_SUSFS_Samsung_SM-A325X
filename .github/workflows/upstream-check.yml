@@ -1,12 +1,14 @@
 name: Upstream check
 run-name: Upstream check${{ github.event_name == 'workflow_dispatch' && ' (manual)' || '' }}
 
-# Three times a day: did the Aigis kernel, the mzggr kernel, xxKSU, Jack's
-# SUSFS 4.14 patch or NoMount (master only) get new commits since the last
+# Three times a day: did the Aigis kernel, the mzggr kernel, xxKSU, BakaSU
+# (sync-up, or the branch set by "Switch BakaSU branch"), Jack's SUSFS 4.14
+# patch or NoMount (master only) get new commits since the last
 # check? The newest commits seen are saved in configs/upstream-state.json on
 # the default branch. When something is new, only that is rebuilt (commit mode
 # Latest, release type Pre-release, NoMount master), in one Build Kernel run
-# with every file: xxKSU or SUSFS = both kernels, one kernel tree = that kernel,
+# with every file (Kernel both, Root flavor All): xxKSU = the xxKSU kernels,
+# BakaSU = Aigis BakaSU, SUSFS = all kernels, one kernel tree = that kernel,
 # NoMount = only the NoMount modules; the rest comes from an earlier run.
 on:
   schedule:
@@ -89,6 +91,10 @@ jobs:
               fi
             else
               echo "### No new upstream commits"
+            fi
+            if [[ -s bakasu-merged.md ]]; then
+              echo
+              cat bakasu-merged.md
             fi
             if [[ -s ignored.md ]]; then
               echo

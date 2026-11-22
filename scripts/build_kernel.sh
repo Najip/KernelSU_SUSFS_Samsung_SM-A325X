@@ -118,7 +118,11 @@ fi
 cd "$KERNEL_DIR"
 base=()
 for f in $KERNEL_FRAGMENTS; do base+=("arch/arm64/configs/$f"); done
-fragments=("$ROOT/configs/a325x-xxksu-susfs.config" "$ROOT/configs/hooks/$KSU_HOOK.config")
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+  fragments=("$ROOT/configs/a325x-bakasu-susfs.config")
+else
+  fragments=("$ROOT/configs/a325x-xxksu-susfs.config" "$ROOT/configs/hooks/$KSU_HOOK.config")
+fi
 [[ "$PERF_TUNING" == true ]] && fragments+=("$ROOT/configs/a325x-tuning.config")
 [[ "${NOMOUNT_MODE:-lkm}" == integrate ]] && fragments+=("$ROOT/configs/nomount-integrate.config")
 
@@ -181,10 +185,13 @@ case "$KSU_HOOK" in
   syscall_table) hook_symbols="hook_aarch64_execve hook_aarch64_reboot" ;;
   branch_link) hook_symbols="bl_hack_init_thread ksu_do_faccessat hook_aarch64_execve" ;;
 esac
-for symbol in erofs_fs_type ksu_handle_sys_reboot ksu_handle_newfstat_ret $hook_symbols \
-    xxksu_parent_sucompat_enabled susfs_set_priority_uid_filter susfs_is_priority_uid_filtered; do
+root_symbols="ksu_handle_newfstat_ret $hook_symbols xxksu_parent_sucompat_enabled"
+# BakaSU: the SUSFS inline hook calls (see BakaSU kernel/tools/inline_hook_check.mk)
+[[ "$ROOT_FLAVOR" == bakasu ]] && root_symbols="ksu_handle_execveat ksu_handle_setresuid ksu_handle_faccessat ksu_handle_stat"
+for symbol in erofs_fs_type ksu_handle_sys_reboot $root_symbols \
+    susfs_set_priority_uid_filter susfs_is_priority_uid_filtered; do
   grep -Eq "[[:space:]]$symbol$" "$OUT_DIR/kernel-symbols.txt" || {
-    echo "Missing linked xxKSU/SUSFS symbol: $symbol" >&2; exit 1; }
+    echo "Missing linked $ROOT_NAME/SUSFS symbol: $symbol" >&2; exit 1; }
 done
 if [[ "${NOMOUNT_MODE:-lkm}" == integrate ]]; then
   grep -q '^CONFIG_NOMOUNT=y' "$OUT_DIR/.config" || { echo "NoMount is not built in" >&2; exit 1; }
