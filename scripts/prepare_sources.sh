@@ -55,7 +55,15 @@ fetch() {
   else
     git -C "$dir" remote set-url origin "$url"
   fi
-  git -C "$dir" fetch -q --depth=1 --no-tags origin "$ref"
+  if ! git -C "$dir" fetch -q --depth=1 --no-tags origin "$ref"; then
+    # A reused copy can refuse the fetch (for example "not our ref" after the
+    # upstream branch changed): start again with a fresh copy.
+    echo "Fetch failed in the reused copy of $url, starting with a fresh copy."
+    rm -rf -- "$dir"
+    git init -q "$dir"
+    git -C "$dir" remote add origin "$url"
+    git -C "$dir" fetch -q --depth=1 --no-tags origin "$ref"
+  fi
   git -C "$dir" checkout -q -f --detach FETCH_HEAD
   git -C "$dir" reset -q --hard
   git -C "$dir" clean -qffdx
@@ -105,11 +113,28 @@ git apply --whitespace=nowarn "$ROOT/patches/susfs/0001-jack-core-local-addition
 applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12} (core files)" "susfs/0001-jack-core-local-additions.patch")
 
 log "$ROOT_NAME: $KSU_REPO ($KSU_REF)"
-fetch "$KSU_REPO" "$KSU_REF" KernelSU
 if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   # BakaSU's version code is its commit count (30000 + count + 700), the same
-  # number its manager shows, so it needs the full history and tags.
-  git -C KernelSU fetch -q --unshallow --tags origin || git -C KernelSU fetch -q --tags origin
+  # number its manager shows, so it needs the full history and tags. Always a
+  # fresh copy: a reused one may hold the history of another BakaSU branch.
+  rm -rf -- KernelSU
+  git init -q KernelSU
+  git -C KernelSU remote add origin "$KSU_REPO"
+  bakasu_branch=${KSU_BRANCH:-$KSU_REF}
+  if [[ "$bakasu_branch" =~ ^[0-9a-f]{40}$ ]]; then
+    git -C KernelSU fetch -q --tags origin "$bakasu_branch"
+  else
+    git -C KernelSU fetch -q --tags origin "+refs/heads/$bakasu_branch:refs/remotes/origin/$bakasu_branch"
+  fi
+  if [[ "$KSU_REF" =~ ^[0-9a-f]{40}$ ]]; then
+    git -C KernelSU cat-file -e "$KSU_REF^{commit}" 2>/dev/null \
+      || git -C KernelSU fetch -q --tags origin "$KSU_REF"
+    git -C KernelSU checkout -q -f --detach "$KSU_REF"
+  else
+    git -C KernelSU checkout -q -f --detach "origin/$bakasu_branch"
+  fi
+else
+  fetch "$KSU_REPO" "$KSU_REF" KernelSU
 fi
 ksu_sha=$(git -C KernelSU rev-parse HEAD)
 ksu_date=$(git -C KernelSU show -s --format=%cI HEAD)
