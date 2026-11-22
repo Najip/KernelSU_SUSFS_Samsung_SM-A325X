@@ -350,7 +350,7 @@ FILE_NAMES = {
 
 def title_ok(title):
     """Is this run-name the Build Kernel run the upstream check starts?"""
-    return (title.startswith("A325X xxKSU + SUSFS kernel (Aigis + mzggr) (root All)") and "(Latest) (upstream)" in title
+    return (title.startswith("A325X xxKSU/BakaSU + SUSFS kernel (Aigis + mzggr) (root All)") and "(Latest) (upstream)" in title
             and "NoMount lkm-master" in title and "+ Pre-release" in title)
 
 

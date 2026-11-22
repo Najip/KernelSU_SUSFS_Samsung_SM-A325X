@@ -180,6 +180,7 @@ test -s "$OUT_DIR/vmlinux"
 test -s "$OUT_DIR/arch/arm64/boot/Image"
 "$READELF" -h "$OUT_DIR/vmlinux" | grep -q AArch64
 "$NM" --defined-only "$OUT_DIR/vmlinux" > "$OUT_DIR/kernel-symbols.txt"
+hook_symbols=""  # BakaSU passes KSU_HOOK=inline, which has its own list below
 case "$KSU_HOOK" in
   manual) hook_symbols="ksu_handle_sys_execve" ;;
   syscall_table) hook_symbols="hook_aarch64_execve hook_aarch64_reboot" ;;
