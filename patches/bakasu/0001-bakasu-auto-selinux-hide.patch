@@ -1,0 +1,147 @@
+diff --git a/include/linux/susfs_ksu.h b/include/linux/susfs_ksu.h
+index 43bba88..da70d7c 100644
+--- a/include/linux/susfs_ksu.h
++++ b/include/linux/susfs_ksu.h
+@@ -20,12 +20,9 @@ bool susfs_is_current_ksu_domain(void);
+ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
+ 			  void __user **arg);
+ 
+-/* Published by BakaSU's supported SUSFS manual SELinux hook mode. */
+-extern bool ksu_selinux_hide_running;
+-extern struct page *fake_status;
+-void initialize_fake_status(void);
+-ssize_t my_write_context(struct file *file, char *buf, size_t size);
+-ssize_t my_write_access(struct file *file, char *buf, size_t size);
+-int my_setprocattr(const char *name, void *value, size_t size);
++/*
++ * SELinux hide: BakaSU hooks selinuxfs and setprocattr itself on 4.14
++ * (its "auto" mode), so the kernel has no SELinux hide hooks of its own.
++ */
+ #endif
+ #endif
+diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c
+index 2028e6a..0271eba 100644
+--- a/security/selinux/hooks.c
++++ b/security/selinux/hooks.c
+@@ -2448,7 +2448,6 @@ static int check_nnp_nosuid(const struct linux_binprm *bprm,
+ 	if (new_tsec->sid == old_tsec->sid)
+ 		return 0; /* No change in credentials */
+ 
+-
+ 	/*
+ 	 * If the policy enables the nnp_nosuid_transition policy capability,
+ 	 * then we permit transitions under NNP or nosuid if the
+@@ -6434,18 +6433,6 @@ abort_change:
+ 	return error;
+ }
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-#include <linux/susfs_ksu.h>
+-
+-static int susfs_selinux_setprocattr(const char *name, void *value, size_t size)
+-{
+-	if (current_uid().val >= 10000 && READ_ONCE(ksu_selinux_hide_running) &&
+-	    !strcmp(name, "current"))
+-		return my_setprocattr(name, value, size);
+-	return selinux_setprocattr(name, value, size);
+-}
+-#endif
+-
+ static int selinux_ismaclabel(const char *name)
+ {
+ 	return (strcmp(name, XATTR_SELINUX_SUFFIX) == 0);
+@@ -6990,11 +6977,7 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
+ 	LSM_HOOK_INIT(d_instantiate, selinux_d_instantiate),
+ 
+ 	LSM_HOOK_INIT(getprocattr, selinux_getprocattr),
+-#ifdef CONFIG_KSU_SUSFS
+-	LSM_HOOK_INIT(setprocattr, susfs_selinux_setprocattr),
+-#else
+ 	LSM_HOOK_INIT(setprocattr, selinux_setprocattr),
+-#endif
+ 
+ 	LSM_HOOK_INIT(ismaclabel, selinux_ismaclabel),
+ 	LSM_HOOK_INIT(secctx_to_secid, selinux_secctx_to_secid),
+diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
+index 1e3eebb..0cfa51c 100644
+--- a/security/selinux/selinuxfs.c
++++ b/security/selinux/selinuxfs.c
+@@ -42,12 +42,6 @@
+ #include "objsec.h"
+ #include "conditional.h"
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-#include <linux/susfs_ksu.h>
+-#include <linux/jump_label.h>
+-extern struct static_key_false fake_status_initialize_key;
+-#endif
+-
+ enum sel_inos {
+ 	SEL_ROOT_INO = 2,
+ 	SEL_LOAD,	/* load policy */
+@@ -236,27 +230,11 @@ static int sel_open_handle_status(struct inode *inode, struct file *filp)
+ 	struct selinux_fs_info *fsi = file_inode(filp)->i_sb->s_fs_info;
+ 	struct page    *status = selinux_kernel_status_page(fsi->state);
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-	if (current_uid().val >= 10000 && READ_ONCE(ksu_selinux_hide_running)) {
+-		struct page *page = READ_ONCE(fake_status);
+-
+-		if (page) {
+-			filp->private_data = page;
+-			return 0;
+-		}
+-	}
+-#endif
+ 	if (!status)
+ 		return -ENOMEM;
+ 
+ 	filp->private_data = status;
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-	/* initialize_fake_status() takes the status lock itself. */
+-	if (static_branch_unlikely(&fake_status_initialize_key) &&
+-	    !READ_ONCE(fake_status))
+-		initialize_fake_status();
+-#endif
+ 	return 0;
+ }
+ 
+@@ -809,37 +787,13 @@ static ssize_t sel_write_relabel(struct file *file, char *buf, size_t size);
+ static ssize_t sel_write_user(struct file *file, char *buf, size_t size);
+ static ssize_t sel_write_member(struct file *file, char *buf, size_t size);
+ 
+-#ifdef CONFIG_KSU_SUSFS
+-static ssize_t susfs_sel_write_context(struct file *file, char *buf, size_t size)
+-{
+-	if (current_uid().val >= 10000 && READ_ONCE(ksu_selinux_hide_running))
+-		return my_write_context(file, buf, size);
+-	return sel_write_context(file, buf, size);
+-}
+-
+-static ssize_t susfs_sel_write_access(struct file *file, char *buf, size_t size)
+-{
+-	if (current_uid().val >= 10000 && READ_ONCE(ksu_selinux_hide_running))
+-		return my_write_access(file, buf, size);
+-	return sel_write_access(file, buf, size);
+-}
+-#endif
+-
+ ssize_t (*write_op[])(struct file *, char *, size_t) = {
+-#ifdef CONFIG_KSU_SUSFS
+-	[SEL_ACCESS] = susfs_sel_write_access,
+-#else
+ 	[SEL_ACCESS] = sel_write_access,
+-#endif
+ 	[SEL_CREATE] = sel_write_create,
+ 	[SEL_RELABEL] = sel_write_relabel,
+ 	[SEL_USER] = sel_write_user,
+ 	[SEL_MEMBER] = sel_write_member,
+-#ifdef CONFIG_KSU_SUSFS
+-	[SEL_CONTEXT] = susfs_sel_write_context,
+-#else
+ 	[SEL_CONTEXT] = sel_write_context,
+-#endif
+ };
+ 
+ static ssize_t selinux_transaction_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
