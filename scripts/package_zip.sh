@@ -36,9 +36,7 @@ fi
 read_json() { python3 -c "import json,sys; d=json.load(open('$INFO_DIR/sources.json')); print(d$1)"; }
 susfs=$(read_json '["susfs"]["version"]')
 kshort=$(read_json '["kernel"]["commit"][:8]')
-# Root module (xxKSU or BakaSU): its short commit, x<sha> or b<sha> in the name.
 xshort=$(read_json '["xxksu"]["commit"][:8]')
-rletter=x; [[ "$ROOT_FLAVOR" == bakasu ]] && rletter=b
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
 # Kernel ID: the same for every build of this exact kernel; the NoMount module
@@ -52,7 +50,7 @@ case "$KSU_HOOK" in
 esac
 [[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
 [[ "${VALHALL_GPU:-false}" == true ]] && suffix=$suffix-vgpu
-[[ "${KERNEL_SOURCE%-bakasu}" == aigis && "$KERNEL_TOOLCHAIN" == aosp ]] && suffix=$suffix-aospclang
+[[ "$KERNEL_SOURCE" == aigis && "$KERNEL_TOOLCHAIN" == aosp ]] && suffix=$suffix-aospclang
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in
@@ -60,9 +58,9 @@ case "$NOMOUNT_MODE" in
   lkm) nomount_line="separate LKM (${NOMOUNT_REF:-dev})" ;;
   *) nomount_line="not included" ;;
 esac
-name="${KERNEL_LABEL}-${ROOT_NAME}-SUSFS-${susfs}-${date}-k${kshort}-${rletter}${xshort}${suffix}"
+name="${KERNEL_LABEL}-xxKSU-SUSFS-${susfs}-${date}-k${kshort}-x${xshort}${suffix}"
 
-sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} ${ROOT_NAME} SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
+sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} xxKSU SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 cp "$IMAGE" "$ak3/Image"
 
 # Flasher additions, run after the kernel is written:
@@ -100,13 +98,13 @@ fi
 [[ -z "${AK3_FROM_TREE:-}" ]] && gzip -n -9 -c "$IMAGE" > "$ak3/Image.gz"
 
 {
-  echo "${KERNEL_LABEL} ${ROOT_NAME} + SUSFS kernel"
+  echo "${KERNEL_LABEL} xxKSU + SUSFS kernel"
   echo "Built: $(date -u '+%Y-%m-%d %H:%M UTC')"
   echo "Kernel release: $release"
   echo "Kernel ID (NoMount match): $kernel_id"
   echo "uname tag: ${KERNEL_TAG:-none}"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
-  echo "$ROOT_NAME: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
+  echo "xxKSU: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"
   echo "Build repo commit: $repo_sha"
   if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then
@@ -115,7 +113,7 @@ fi
     echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
   fi
   echo "AnyKernel3: $ak3_line"
-  if [[ "${KERNEL_SOURCE%-bakasu}" == aigis ]]; then
+  if [[ "$KERNEL_SOURCE" == aigis ]]; then
     echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 with Aigis GPU tuning' || echo 'stock A32 Bifrost r25p0 (same as the mzggr kernel)')"
   else
     echo "GPU: stock A32 Bifrost r25p0"
@@ -123,11 +121,7 @@ fi
   echo "dtb: $dtb_line"
   [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
-  if [[ "$ROOT_FLAVOR" == bakasu ]]; then
-    echo "BakaSU hook style: SUSFS inline hooks (compile-time calls inside the kernel functions)"
-  else
-    echo "xxKSU hook style: $KSU_HOOK"
-  fi
+  echo "xxKSU hook style: $KSU_HOOK"
   echo "Performance tuning: $PERF_TUNING"
   echo "NoMount: $nomount_line"
   echo "Patches applied:"
