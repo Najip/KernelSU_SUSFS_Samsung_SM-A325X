@@ -30,15 +30,15 @@ Flash one kernel ZIP only, and the NoMount ZIP made for that same kernel.
 This table is refreshed automatically each time a full Release is published. xxKSU, the SUSFS patch and the manager app are the same for both kernels, so each has one row.
 
 <!-- SOURCES:START -->
-Last release: [build-20261120-79](../../releases/tag/build-20261120-79)
+Last release: [build-20261122-98](../../releases/tag/build-20261122-98)
 
 | Part | Used by | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|---|
 | Kernel | Main kernel: Aigis | [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32) | `bpf-5.15-legion`, Linux 4.14.357 | [`dc0935aba4a7`](https://github.com/SlamZDank/Aigis-Kernel-A32/commit/dc0935aba4a71c0cf3d7c7fd3c38c1e5e58c86c6) | 2026-11-19 |
 | Kernel | Alt. kernel: mzggr | [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) | `common`, Linux 4.14.357-openela | [`7dd52de28d1e`](https://github.com/mzggr0914/android_kernel_a325x_bakasu/commit/7dd52de28d1ee64dddc1f3e853e214fab7578c44) | 2026-11-16 |
-| xxKSU (root) | Both kernels | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32731, tag v3.3.1+54 | [`f27e1f0d3192`](https://github.com/backslashxx/KernelSU/commit/f27e1f0d3192820b0964881585d764ab0f0de56f) | 2026-11-20 |
-| SUSFS patch | Both kernels | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`26f2313be61f`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/26f2313be61f7a8603a50b2dcd12171495a79d27) | 2026-11-18 |
-| xxKSU manager app | Both kernels | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | release [v3.3.1+54](https://github.com/backslashxx/KernelSU/releases/tag/v3.3.1%2B54), `KernelSU_v3.3.1+54_32735-release.apk` | - | 2026-11-20 |
+| xxKSU (root) | Both kernels | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | `master`, KSU_VERSION 32733, tag v3.3.1+55 | [`7ba525582f49`](https://github.com/backslashxx/KernelSU/commit/7ba525582f49a82547d4303f4edeea30784a4002) | 2026-11-22 |
+| SUSFS patch | Both kernels | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`ec069a4e34f9`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/ec069a4e34f992d602a6b40d2e211df2516e2865) | 2026-11-18 |
+| xxKSU manager app | Both kernels | [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) | release [v3.3.1+55](https://github.com/backslashxx/KernelSU/releases/tag/v3.3.1%2B55), `KernelSU_v3.3.1+55_32736-release.apk` | - | 2026-11-22 |
 <!-- SOURCES:END -->
 
 Other parts (pinned in this repo):
