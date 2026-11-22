@@ -73,9 +73,9 @@ on:
         description: 'NoMount branch'
         type: choice
         options:
-          - dev
           - master
-        default: dev
+          - dev
+        default: master
       nomount_only:
         description: 'Build only the NoMount module (no kernel ZIP). Uses the saved kernel kit of the same kernel when there is one, otherwise compiles the kernel to match it'
         type: boolean
@@ -123,7 +123,7 @@ env:
   KERNEL_TAG: ${{ inputs.uname_tag }}
   KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
-  NOMOUNT_REF: ${{ inputs.nomount_branch || 'dev' }}
+  NOMOUNT_REF: ${{ inputs.nomount_branch || 'master' }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
