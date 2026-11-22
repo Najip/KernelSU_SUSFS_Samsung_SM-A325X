@@ -66,7 +66,9 @@ Recommended. Always use the NoMount ZIP from the same release and for the same k
 No, use the xxKSU manager from the release. Other managers do not match this kernel.
 
 [B]Which SUSFS module should I use?[/B]
-Any module made for SUSFS v2.4.0 (for example BRENE). Older modules for SUSFS 1.5.x do not work.
+[B]BRENE is always recommended[/B] as the SUSFS userspace module: [URL='https://github.com/rrr333nnn333/BRENE']rrr333nnn333/BRENE[/URL]. It always keeps up to date with simonpunk's SUSFS updates, so it matches the SUSFS v2.4.0 in this kernel.
+
+[COLOR=rgb(226, 80, 65)][B]Warning: do NOT use sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not made for this kernel's SUSFS version and can break root hiding or cause problems. If it is installed, remove it in the KernelSU manager, reboot, then install BRENE.
 
 [B]Release or pre-release?[/B]
 Releases are tested by me on my phone. Pre-releases are built automatically when an upstream source changes and are not tested yet.
