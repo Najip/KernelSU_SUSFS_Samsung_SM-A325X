@@ -117,14 +117,21 @@ if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   # BakaSU's version code is its commit count (30000 + count + 700), the same
   # number its manager shows, so it needs the full history and tags. Always a
   # fresh copy: a reused one may hold the history of another BakaSU branch.
-  rm -rf -- KernelSU
-  git init -q KernelSU
-  git -C KernelSU remote add origin "$KSU_REPO"
-  bakasu_branch=${KSU_BRANCH:-$KSU_REF}
-  if [[ "$bakasu_branch" =~ ^[0-9a-f]{40}$ ]]; then
-    git -C KernelSU fetch -q --tags origin "$bakasu_branch"
-  else
-    git -C KernelSU fetch -q --tags origin "+refs/heads/$bakasu_branch:refs/remotes/origin/$bakasu_branch"
+  bakasu_branch=${KSU_BRANCH:-main}
+  [[ "$bakasu_branch" =~ ^[0-9a-f]{40}$ ]] && bakasu_branch=main
+  bakasu_clone() {
+    rm -rf -- KernelSU
+    git "$@" clone -q --no-checkout --branch "$bakasu_branch" "$KSU_REPO" KernelSU
+  }
+  if ! bakasu_clone; then
+    echo "BakaSU download failed, trying again with the older git protocol."
+    if ! bakasu_clone -c protocol.version=0; then
+      echo "BakaSU download failed twice. Git settings that can change downloads:"
+      git --version
+      git config --show-origin --get-regexp '^(url\.|protocol|fetch\.|transfer\.|remote\.|http\.).*' \
+        | sed -E 's#(https?://)[^/@]+@#\1***@#g' || true
+      exit 1
+    fi
   fi
   if [[ "$KSU_REF" =~ ^[0-9a-f]{40}$ ]]; then
     git -C KernelSU cat-file -e "$KSU_REF^{commit}" 2>/dev/null \
