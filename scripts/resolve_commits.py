@@ -6,15 +6,17 @@
     Writes kernel_ref, ksu_ref, susfs_ref, the matching *_branch values and
     commit_mode to $GITHUB_OUTPUT (and to stdout).
 
-    KERNEL_SOURCE=mzggr|aigis picks the kernel (default mzggr).
+    KERNEL_SOURCE=mzggr|aigis|aigis-bakasu picks the kernel (default mzggr).
     Latest and Promoted use the branch tips in scripts/sources.conf.
     Verified uses configs/verified.json and fails if a pin is missing: the
-    top-level kernel/xxksu/susfs entries for mzggr, the "aigis" entry for Aigis.
+    top-level kernel/xxksu/susfs entries for mzggr, the "aigis" entry for Aigis,
+    the "aigis-bakasu" entry for Aigis BakaSU ("xxksu" there = BakaSU).
 
   resolve_commits.py promote <configs/verified.json> <sources.json>...
     Rewrites the verified pins from the commits that were actually built.
     Each sources.json updates the pins of its own kernel (found by its kernel
-    repo); the pins of a kernel that was not built stay as they were.
+    repo, or its "source" field); the pins of a kernel that was not built stay
+    as they were.
 """
 import json
 import os
@@ -31,6 +33,19 @@ SOURCES = (
     ("xxksu", "KSU_REPO", "KSU_REF", "ksu_ref", "ksu_branch"),
     ("susfs", "SUSFS_REPO", "SUSFS_REF", "susfs_ref", "susfs_branch"),
 )
+
+
+# Kernels whose pins are a nested entry of verified.json (mzggr = top level).
+NESTED = {"aigis": "Aigis", "aigis-bakasu": "Aigis BakaSU"}
+
+
+def kernel_of(src):
+    """Which kernel a sources.json is for: its "source" field (newer builds),
+    else by kernel repo (older builds were xxKSU: aigis or mzggr)."""
+    if src.get("source"):
+        return src["source"]
+    repo = ((src.get("kernel") or {}).get("repo") or "").lower()
+    return "aigis" if "aigis" in repo else "mzggr"
 
 
 def fail(message):
@@ -99,11 +114,11 @@ def resolve():
         if not path.exists():
             fail("No verified commits yet. Run a build with commit mode Promoted after one you have tested.")
         data = json.loads(path.read_text())
-        aigis = os.environ.get("KERNEL_SOURCE", "mzggr") == "aigis"
-        if aigis:
-            data = data.get("aigis") or {}
+        source = os.environ.get("KERNEL_SOURCE", "mzggr")
+        if source in NESTED:
+            data = data.get(source) or {}
             if not data:
-                fail("No verified Aigis commits yet. Run a Latest build with Kernel aigis or both, then Promoted with aigis or both.")
+                fail(f"No verified {NESTED[source]} commits yet. Run a Latest build of it, then Promoted with the same Kernel and Root flavor.")
         missing = []
         for key, repo_var, ref_var, ref_out, branch_out in SOURCES:
             item = data.get(key) or {}
@@ -175,20 +190,18 @@ def promote(verified_path, *sources_paths):
     if os.environ.get("SOURCE_RUN_URL"):
         data["run"] = os.environ["SOURCE_RUN_URL"]
     # Keep the pins of the kernel that was not built this time.
-    mzggr = {k: v for k, v in old.items() if k not in ("note", "updated", "run", "aigis")}
-    aigis = old.get("aigis")
-    aigis_repo = load_conf("aigis")["KERNEL_REPO"].rstrip("/")
+    mzggr = {k: v for k, v in old.items() if k not in ("note", "updated", "run", *NESTED)}
+    nested = {k: old[k] for k in NESTED if old.get(k)}
     for path in sources_paths:
         src = json.loads(Path(path).read_text())
-        kernel_repo = ((src.get("kernel") or {}).get("repo") or "").rstrip("/")
-        if kernel_repo == aigis_repo:
-            aigis = pins(src, load_conf("aigis"))
-            aigis["run"] = data["run"]
+        source = kernel_of(src)
+        if source in NESTED:
+            nested[source] = pins(src, load_conf(source))
+            nested[source]["run"] = data["run"]
         else:
             mzggr = pins(src, load_conf("mzggr"))
     data.update(mzggr)
-    if aigis:
-        data["aigis"] = aigis
+    data.update(nested)
     Path(verified_path).write_text(json.dumps(data, indent=2) + "\n")
     print(json.dumps(data, indent=2))
 

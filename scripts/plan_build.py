@@ -5,6 +5,9 @@
 
 Environment (set by the workflow's pick job):
   KERNEL_CHOICE  mzggr, aigis or both (the "Kernel" dropdown)
+  ROOT_FLAVOR    xxKSU (default), BakaSU or All (the "Root flavor" dropdown).
+                 BakaSU is built on the Aigis kernel only (source aigis-bakasu);
+                 All = the xxKSU kernels plus Aigis BakaSU.
   COMMIT_MODE    Latest, Verified or Promoted
   NM_ONLY        true = NoMount module only
   REUSE          (Upstream check) JSON, per kernel {"mode": kernel|nomount|reuse,
@@ -21,7 +24,10 @@ Writes to $GITHUB_OUTPUT:
   build_any     true when the build job has anything to do
   build_kernel  true when kernel ZIPs are built (not Promoted / NoMount only)
   promote_ok    true for a Promoted run that found a Latest build
-  sources       the kernels of this run, e.g. "aigis mzggr" (Aigis first)
+  sources       the kernels of this run, e.g. "aigis aigis-bakasu mzggr" (Aigis first)
+  xxksu_manager true when an xxKSU kernel is in this run (xxKSU manager APK)
+  bakasu_ref, bakasu_branch  BakaSU commit / branch of Aigis BakaSU (empty
+                when it is not in this run): its manager APK must match it
   source_run, source_url, checkout_sha  (Promoted)
   collect_sources, collect_runs  kernels whose files come from an earlier run
                 (Promoted, reuse) and that run per kernel (JSON)
@@ -78,6 +84,18 @@ def main():
     sources = {"mzggr": ["mzggr"], "aigis": ["aigis"], "both": ["aigis", "mzggr"]}.get(choice)
     if not sources:
         fail(f"Unknown kernel '{choice}' (use mzggr, aigis or both).")
+    flavor = e.get("ROOT_FLAVOR") or "xxKSU"
+    if flavor not in ("xxKSU", "BakaSU", "All"):
+        fail(f"Unknown root flavor '{flavor}' (use xxKSU, BakaSU or All).")
+    if flavor != "xxKSU":
+        if "aigis" not in sources:
+            fail("BakaSU is built on the main kernel (Aigis) only. Choose Kernel aigis or both.")
+        if flavor == "BakaSU" and "mzggr" in sources:
+            print("::warning title=mzggr skipped::Root flavor BakaSU is for the Aigis kernel only; "
+                  "the mzggr kernel is not built. Use Root flavor All for xxKSU kernels too.")
+        keep = ["aigis-bakasu"] if flavor == "BakaSU" else sources + ["aigis-bakasu"]
+        order = ["aigis", "aigis-bakasu", "mzggr"]
+        sources = [s for s in order if s in keep]
     mode = e.get("COMMIT_MODE", "Latest")
     nm_only = e.get("NM_ONLY") == "true"
     nomount_mode = e.get("NOMOUNT_MODE", "lkm")
@@ -163,11 +181,12 @@ def main():
             entries.append({
                 "source": src, **{k: refs.get(k, "") for k in REF_KEYS},
                 # Our tuning is for the mzggr kernel only (Aigis keeps its own).
-                "ksu_hook": e.get("KSU_HOOK", "manual"),
+                # BakaSU always uses its SUSFS inline hooks ("inline").
+                "ksu_hook": "inline" if src == "aigis-bakasu" else e.get("KSU_HOOK", "manual"),
                 "perf_tuning": e.get("PERF_TUNING", "false") if src == "mzggr" else "false",
                 "network_fix": e.get("NETWORK_FIX", "true"), "kernel_release": "",
                 # Valhall GPU is for the Aigis kernel only.
-                "valhall_gpu": e.get("VALHALL_GPU", "false") if src == "aigis" else "false",
+                "valhall_gpu": e.get("VALHALL_GPU", "false") if src.startswith("aigis") else "false",
                 "kernel_tag": e.get("KERNEL_TAG", ""),
                 "kit_id": kit, "build_nomount": str(nomount_mode == "lkm").lower(),
                 "build_kernel": str(kernel).lower(),
@@ -175,11 +194,19 @@ def main():
         if kept:
             out.update(collect_sources=" ".join(kept), collect_runs=json.dumps(kept, separators=(",", ":")))
 
+    for x in entries:
+        if x["source"] == "aigis-bakasu":
+            x["ksu_hook"] = "inline"  # BakaSU: always its SUSFS inline hooks
     matrix = [x for x in entries if x["build_kernel"] == "true" or x["build_nomount"] == "true"]
     for i, x in enumerate(matrix):
         x["first"] = "true" if i == 0 else "false"
         print(f"{x['source']}: kernel ZIP {x['build_kernel']}, NoMount LKM build {x['build_nomount']}, "
               f"kernel kit {x['kit_id'] or 'none'}")
+    # Manager apps of this run: xxKSU when an xxKSU kernel is in it, BakaSU
+    # (from the BakaSU build of the same commit) for Aigis BakaSU.
+    out["xxksu_manager"] = str(any(s != "aigis-bakasu" for s in sources)).lower()
+    out["bakasu_ref"] = next((x["ksu_ref"] for x in entries if x["source"] == "aigis-bakasu"), "")
+    out["bakasu_branch"] = next((x["ksu_branch"] for x in entries if x["source"] == "aigis-bakasu"), "")
     out["matrix"] = json.dumps(matrix, separators=(",", ":"))
     out["build_any"] = str(bool(matrix)).lower()
     emit(out)

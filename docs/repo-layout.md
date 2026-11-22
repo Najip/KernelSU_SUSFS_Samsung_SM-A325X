@@ -15,7 +15,7 @@
 | `docs/xda-thread.txt` | XDA thread template (BBCode): first post, changelog post, reserved posts |
 | `scripts/xda_changelog.py` | Turns the release notes into `XDA-changelog-<tag>.txt` for the XDA changelog post |
 | `tools/extract_log.py` | Makes a short version of a GitHub Actions build log (opens a file picker) |
-| `patches/base/` | Turns mzggr0914's BakaSU tree into the xxKSU + SUSFS layout |
+| `patches/base/` | Turns each upstream tree into the xxKSU + SUSFS layout, or Aigis into the BakaSU + SUSFS inline-hook layout |
 | `patches/susfs/` | Small additions on top of JackA1ltman's SUSFS core files |
 | `patches/kernelsu/` | Small xxKSU changes for SUSFS |
 | `patches/kernel/` | Network fix and optional tuning |
@@ -25,6 +25,7 @@
 | `scripts/resolve_commits.py` | Picks the commits for Latest, Verified and Promoted |
 | `scripts/promoted_source.py` | Finds and collects the `Latest` run that `Promoted` takes its files from |
 | `scripts/build_nomount.sh` | Builds the NoMount module (after a kernel compile, or from a kernel kit) |
+| `scripts/bakasu_manager.py` | Finds the BakaSU Build Manager run of the BakaSU commit and downloads its APK |
 | `scripts/kernel_kit.py` | Kernel kit key, lookup and download |
 | `scripts/kernel_id.sh` | Kernel ID that the flasher uses to check the NoMount module |
 | `anykernel/nomount-check.sh`, `anykernel/gpu-cleanup.sh` | Flasher checks added after the kernel is written |
