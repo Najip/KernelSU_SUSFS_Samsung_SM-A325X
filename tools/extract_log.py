@@ -29,7 +29,8 @@ IMPORTANT = re.compile("|".join([
     r"Config not applied", r"Config still enabled", r"Missing linked",       # our checks
     r"was dropped by olddefconfig", r"does not match", r"not found\b",
     r"No such file or directory", r"Permission denied", r"command not found",
-    r"Traceback \(most recent call last\)", r"\bException\b", r"Killed\b",
+    r"Traceback \(most recent call last\)", r"\bException:", r"unbound variable",
+    r"syntax error", r"line \d+: .*(not found|No such)", r"Killed\b",
     r"No space left on device", r"out of memory", r"timed out", r"rate limit",
     r"HTTP \d{3}", r"curl: \(\d+\)",
     r"Process completed with exit code",
@@ -47,7 +48,7 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 # GitHub prints the script of each step in cyan before running it; those
 # lines are code, not output (marked with this prefix after cleaning).
 CODE = "\u00a7 "
-COMPILER_ERROR = re.compile(r"(\berror:|fatal error|undefined reference|Error \d+|##\[error\])", re.IGNORECASE)
+COMPILER_ERROR = re.compile(r"(\berror:|fatal error|undefined reference|Error \d+|unbound variable|##\[error\])", re.IGNORECASE)
 MAX_LINES = 600
 CONTEXT_BEFORE, CONTEXT_AFTER, MAX_CONTEXT = 12, 6, 8
 
