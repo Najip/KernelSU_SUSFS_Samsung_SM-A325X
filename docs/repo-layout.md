@@ -12,6 +12,8 @@
 | `scripts/package_zip.sh` | Makes the AnyKernel3 ZIP and `build-info.txt` |
 | `scripts/release_notes.py` | Release notes and README table |
 | `tools/collect-logs.sh` | Log collector for TWRP and rooted Android (Termux) |
+| `docs/xda-thread.txt` | XDA thread template (BBCode): first post, changelog post, reserved posts |
+| `scripts/xda_changelog.py` | Turns the release notes into `XDA-changelog-<tag>.txt` for the XDA changelog post |
 | `tools/extract_log.py` | Makes a short version of a GitHub Actions build log (opens a file picker) |
 | `patches/base/` | Turns mzggr0914's BakaSU tree into the xxKSU + SUSFS layout |
 | `patches/susfs/` | Small additions on top of JackA1ltman's SUSFS core files |
