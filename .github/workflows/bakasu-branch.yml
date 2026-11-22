@@ -1,0 +1,61 @@
+name: Switch BakaSU branch
+run-name: Switch BakaSU branch to ${{ inputs.branch }}
+
+# Which BakaSU branch the Aigis BakaSU kernel uses (BAKASU_BRANCH in
+# scripts/sources.conf). sync-up = SUSFS 2.4.0 work (default). main = BakaSU's
+# main branch (SUSFS 2.3.0 until sync-up is merged into it). The Upstream check
+# warns when sync-up has been merged into main; nothing is switched by itself.
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'BakaSU branch for the Aigis BakaSU kernel'
+        type: choice
+        options:
+          - sync-up
+          - main
+        default: sync-up
+
+permissions:
+  contents: write
+
+jobs:
+  switch:
+    name: Set BakaSU branch
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: ${{ github.ref_name }}
+      WANT: ${{ inputs.branch }}
+    steps:
+      - name: Checkout ${{ github.ref_name }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+
+      - name: Change BAKASU_BRANCH in scripts/sources.conf
+        run: |
+          set -euo pipefail
+          git ls-remote --exit-code https://github.com/Baka-SU/BakaSU "refs/heads/$WANT" >/dev/null \
+            || { echo "::error::BakaSU has no branch $WANT."; exit 1; }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch -q origin "$BRANCH" && git reset -q --hard FETCH_HEAD
+            grep -q '^BAKASU_BRANCH=' scripts/sources.conf || { echo "::error::No BAKASU_BRANCH line in scripts/sources.conf."; exit 1; }
+            sed -i "s/^BAKASU_BRANCH=.*/BAKASU_BRANCH=$WANT/" scripts/sources.conf
+            if git diff --quiet; then
+              echo "### BakaSU branch is already $WANT" >> "$GITHUB_STEP_SUMMARY"; exit 0
+            fi
+            git commit -q -am "BakaSU branch: $WANT"
+            if git push -q origin "HEAD:$BRANCH"; then
+              {
+                echo "### BakaSU branch is now \`$WANT\`"
+                echo "The next Aigis BakaSU build uses Baka-SU/BakaSU \`$WANT\`. Verified (and so a full Release)"
+                echo "needs a new Latest build + Promoted with Root flavor BakaSU or All first."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::Could not push the change.'; exit 1

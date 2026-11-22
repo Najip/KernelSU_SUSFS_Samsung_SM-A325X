@@ -1,5 +1,5 @@
 name: NoMount LKM
-run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.kernel_source == 'aigis' && ' for Aigis' || '' }}${{ inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' for tuning kernel' || '' }}${{ inputs.kernel_source == 'aigis' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.kernel_source == 'aigis' && inputs.compiler == 'main' && ' (main compiler)' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: NoMount LKM (${{ inputs.nomount_ref }})${{ inputs.kernel_source == 'aigis' && ' for Aigis' || (inputs.kernel_source == 'aigis-bakasu' && ' for Aigis BakaSU' || '') || '' }}${{ inputs.perf_tuning && !startsWith(inputs.kernel_source, 'aigis') && ' for tuning kernel' || '' }}${{ startsWith(inputs.kernel_source, 'aigis') && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ startsWith(inputs.kernel_source, 'aigis') && inputs.compiler == 'main' && ' (main compiler)' || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Builds nomount-4.14.ko and the flashable NoMount module ZIP (flash it in the
 # KernelSU manager). The kernel is compiled in the same run with the same
@@ -71,10 +71,11 @@ on:
         type: string
         default: '-forkby-gh.Najip'
       kernel_source:
-        description: 'Kernel you flashed. aigis = main kernel (Aigis), mzggr = Alt. kernel (mzggr0914)'
+        description: 'Kernel you flashed. aigis = main kernel (Aigis), aigis-bakasu = main kernel with BakaSU, mzggr = Alt. kernel (mzggr0914)'
         type: choice
         options:
           - aigis
+          - aigis-bakasu
           - mzggr
         default: aigis
       perf_tuning:
@@ -367,7 +368,7 @@ jobs:
           [[ "$PERF_TUNING" == true ]] && suffix=-tuning
           name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-${KERNEL_SOURCE}-k${kshort}-n${nshort}${suffix}"
           {
-            echo "NoMount LKM for A325X xxKSU + SUSFS kernel"
+            echo "NoMount LKM for A325X $([[ "$KERNEL_SOURCE" == aigis-bakasu ]] && echo BakaSU || echo xxKSU) + SUSFS kernel"
             echo "NoMount: $NOMOUNT_REPO branch $NOMOUNT_REF @ $NOMOUNT_SHA ($NOMOUNT_COUNT commits)"
             echo "lkmloader: $LKMLOADER_REPO @ $LKMLOADER_SHA"
             echo "Built for kernel release: $KERNEL_RELEASE"

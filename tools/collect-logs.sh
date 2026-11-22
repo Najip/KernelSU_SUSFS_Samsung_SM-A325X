@@ -6,6 +6,8 @@
 #   - Termux: su -c sh /sdcard/Download/collect-logs.sh
 #
 # Output: /sdcard/kernel-logs/<date-time>-<twrp|android>/ plus a .tar.gz of it.
+# summary.txt in it is the short report (kernel, root: xxKSU or BakaSU, SUSFS,
+# modules, errors of the previous boot): send me that one first.
 # Best moment to run it in TWRP: right after a bootloop, entered with
 # Volume Down + Power, then Volume Up + Power (no full power-off), so the
 # crash log of the failed boot is still in memory.
@@ -101,8 +103,19 @@ else
       break
     fi
   done
-  save susfs-dmesg.txt sh -c 'dmesg | grep -iE "susfs|kernelsu|ksu"'
+  save susfs-dmesg.txt sh -c 'dmesg | grep -iE "susfs|kernelsu|ksu|bakasu|nomount"'
   copy /data/adb/ksu/log ksu-log.txt
+  # SUSFS tool (BRENE / susfs4ksu module), modules, NoMount.
+  for tool in /data/adb/ksu/bin/ksu_susfs /data/adb/ksu/bin/susfs; do
+    if [ -x "$tool" ]; then
+      save susfs-version.txt "$tool" show version
+      save susfs-features.txt "$tool" show enabled_features
+      break
+    fi
+  done
+  save modules.txt sh -c 'for m in /data/adb/modules/*/module.prop; do [ -f "$m" ] || continue; d=${m%/module.prop}; s=; [ -f "$d/disable" ] && s=" (disabled)"; echo "$(basename "$d"): $(grep -m1 "^version=" "$m" | cut -d= -f2)$s"; done'
+  save lsmod.txt cat /proc/modules
+  save managers.txt sh -c 'pm list packages -f 2>/dev/null | grep -iE "kernelsu|ksu|bakasu|xxksu"' 
 fi
 
 # Summary of what usually matters most.
@@ -111,6 +124,17 @@ fi
   echo "Kernel now running: $(cat /proc/version 2>/dev/null)"
   echo "ROM: $(getprop ro.build.display.id 2>/dev/null)"
   echo "Model: $(getprop ro.product.model 2>/dev/null) / bootloader $(getprop ro.boot.bootloader 2>/dev/null)"
+  if [ "$MODE" = android ]; then
+    echo "Root: $(cat "$OUT/ksud-version.txt" 2>/dev/null | head -n 1)"
+    echo "SUSFS: $(cat "$OUT/susfs-version.txt" 2>/dev/null | head -n 1)"
+    echo "NoMount loaded: $(grep -q '^nomount ' /proc/modules 2>/dev/null && echo yes || echo 'no (or built in)')"
+    echo
+    echo "== Root / SUSFS kernel messages (first 40)"
+    grep -a -iE "bakasu|kernelsu|ksu|susfs" "$OUT/susfs-dmesg.txt" 2>/dev/null | head -n 40
+    echo
+    echo "== Modules"
+    cat "$OUT/modules.txt" 2>/dev/null
+  fi
   echo
   echo "== Previous boot: kernel version"
   cat "$OUT"/pstore/console-ramoops* "$OUT/last_kmsg.txt" 2>/dev/null | grep -a -m 2 "Linux version"
