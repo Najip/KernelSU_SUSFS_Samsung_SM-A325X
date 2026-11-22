@@ -125,6 +125,8 @@ def notes(cur_path, prev_path, info_path, out_path):
             continue
         s = cur[key]
         repo = slug(s["repo"])
+        if key == "xxksu":
+            title = cur.get("root") or title  # the root module: xxKSU or BakaSU
         head = f"### {title}: [`{s['commit'][:8]}`](https://github.com/{repo}/commit/{s['commit']})"
         md.append(head)
         old = prev.get(key, {}).get("commit") if prev else None
@@ -154,10 +156,18 @@ def notes(cur_path, prev_path, info_path, out_path):
     print("\n".join(md))
 
 
+def kernel_of(src):
+    """Kernel of a sources.json: its "source" field, else by repo (older builds)."""
+    if src.get("source"):
+        return src["source"]
+    return "aigis" if "aigis" in src["kernel"]["repo"].lower() else "mzggr"
+
+
 # How each kernel is named in the README. Aigis is the main kernel (the one I
 # use every day); mzggr is the Alt. kernel. Both are released.
 KERNEL_ROLES = [
     ("aigis", "Main kernel: Aigis"),
+    ("aigis-bakasu", "Main kernel: Aigis (BakaSU)"),
     ("mzggr", "Alt. kernel: mzggr"),
 ]
 
@@ -182,33 +192,52 @@ def readme(readme_path, tag, *paths):
     found = {}
     for path in paths:
         cur = json.load(open(path))
-        found["aigis" if "aigis" in cur["kernel"]["repo"].lower() else "mzggr"] = cur
+        found[kernel_of(cur)] = cur
     present = [(key, title) for key, title in KERNEL_ROLES if key in found]
     for key, title in KERNEL_ROLES:
+        # Aigis BakaSU is optional (Root flavor BakaSU / All): no empty row.
+        if key == "aigis-bakasu" and key not in found:
+            continue
         if key in found:
             k = found[key]["kernel"]
             row("Kernel", title, k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
         else:
             rows.append(f"| Kernel | {title} | Not in this release | | | |")
-    shared = [
-        ("xxKSU (root)", "xxksu", lambda x: f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}"),
-        ("SUSFS patch", "susfs", lambda f: f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`"),
-    ]
-    for part, name, version in shared:
-        commits = {found[key][name]["commit"] for key, _ in present}
+    def used_by(group):
+        if len(group) == 1:
+            return group[0][1]
+        return "Both kernels" if len(group) == 2 else "All kernels"
+
+    root_version = lambda x: f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}"
+    # Root module: one group per flavor (xxKSU kernels, BakaSU kernel).
+    groups = [("xxKSU (root)", [p for p in present if p[0] != "aigis-bakasu"], "xxksu"),
+              ("BakaSU (root)", [p for p in present if p[0] == "aigis-bakasu"], "bakasu")]
+    shared = [(part, group, "xxksu", root_version) for part, group, _ in groups if group]
+    shared.append(("SUSFS patch", present, "susfs", lambda f: f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`"))
+    for part, group, name, version in shared:
+        commits = {found[key][name]["commit"] for key, _ in group}
         if len(commits) == 1:
-            s = found[present[0][0]][name]
-            row(part, "Both kernels" if len(present) > 1 else present[0][1], s, version(s))
+            s = found[group[0][0]][name]
+            row(part, used_by(group), s, version(s))
         else:
-            for key, title in present:
+            for key, title in group:
                 row(part, title, found[key][name], version(found[key][name]))
-    manager = os.path.join(os.path.dirname(paths[0]), "manager.json")
-    if os.path.exists(manager):
+    folder = os.path.dirname(paths[0])
+    for part, group, flavor in groups:
+        if not group:
+            continue
+        # manager.json (xxKSU) and manager-bakasu.json sit next to the first sources.json.
+        manager = os.path.join(folder, "manager.json" if flavor == "xxksu" else "manager-bakasu.json")
+        if not os.path.exists(manager):
+            continue
         m = json.load(open(manager))
         repo = slug(m["repo"])
-        used_by = "Both kernels" if len(present) > 1 else (present[0][1] if present else "")
-        rows.append(f"| xxKSU manager app | {used_by} | [{repo}](https://github.com/{repo}) | "
-                    f"release [{m['tag']}]({m['url']}), `{m['apk']}` | - | {m.get('date', '')[:10]} |")
+        name = part.replace(" (root)", "")
+        kind = "release" if flavor == "xxksu" else "Actions build"
+        commit = m.get("commit") or ""
+        commit_cell = f"[`{commit[:12]}`](https://github.com/{repo}/commit/{commit})" if commit else "-"
+        rows.append(f"| {name} manager app | {used_by(group)} | [{repo}](https://github.com/{repo}) | "
+                    f"{kind} [{m['tag']}]({m['url']}), `{m['apk']}` | {commit_cell} | {m.get('date', '')[:10]} |")
     block = ["<!-- SOURCES:START -->",
              f"Last release: [{tag}](../../releases/tag/{tag})", ""] + rows + ["<!-- SOURCES:END -->"]
     text = open(readme_path).read()

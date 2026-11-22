@@ -32,9 +32,10 @@ What I ask (a request, not a license condition): credit this repo when you reuse
 | NoMount (kernel module) | [maxsteeel/nomount](https://github.com/maxsteeel/nomount) `kernel/` | GPL-2.0 (`kernel/LICENSE`) | Built as an LKM or into the kernel | Yes |
 | NoMount (userspace) and LKM loader | [maxsteeel/nomount](https://github.com/maxsteeel/nomount), [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader) | GPL-3.0 | Put in the NoMount module ZIP | Yes, separate programs in the same ZIP |
 | AnyKernel3 | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | Its own BSD-style license; its tools keep their own licenses | The flasher in every kernel ZIP | Yes, its `LICENSE` file stays in the ZIP |
-| BakaSU | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | GPL-3.0 | Removed at build time, not shipped | Not used |
+| BakaSU (kernel part) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) `kernel/` | GPL-2.0 (`kernel/LICENSE`) | Built into the Aigis BakaSU kernel (removed from the xxKSU kernels) | Yes, its commit is linked in the release |
+| BakaSU manager app | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) Build Manager runs | GPL-3.0 | The `.apk` is attached to releases unchanged | Yes, linked to its run and source |
 | Valhall GPU drivers module | [Aigis release `GPU-Update`](https://github.com/SlamZDank/Aigis-Kernel-A32/releases/tag/GPU-Update) | No license given. It holds closed Mali GPU driver files from Samsung A14 vendor firmware | Bundled into the Aigis Valhall kernel ZIP | **Risk**: nobody gave a license to share these files (the Aigis release shares them the same way) |
 
 ## Source for each release
 
-Every release lists the exact commits of each kernel, xxKSU, the SUSFS patch and this repo under **Source code (GPL-2.0)**, so anyone can rebuild the same kernel.
+Every release lists the exact commits of each kernel, xxKSU or BakaSU, the SUSFS patch and this repo under **Source code (GPL-2.0)**, so anyone can rebuild the same kernel.

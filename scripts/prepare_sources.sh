@@ -25,6 +25,9 @@ case "$NOMOUNT_MODE" in
   no|lkm|integrate) ;;
   *) echo "Unknown NOMOUNT_MODE '$NOMOUNT_MODE' (use no, lkm or integrate)" >&2; exit 1 ;;
 esac
+# BakaSU builds always use its SUSFS inline hooks (calls placed in the kernel
+# functions at compile time, like xxKSU manual); KSU_HOOK is ignored there.
+[[ "$ROOT_FLAVOR" == bakasu ]] && KSU_HOOK=manual
 case "$KSU_HOOK" in
   manual|syscall_table|branch_link) ;;
   *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
@@ -101,30 +104,46 @@ sed -i 's/[ \t]*$//' "${core_files[@]}"
 git apply --whitespace=nowarn "$ROOT/patches/susfs/0001-jack-core-local-additions.patch"
 applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12} (core files)" "susfs/0001-jack-core-local-additions.patch")
 
-log "xxKSU: $KSU_REPO ($KSU_REF)"
+log "$ROOT_NAME: $KSU_REPO ($KSU_REF)"
 fetch "$KSU_REPO" "$KSU_REF" KernelSU
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+  # BakaSU's version code is its commit count (30000 + count + 700), the same
+  # number its manager shows, so it needs the full history and tags.
+  git -C KernelSU fetch -q --unshallow --tags origin || git -C KernelSU fetch -q --tags origin
+fi
 ksu_sha=$(git -C KernelSU rev-parse HEAD)
 ksu_date=$(git -C KernelSU show -s --format=%cI HEAD)
 ksu_subject=$(git -C KernelSU show -s --format=%s HEAD)
-ksu_version=$(grep -o 'KSU_VERSION=[0-9]*' KernelSU/kernel/Makefile | head -n1 | cut -d= -f2)
-ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+  ksu_version=$((30000 + $(git -C KernelSU rev-list --count HEAD) + 700))
+  ksu_tag=$(git -C KernelSU describe --abbrev=0 --tags 2>/dev/null || true)
+else
+  ksu_version=$(grep -o 'KSU_VERSION=[0-9]*' KernelSU/kernel/Makefile | head -n1 | cut -d= -f2)
+  ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
+fi
 
-log "Applying xxKSU patches"
-for p in "$ROOT"/patches/kernelsu/*.patch; do
-  echo "  $(basename "$p")"
-  git -C KernelSU apply --whitespace=nowarn "$p"
-  applied+=("kernelsu/$(basename "$p")")
-done
+if [[ "$ROOT_FLAVOR" == xxksu ]]; then
+  log "Applying xxKSU patches"
+  for p in "$ROOT"/patches/kernelsu/*.patch; do
+    echo "  $(basename "$p")"
+    git -C KernelSU apply --whitespace=nowarn "$p"
+    applied+=("kernelsu/$(basename "$p")")
+  done
+fi
 ln -sfn ../KernelSU/kernel drivers/kernelsu
 
-log "Hook style: $KSU_HOOK"
-if [[ "$KSU_HOOK" != manual ]]; then
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+  log "Hook style: BakaSU SUSFS inline hooks"
+  applied+=("hook style: BakaSU SUSFS inline (kernel calls BakaSU directly, next to the SUSFS hooks)")
+elif [[ "$KSU_HOOK" != manual ]]; then
+  log "Hook style: $KSU_HOOK"
   # xxKSU hooks these syscalls itself; skip the kernel's own calls to it.
   echo "  hooks/0001-hookless-skip-parent-hooks.patch"
   git apply "$ROOT/patches/hooks/0001-hookless-skip-parent-hooks.patch"
   applied+=("hooks/0001-hookless-skip-parent-hooks.patch ($KSU_HOOK)")
 else
+  log "Hook style: manual"
   applied+=("hook style: manual (kernel calls xxKSU directly)")
 fi
 
@@ -182,6 +201,7 @@ if [[ "$NOMOUNT_MODE" == integrate ]]; then
   } > fs/nomount/Makefile
   grep -q 'obj-\$(CONFIG_NOMOUNT)' fs/nomount/Makefile
   grep -q 'fs/nomount/Kconfig' fs/Kconfig || sed -i 's|^source "fs/Kconfig.susfs"$|&\nsource "fs/nomount/Kconfig"|' fs/Kconfig
+  grep -q 'fs/nomount/Kconfig' fs/Kconfig || sed -i 's|^source "fs/unicode/Kconfig"$|&\nsource "fs/nomount/Kconfig"|' fs/Kconfig
   grep -q 'fs/nomount/Kconfig' fs/Kconfig || { echo "Could not add NoMount to fs/Kconfig" >&2; exit 1; }
   grep -q 'nomount/' fs/Makefile || echo 'obj-$(CONFIG_NOMOUNT) += nomount/' >> fs/Makefile
   rm -rf -- "$nm_up"
@@ -203,7 +223,7 @@ printf '%s\n' "${applied[@]}" > "$INFO_DIR/applied-patches.txt"
 
 export kernel_sha kernel_date kernel_subject kernel_version kernel_branch ksu_branch susfs_branch susfs_sha susfs_patch_date susfs_version
 export ksu_sha ksu_date ksu_subject ksu_version ksu_tag nomount_sha NOMOUNT_MODE NOMOUNT_REF NOMOUNT_REPO
-export KERNEL_REPO KERNEL_REF KSU_REPO KSU_REF SUSFS_REPO SUSFS_REF SUSFS_PATCH
+export KERNEL_SOURCE ROOT_NAME KERNEL_REPO KERNEL_REF KSU_REPO KSU_REF SUSFS_REPO SUSFS_REF SUSFS_PATCH
 python3 - "$INFO_DIR/sources.json" <<'EOF'
 import json, os, sys
 e = os.environ
@@ -211,7 +231,10 @@ data = {
     "kernel": {"repo": e["KERNEL_REPO"], "ref": e["KERNEL_REF"], "commit": e["kernel_sha"],
                "date": e["kernel_date"], "subject": e["kernel_subject"],
                "version": e["kernel_version"], "branch": e["kernel_branch"]},
-    "xxksu": {"repo": e["KSU_REPO"], "ref": e["KSU_REF"], "commit": e["ksu_sha"],
+    "source": e["KERNEL_SOURCE"],
+    "root": e["ROOT_NAME"],
+    # "xxksu" = the root module of this kernel (xxKSU or BakaSU, see "root").
+    "xxksu": {"name": e["ROOT_NAME"], "repo": e["KSU_REPO"], "ref": e["KSU_REF"], "commit": e["ksu_sha"],
               "date": e["ksu_date"], "subject": e["ksu_subject"],
               "ksu_version": e["ksu_version"], "tag": e["ksu_tag"], "branch": e["ksu_branch"]},
     "susfs": {"repo": e["SUSFS_REPO"], "ref": e["SUSFS_REF"], "commit": e["susfs_sha"],
