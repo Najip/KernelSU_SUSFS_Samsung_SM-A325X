@@ -133,7 +133,7 @@ name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-${KERNEL_SOURCE:-mzggr}-k${
   echo "xxKSU hook style: ${KSU_HOOK:-}"
   echo "Performance tuning kernel: ${PERF_TUNING:-false}"
   echo "Kernel sources used:"
-  python3 -c "import json;d=json.load(open('$INFO_DIR/sources.json'));[print(f'  {k}: {v[\"repo\"]} @ {v[\"commit\"]}') for k,v in d.items()]"
+  python3 -c "import json;d=json.load(open('$INFO_DIR/sources.json'));[print(f'  {k}: {v[\"repo\"]} @ {v[\"commit\"]}') for k,v in d.items() if isinstance(v,dict)]"
   [[ -n "${GITHUB_RUN_ID:-}" ]] && echo "Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 } > "$artifacts/build-info.txt"
 cp "$artifacts/build-info.txt" "$mod/build-info.txt"

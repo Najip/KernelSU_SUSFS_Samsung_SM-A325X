@@ -374,7 +374,7 @@ jobs:
             echo "Built for kernel release: $KERNEL_RELEASE"
             echo "Performance tuning kernel: $PERF_TUNING"
             echo "Kernel sources used:"
-            python3 -c "import json;d=json.load(open('$INFO_DIR/sources.json'));[print(f'  {k}: {v[\"repo\"]} @ {v[\"commit\"]}') for k,v in d.items()]"
+            python3 -c "import json;d=json.load(open('$INFO_DIR/sources.json'));[print(f'  {k}: {v[\"repo\"]} @ {v[\"commit\"]}') for k,v in d.items() if isinstance(v,dict)]"
             echo "Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } > "$ARTIFACTS/build-info.txt"
           cp "$ARTIFACTS/build-info.txt" "$mod/build-info.txt"
