@@ -1,5 +1,5 @@
 name: Build Kernel
-run-name: ${{ inputs.release_type == 'Release from pre-release' && format('A325X publish {0} as Release', inputs.pre_release != '' && inputs.pre_release || 'the newest pre-release') || '' }}${{ inputs.release_type != 'Release from pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X BakaSU + SUSFS kernel')) || '' }} (Aigis)${{ inputs.bakasu_branch != '' && inputs.bakasu_branch != 'main' && format(' (BakaSU {0})', inputs.bakasu_branch) || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.reuse != '' && ' (upstream)' || '' }}${{ format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.release_type == 'Release from pre-release' && format('A325X publish {0} as Release', inputs.pre_release != '' && inputs.pre_release || 'the newest pre-release') || '' }}${{ inputs.release_type != 'Release from pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X BakaSU + SUSFS kernel')) || '' }} (Aigis)${{ inputs.bakasu_branch != '' && inputs.bakasu_branch != 'main' && format(' (BakaSU {0})', inputs.bakasu_branch) || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ startsWith(inputs.reuse, '{') && ' (upstream)' || '' }}${{ inputs.reuse != '' && !startsWith(inputs.reuse, '{') && ' (reused run)' || '' }}${{ format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (Aigis kernel, BakaSU, SUSFS patch, NoMount) is downloaded fresh during the run.
@@ -126,9 +126,11 @@ jobs:
           if [[ -n "$REUSE" ]]; then
             [[ "$MODE" == Latest && "$NM_ONLY" != true && "$NOMOUNT_MODE" == lkm ]] \
               || fail "reuse needs commit mode Latest, NoMount lkm and NoMount only unticked."
-            [[ "$TYPE" == CI || "$TYPE" == Pre-release ]] || fail "reuse can only make a CI build or a Pre-release."
+            [[ "$TYPE" == CI || "$TYPE" == Pre-release || "$TYPE" == Release ]] \
+              || fail "reuse can make a CI build, a Pre-release or a Release (not Release from pre-release: that one takes no run)."
           fi
-          if [[ "$TYPE" == Release && "$MODE" != Verified ]]; then
+          # Release: Verified commits, or the tested files of an earlier run (reuse).
+          if [[ "$TYPE" == Release && "$MODE" != Verified && -z "$REUSE" ]]; then
             fail "Release must use Verified. Latest and Promoted can publish a Pre-release, which can then become the full Release with 'Release from pre-release'."
           fi
           if [[ "$TYPE" == 'Release from pre-release' ]]; then
@@ -624,9 +626,11 @@ jobs:
           fetch-depth: 1
 
       - name: Check the release is allowed
+        env:
+          REUSE: ${{ inputs.reuse }}
         run: |
           set -euo pipefail
-          if [[ "${{ inputs.release_type }}" == Release && "${{ inputs.commit_mode }}" != Verified ]]; then
+          if [[ "${{ inputs.release_type }}" == Release && "${{ inputs.commit_mode }}" != Verified && -z "$REUSE" ]]; then
             echo "::error::Release must use Verified. Latest and Promoted can publish a Pre-release, which can then become the full Release with 'Release from pre-release'."
             exit 1
           fi

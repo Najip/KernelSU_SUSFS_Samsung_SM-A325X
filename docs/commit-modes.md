@@ -22,7 +22,7 @@ How `Promoted` gets the NoMount module:
 
 With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The kernel options are ignored in `Promoted`; they come from the `Latest` run.
 
-Building a full `Release` directly (release type `Release`) needs commit mode `Verified`; with `Latest` or `Promoted` it stops with "Release must use Verified". Publish a `Pre-release` instead and turn it into the Release as below.
+Building a full `Release` directly (release type `Release`) needs commit mode `Verified`; with `Latest` or `Promoted` it stops with "Release must use Verified". Two ways around it: publish a `Pre-release` and turn it into the Release as below, or run `Latest` + `Release` with a tested run's link in the **reuse** box (its kernel is published as the Release, no new kernel build).
 
 **Release from pre-release** (no build): test first, then publish exactly what you flashed. Any pre-release works, also one built with `Latest` (for example an automatic upstream pre-release) that was never Verified.
 
