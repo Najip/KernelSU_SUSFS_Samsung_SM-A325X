@@ -29,7 +29,8 @@
 | `scripts/bakasu_manager.py` | Finds the BakaSU Build Manager run of the BakaSU commit and downloads its APK |
 | `scripts/kernel_kit.py` | Kernel kit key, lookup and download |
 | `scripts/kernel_id.sh` | Kernel ID that the flasher uses to check the NoMount module |
-| `anykernel/nomount-check.sh`, `anykernel/valhall-install.sh` | Flasher steps added after the kernel is written (NoMount check/install, Valhall drivers module) |
+| `anykernel/nomount-check.sh`, `anykernel/valhall-install.sh`, `anykernel/jpeg-bbr-install.sh` | Flasher steps added after the kernel is written (NoMount check/install, Valhall drivers module, JPEG + BBR fix module) |
+| `anykernel/jpeg-bbr/` | The JPEG + BBR fix module (by Juan, LumiROM) that every kernel ZIP installs |
 | `configs/nomount-integrate.config` | Turns on NoMount built into the kernel (`integrate`) |
 | `configs/` | Config fragments merged after the tree's own fragments |
 | `docs/` | These pages (the README sources table is the only part updated automatically) |
