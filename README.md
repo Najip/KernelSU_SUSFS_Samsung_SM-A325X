@@ -27,7 +27,7 @@ Details: [Kernel details](docs/kernels.md).
 This table is refreshed automatically each time a full Release is published (the one below is from the last xxKSU release until the first BakaSU Release).
 
 <!-- SOURCES:START -->
-Last release: [build-20261123-112](../../releases/tag/build-20261123-112)
+Last release: [build-20261123-115](../../releases/tag/build-20261123-115)
 
 | Part | Used by | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|---|
