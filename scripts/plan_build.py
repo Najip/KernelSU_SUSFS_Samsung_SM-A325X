@@ -12,8 +12,10 @@ Environment (set by the workflow's pick job):
                  "run": <run id or run link>}: kernel = build it; nomount = keep
                  the kernel files of that run and build only NoMount (from its
                  kernel kit); reuse = keep all its files.
-                 By hand also just a run link or number (= nomount for every
-                 kernel), or "all <run link>" (= reuse).
+                 By hand also just a run link or number (= auto: keep the
+                 kernel, and keep its NoMount module too when it has one from
+                 the chosen NoMount branch, else build one), "nomount <run link>"
+                 (always build a new NoMount) or "all <run link>" (= auto).
   NOMOUNT_MODE, NOMOUNT_REF, NETWORK_FIX,
   VALHALL_GPU, AIGIS_COMPILER, BRANCH
 
@@ -102,14 +104,14 @@ def parse_reuse(text, sources, repo):
             if v.get("run"):
                 v["run"] = run_of(v["run"], repo)
         return plan
-    mode = "nomount"
+    mode = "auto"
     word = text.split()[0].lower()
-    if word in ("all", "reuse", "nomount"):
-        mode = "reuse" if word in ("all", "reuse") else "nomount"
+    if word in ("all", "reuse", "auto", "nomount"):
+        mode = "nomount" if word == "nomount" else "auto"
         text = text[len(word):]
     rid = run_of(text, repo)
-    summary("reuse: " + ("keep all files" if mode == "reuse" else "keep the kernel, build a new NoMount module")
-            + f" of run {rid}")
+    summary(f"reuse: keep the kernel of run {rid}, " + ("build a new NoMount module" if mode == "nomount"
+            else "and its NoMount module when it fits (else build one)"))
     return {src: {"mode": mode, "run": rid} for src in sources}
 
 
@@ -164,7 +166,7 @@ def main():
         kept = {}
         for src in sources:
             want = reuse.get(src, {"mode": "kernel"})
-            if want["mode"] in ("nomount", "reuse"):
+            if want["mode"] in ("nomount", "reuse", "auto"):
                 # Upstream check: this kernel had no update; keep its files.
                 rid = str(want["run"])
                 subprocess.check_call([sys.executable, str(SCRIPTS / "promoted_source.py"), "download", rid, f"source-{src}"],
@@ -173,6 +175,12 @@ def main():
                 if not info.get("kernel_release"):
                     fail(f"Run {rid} has no {src} kernel files left; build it instead.")
                 build_nm = want["mode"] == "nomount"
+                if want["mode"] == "auto":
+                    # Keep the run's NoMount module when it has one from the chosen branch.
+                    has = info.get("has_nomount") == "true" and info.get("nomount_branch") == nomount_ref
+                    build_nm = nomount_mode == "lkm" and not has
+                    summary(f"{src}: run {rid} " + (f"has a NoMount {nomount_ref} module, kept" if has else
+                            f"has no NoMount {nomount_ref} module (it has: {info.get('nomount_branch') or 'none'}), building one"))
                 kit = run(["kernel_kit.py", "in-run", rid], KERNEL_SOURCE=src).get("kit_id", "") if build_nm else ""
                 kept[src] = rid
                 entries.append({
