@@ -11,7 +11,7 @@
    - **BakaSU branch**: `main` by default. The run stops if Baka-SU/BakaSU has no such branch.
    - **Valhall GPU** and **Compiler**: see [Kernel details](kernels.md).
    - **uname tag**: `-forkby-gh.Najip` by default, added to the end of `uname -r`. Letters, digits, space and `. _ + -` only (no `/`, the release name is also a folder name). Clear it for the kernel's own name. `bpfloader`, `netbpfload` and `netd` still see the fixed fake version, so networking is not affected. A NoMount module must be built with the same tag.
-   - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
+   - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix (by Juan, LumiROM). Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](commit-modes.md).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, `Release` publishes a full release, (only with commit mode `Verified`), and `Release from pre-release` turns a pre-release into the full Release without building (any pre-release, Verified or not). Both attach the NoMount module built in the same run (see [Commit modes and releases](commit-modes.md)).
    - **NoMount**: `lkm` by default: the module built for this exact kernel goes inside the kernel ZIP (folder `nomount/`, installed by TWRP) and is also kept as a separate module (`NoMount-...-aigis-bakasu-....zip` and `nomount-4.14-aigis-bakasu.ko`). `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`). There is no kernel-only choice.

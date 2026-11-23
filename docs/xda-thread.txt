@@ -28,7 +28,7 @@ A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [*][B]BakaSU[/B] (KernelSU fork for non-GKI kernels), SUSFS inline hooks
 [*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
 [*][B]NoMount[/B] by maxsteeel, installed by the kernel ZIP (or built in)
-[*]Network fix (UDP GSO), no LTO
+[*]Network fix (UDP GSO) by Juan (LumiROM), no LTO
 [*]JPEG + BBR fix by Juan (LumiROM): fixes blank JPEG photos in Telegram and other apps on One UI 9 ports, keeps TCP on BBR (a small module installed by the kernel ZIP)
 [/LIST]
 [B]Why BakaSU now?[/B] Until 22 Nov 2026 this kernel used xxKSU (backslashxx). Its developer archived xxKSU on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. I switched to BakaSU, which is actively developed. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped. Old xxKSU builds stay on the releases page.
@@ -117,7 +117,7 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 [*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
 [*]maxsteeel for NoMount and lkmloader
 [*]osm0sis for AnyKernel3
-[*]Juan (LumiROM) for the network fix, the mzggr tuning (earlier builds) and the JPEG + BBR fix
+[*]Juan (LumiROM) for the network fix (UDP GSO), the mzggr tuning (earlier builds) and the JPEG + BBR fix
 [*]Perplexity Computer for helping build the kernel and its pipeline
 [/LIST]
 
