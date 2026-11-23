@@ -13,9 +13,9 @@ The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
 Recommended modules:
 
 - [BRENE](https://github.com/rrr333nnn333/BRENE): the SUSFS userspace module I recommend. It keeps up with simonpunk's SUSFS.
-- [HMA-OSS](https://github.com/frknkrc44/HMA-OSS): hides your app list; use it as the userspace side of the SUSFS priority UID filter.
+- [HMA-OSS](https://github.com/frknkrc44/HMA-OSS): needed for BRENE's app hiding. BRENE's "Hide third party apps" (on by default) and "Hide all apps with uid >= 10000" options give the kernel the list of apps through the SUSFS priority UID filter (`susfs set_priority_uid_filter`); HMA-OSS does the userspace side, as BRENE notes next to those options.
 - BakaSU's built-in SUSFS settings work on their own, but turn them off when you use BRENE so the two do not conflict.
-- Not recommended: sidex15's susfs4ksu-module. It is not updated often and does not work with the latest SUSFS (simonpunk's or JackA1ltman's 4.14 port).
+- Not recommended: sidex15's susfs4ksu-module. It is not updated often and does not work with the latest SUSFS (simonpunk's or JackA1ltman's 4.14 port). Installing BRENE disables it (and susfs_manager, ReSuSFS); better remove it.
 
 After writing the kernel, the ZIP also checks your modules (when `/data` is mounted and decrypted):
 

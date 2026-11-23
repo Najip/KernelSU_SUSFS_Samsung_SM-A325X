@@ -8,7 +8,7 @@
 [*]xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. New builds use [URL='https://github.com/Baka-SU/BakaSU']BakaSU[/URL] (actively developed KernelSU fork, SUSFS inline hooks) on the Aigis kernel.
 [*]The Alt. kernel (mzggr) is dropped: it was xxKSU-only and is not developed anymore.
 [*]Use the BakaSU manager app from the release, and uninstall the old xxKSU manager. The kernel ZIP now installs the matching NoMount module by itself.
-[*]Recommended modules updated: BRENE for SUSFS (turn off BakaSU's built-in SUSFS settings when you use it), HMA-OSS for the SUSFS priority UID filter. sidex15's susfs4ksu-module is not recommended.
+[*]Recommended modules updated: BRENE for SUSFS (turn off BakaSU's built-in SUSFS settings when you use it), HMA-OSS for BRENE's app hiding (SUSFS priority UID filter). sidex15's susfs4ksu-module is not recommended.
 [*]The first BakaSU builds come as pre-releases; a full release follows after I test it. Old xxKSU releases stay on the releases page, without updates.
 [/LIST]
 
@@ -27,7 +27,7 @@
 [B]Recommended modules[/B]
 [LIST]
 [*]SUSFS userspace: [URL='https://github.com/rrr333nnn333/BRENE']BRENE[/URL]. Turn off BakaSU's built-in SUSFS settings when you use it.
-[*]SUSFS priority UID filter: [URL='https://github.com/frknkrc44/HMA-OSS']HMA-OSS[/URL].
+[*][URL='https://github.com/frknkrc44/HMA-OSS']HMA-OSS[/URL]: needed for BRENE's app hiding (BRENE sets the SUSFS priority UID filter, HMA-OSS does the userspace side).
 [*]NoMount: installed by the kernel ZIP; the separate NoMount ZIP is in the same release.
 [*]Not recommended: sidex15's susfs4ksu-module (not updated often, does not work with the latest SUSFS).
 [/LIST]

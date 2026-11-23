@@ -73,10 +73,10 @@ No, use the BakaSU manager from the release. Other managers do not match this ke
 [B]Which SUSFS modules should I use?[/B]
 [LIST]
 [*][B]BRENE[/B] ([URL='https://github.com/rrr333nnn333/BRENE']rrr333nnn333/BRENE[/URL]): the recommended SUSFS userspace module. It keeps up with simonpunk's SUSFS, so it matches the SUSFS in this kernel.
-[*][B]HMA-OSS[/B] ([URL='https://github.com/frknkrc44/HMA-OSS']frknkrc44/HMA-OSS[/URL]): hides your app list. Use it as the userspace side of the SUSFS priority UID filter.
+[*][B]HMA-OSS[/B] ([URL='https://github.com/frknkrc44/HMA-OSS']frknkrc44/HMA-OSS[/URL]): needed for BRENE's app hiding. BRENE's "Hide third party apps" (on by default) and "Hide all apps with uid >= 10000" options give the kernel the apps to hide through the SUSFS priority UID filter; HMA-OSS does the userspace side (BRENE says so next to those options).
 [*][B]BakaSU's built-in SUSFS settings[/B]: usable on their own, but [B]turn them off when you use BRENE[/B], so the two do not conflict.
 [/LIST]
-[COLOR=rgb(226, 80, 65)][B]Not recommended: sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not updated often and does not work with the latest SUSFS (neither simonpunk's nor JackA1ltman's 4.14 port). If it is installed, remove it in the BakaSU manager, reboot, then install BRENE.
+[COLOR=rgb(226, 80, 65)][B]Not recommended: sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not updated often and does not work with the latest SUSFS (neither simonpunk's nor JackA1ltman's 4.14 port). BRENE disables it (and other SUSFS modules) when you install BRENE; better remove it in the BakaSU manager.
 
 [B]Release or pre-release?[/B]
 Releases are tested by me on my phone. Pre-releases are built automatically when an upstream source changes and are not tested yet.
