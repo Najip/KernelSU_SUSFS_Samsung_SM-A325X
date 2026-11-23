@@ -1,19 +1,19 @@
 {
   "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
-  "checked": "2026-11-23T14:39:12Z",
+  "checked": "2026-11-23T19:50:28Z",
   "sources": {
     "aigis": {
-      "commit": "a1c5a25de5a21a5806c431a69c2fbeacb7502b75",
-      "date": "2026-11-23T14:24:14Z",
-      "subject": "Fix: kernel panic regression caused by null deref",
+      "commit": "a4a77c638ab809bbe299a18858706afff8c3cadd",
+      "date": "2026-11-23T16:23:23Z",
+      "subject": "chore: bump KernelSU to de80463b [skip ci]",
       "name": "Aigis kernel",
       "repo": "https://github.com/SlamZDank/Aigis-Kernel-A32",
       "branch": "bpf-5.15-legion"
     },
     "bakasu": {
-      "commit": "bc8224d043fda63dd9ebce2f9caa5466610f7286",
-      "date": "2026-11-23T14:21:28Z",
-      "subject": "manager: request ACCESS_LOCAL_NETWORK on Android 17 (#669)",
+      "commit": "57b2db6076f439cfd489f14576444e8f0f2f0a25",
+      "date": "2026-11-23T16:53:36Z",
+      "subject": "manager: update translations from Weblate (#673)",
       "name": "BakaSU",
       "repo": "https://github.com/Baka-SU/BakaSU",
       "branch": "main"
@@ -37,6 +37,23 @@
     }
   },
   "history": [
+    {
+      "found": "2026-11-23T19:50:28Z",
+      "changed": [
+        "bakasu"
+      ],
+      "commits": {
+        "bakasu": "57b2db6076f439cfd489f14576444e8f0f2f0a25"
+      },
+      "build": {
+        "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45253112230",
+        "plan": {
+          "aigis-bakasu": {
+            "mode": "kernel"
+          }
+        }
+      }
+    },
     {
       "found": "2026-11-23T14:39:12Z",
       "changed": [
@@ -159,17 +176,17 @@
       "date": "2026-11-22T15:56:39Z"
     },
     "aigis-bakasu-kernel": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45196525994",
-      "date": "2026-11-23T14:39:16Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45253112230",
+      "date": "2026-11-23T19:50:32Z"
     },
     "aigis-bakasu-nomount": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45196525994",
-      "date": "2026-11-23T14:39:16Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45253112230",
+      "date": "2026-11-23T19:50:32Z"
     }
   },
   "last_build": {
-    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45196525994",
-    "date": "2026-11-23T14:39:16Z",
+    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45253112230",
+    "date": "2026-11-23T19:50:32Z",
     "plan": {
       "aigis-bakasu": {
         "mode": "kernel"
