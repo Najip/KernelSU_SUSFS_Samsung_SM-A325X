@@ -703,10 +703,10 @@ jobs:
           tag="$prefix-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
           echo "TAG=$tag" >> "$GITHUB_ENV"
           scripts/release_body.sh release "$prefix" "${{ inputs.release_type }}" "$tag" notes.md
-          # Full Release: also a ready-to-paste XDA changelog post (BBCode).
+          # Full Release: also ready-to-paste XDA posts #2 (changelog) and #3 (updates), BBCode.
           if [[ "${{ inputs.release_type }}" == Release ]]; then
-            python3 scripts/xda_changelog.py notes.md "$tag" \
-              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "release/XDA-changelog-$tag.txt"
+            python3 scripts/xda_posts.py notes.md "$tag" \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "release/XDA-posts-$tag.txt"
           fi
 
       - name: Publish release
@@ -719,7 +719,7 @@ jobs:
           done
           [[ -n "$name" ]] || { echo "::error::No kernel ZIP in the release."; exit 1; }
           shopt -s nullglob
-          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-changelog-*.txt)
+          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-posts-*.txt)
           # Create the tag first, then the release without --target. With --target,
           # GitHub wants the "workflows" permission (which this token cannot get)
           # when workflow files changed on the branch after this commit: HTTP 403
@@ -794,9 +794,9 @@ jobs:
           set -euo pipefail
           scripts/release_body.sh release "$PREFIX" Release "$TAG" notes.md
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest --notes-file notes.md
-          python3 scripts/xda_changelog.py notes.md "$TAG" \
-            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "XDA-changelog-$TAG.txt"
-          gh release upload "$TAG" "XDA-changelog-$TAG.txt" --repo "$GITHUB_REPOSITORY" --clobber
+          python3 scripts/xda_posts.py notes.md "$TAG" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "XDA-posts-$TAG.txt"
+          gh release upload "$TAG" "XDA-posts-$TAG.txt" --repo "$GITHUB_REPOSITORY" --clobber
           echo "### Published $TAG as the full Release" >> "$GITHUB_STEP_SUMMARY"
           echo "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 

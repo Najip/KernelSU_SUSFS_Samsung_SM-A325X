@@ -6,9 +6,16 @@
 
 1. Back up your current `boot` partition.
 2. Flash the kernel ZIP with a custom recovery (TWRP / OrangeFox) or an AnyKernel3 flasher app.
-3. Reboot, install the BakaSU manager app (`BakaSU_...apk` on the same release page), and install a SUSFS userspace module if you want to configure SUSFS.
+3. Reboot, install the BakaSU manager app (`BakaSU_...apk` on the same release page), and install the modules below if you want them.
 
 The ZIP only replaces the kernel inside `boot` and keeps your ramdisk.
+
+Recommended modules:
+
+- [BRENE](https://github.com/rrr333nnn333/BRENE): the SUSFS userspace module I recommend. It keeps up with simonpunk's SUSFS.
+- [HMA-OSS](https://github.com/frknkrc44/HMA-OSS): hides your app list; use it as the userspace side of the SUSFS priority UID filter.
+- BakaSU's built-in SUSFS settings work on their own, but turn them off when you use BRENE so the two do not conflict.
+- Not recommended: sidex15's susfs4ksu-module. It is not updated often and does not work with the latest SUSFS (simonpunk's or JackA1ltman's 4.14 port).
 
 After writing the kernel, the ZIP also checks your modules (when `/data` is mounted and decrypted):
 
