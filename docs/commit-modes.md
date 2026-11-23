@@ -7,7 +7,7 @@ Every build picks the commits of the kernel, BakaSU and the SUSFS patch in one o
 | Mode | What it builds | When to use it |
 |---|---|---|
 | `Latest` (default) | The newest commit of each source. | Trying out new upstream changes. |
-| `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. Release type `Release` (build and publish in one run) only works in this mode; `Release from pre-release` does not need it. |
+| `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. No release type needs it. |
 | `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
 
 The pins were reset when I switched to BakaSU (23 Nov 2026), because the old ones were for xxKSU. Until the first `Promoted` run after that, `Verified` stops with "No verified commits yet": run `Latest`, test it, then `Promoted`.
@@ -22,7 +22,7 @@ How `Promoted` gets the NoMount module:
 
 With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The kernel options are ignored in `Promoted`; they come from the `Latest` run.
 
-Building a full `Release` directly (release type `Release`) needs commit mode `Verified`; with `Latest` or `Promoted` it stops with "Release must use Verified". Two ways around it: publish a `Pre-release` and turn it into the Release as below, or run `Latest` + `Release` with a tested run's link in the **reuse** box (its kernel is published as the Release, no new kernel build).
+A full `Release` (release type `Release`) can be built and published in one run with any commit mode (`Latest`, `Verified` or `Promoted`); Verified is not required. To publish exactly what you already tested, use `Latest` + `Release` with the tested run's link in the **reuse** box (no new kernel build), or turn a pre-release into the Release as below.
 
 **Release from pre-release** (no build): test first, then publish exactly what you flashed. Any pre-release works, also one built with `Latest` (for example an automatic upstream pre-release) that was never Verified.
 

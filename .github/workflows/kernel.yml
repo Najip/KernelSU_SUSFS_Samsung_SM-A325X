@@ -55,7 +55,7 @@ on:
         type: boolean
         default: false
       commit_mode:
-        description: 'Which commits to use. Latest = newest of every source (testing). Verified = the pinned commits saved by Promoted (required for release type Release; Release from pre-release takes any pre-release). Promoted = no kernel rebuild: take the newest Latest run with the default kernel options and save its commits as Verified'
+        description: 'Which commits to use. Latest = newest of every source (testing). Verified = the pinned commits saved by Promoted (not required for any release type). Promoted = no kernel rebuild: take the newest Latest run with the default kernel options and save its commits as Verified'
         type: choice
         options:
           - Latest
@@ -63,7 +63,7 @@ on:
           - Promoted
         default: Latest
       release_type:
-        description: 'CI = build only, no release. Pre-release = publish as a pre-release. Release = publish a full release (only allowed with Verified) and update the README sources table. Release from pre-release = no build: turn a pre-release into the full Release (same ZIPs you tested, any commit mode, Verified not needed). Which one: the Pre-release tag box, empty = newest'
+        description: 'CI = build only, no release. Pre-release = publish as a pre-release. Release = publish a full release (any commit mode) and update the README sources table. Release from pre-release = no build: turn a pre-release into the full Release (same ZIPs you tested, any commit mode, Verified not needed). Which one: the Pre-release tag box, empty = newest'
         type: choice
         options:
           - CI
@@ -129,10 +129,7 @@ jobs:
             [[ "$TYPE" == CI || "$TYPE" == Pre-release || "$TYPE" == Release ]] \
               || fail "reuse can make a CI build, a Pre-release or a Release (not Release from pre-release: that one takes no run)."
           fi
-          # Release: Verified commits, or the tested files of an earlier run (reuse).
-          if [[ "$TYPE" == Release && "$MODE" != Verified && -z "$REUSE" ]]; then
-            fail "Release must use Verified. Latest and Promoted can publish a Pre-release, which can then become the full Release with 'Release from pre-release'."
-          fi
+          # Release works with every commit mode (Verified is not required).
           if [[ "$TYPE" == 'Release from pre-release' ]]; then
             [[ "$NM_ONLY" != true ]] || fail "NoMount only builds are not released. Untick NoMount only."
             echo "No build: ${PRE_RELEASE:-the newest pre-release} becomes the full Release (commit mode is not checked)."
@@ -636,10 +633,6 @@ jobs:
           REUSE: ${{ inputs.reuse }}
         run: |
           set -euo pipefail
-          if [[ "${{ inputs.release_type }}" == Release && "${{ inputs.commit_mode }}" != Verified && -z "$REUSE" ]]; then
-            echo "::error::Release must use Verified. Latest and Promoted can publish a Pre-release, which can then become the full Release with 'Release from pre-release'."
-            exit 1
-          fi
           echo "Publishing a ${{ inputs.release_type }} from commit mode ${{ inputs.commit_mode }}."
 
       - name: Download release files
