@@ -27,14 +27,14 @@ Details: [Kernel details](docs/kernels.md).
 This table is refreshed automatically each time a full Release is published (the one below is from the last xxKSU release until the first BakaSU Release).
 
 <!-- SOURCES:START -->
-Last release: [build-20261123-115](../../releases/tag/build-20261123-115)
+Last release: [build-20261123-122](../../releases/tag/build-20261123-122)
 
 | Part | Used by | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|---|
-| Kernel | Main kernel: Aigis (BakaSU) | [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32) | `bpf-5.15-legion`, Linux 4.14.357 | [`7f383c749dc5`](https://github.com/SlamZDank/Aigis-Kernel-A32/commit/7f383c749dc5d6d7bcd6b19e0df15fbe44128f55) | 2026-11-22 |
-| BakaSU (root) | Main kernel: Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | `main`, KSU_VERSION 35282, tag v4.2.0-rc3 | [`63ad1ea3a904`](https://github.com/Baka-SU/BakaSU/commit/63ad1ea3a90455dee9d77163cdafb028d8a90416) | 2026-11-23 |
+| Kernel | Main kernel: Aigis (BakaSU) | [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32) | `bpf-5.15-legion`, Linux 4.14.357 | [`a4a77c638ab8`](https://github.com/SlamZDank/Aigis-Kernel-A32/commit/a4a77c638ab809bbe299a18858706afff8c3cadd) | 2026-11-23 |
+| BakaSU (root) | Main kernel: Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | `main`, KSU_VERSION 35285, tag v4.2.0-rc3 | [`57b2db6076f4`](https://github.com/Baka-SU/BakaSU/commit/57b2db6076f439cfd489f14576444e8f0f2f0a25) | 2026-11-24 |
 | SUSFS patch | Main kernel: Aigis (BakaSU) | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`ec069a4e34f9`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/ec069a4e34f992d602a6b40d2e211df2516e2865) | 2026-11-18 |
-| BakaSU manager app | Main kernel: Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | Actions build [Build Manager #3774](https://github.com/Baka-SU/BakaSU/actions/runs/45080730197), `BakaSU_v4.2.0-rc3_35282-arm64-v8a-release.apk` | [`63ad1ea3a904`](https://github.com/Baka-SU/BakaSU/commit/63ad1ea3a90455dee9d77163cdafb028d8a90416) | 2026-11-22 |
+| BakaSU manager app | Main kernel: Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | Actions build [Build Manager #3786](https://github.com/Baka-SU/BakaSU/actions/runs/45221593387), `BakaSU_v4.2.0-rc3_35285-arm64-v8a-release.apk` | [`57b2db6076f4`](https://github.com/Baka-SU/BakaSU/commit/57b2db6076f439cfd489f14576444e8f0f2f0a25) | 2026-11-23 |
 <!-- SOURCES:END -->
 
 Other parts (pinned in this repo):
