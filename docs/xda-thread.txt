@@ -29,6 +29,7 @@ A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
 [*][B]NoMount[/B] by maxsteeel, installed by the kernel ZIP (or built in)
 [*]Network fix (UDP GSO), no LTO
+[*]JPEG + BBR fix by Juan (LumiROM): fixes blank JPEG photos in Telegram and other apps on One UI 9 ports, keeps TCP on BBR (a small module installed by the kernel ZIP)
 [/LIST]
 [B]Why BakaSU now?[/B] Until 22 Nov 2026 this kernel used xxKSU (backslashxx). Its developer archived xxKSU on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. I switched to BakaSU, which is actively developed. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped. Old xxKSU builds stay on the releases page.
 Tested on: SM-A325F, LumiROM 9 (Android 17). Other A325 models and ROMs should work but are not tested by me.
@@ -51,7 +52,7 @@ Each release has:
 [LIST=1]
 [*]Unlocked bootloader and TWRP or OrangeFox are required.
 [*][B]Back up your current boot partition[/B] in recovery (Backup > Boot). This is your way back.
-[*]Flash the kernel ZIP ([ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]) in recovery. It also installs the matching NoMount module.
+[*]Flash the kernel ZIP ([ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]) in recovery. It also installs the matching NoMount module and the JPEG + BBR fix module.
 [*]Reboot and install the BakaSU manager app from the same release.
 [*]Coming from my xxKSU kernel: uninstall the old xxKSU manager app, then check your modules and root apps in the BakaSU manager.
 [/LIST]
@@ -116,6 +117,7 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 [*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
 [*]maxsteeel for NoMount and lkmloader
 [*]osm0sis for AnyKernel3
+[*]Juan (LumiROM) for the network fix, the mzggr tuning (earlier builds) and the JPEG + BBR fix
 [/LIST]
 
 [B]Kernel version:[/B] 4.14.357

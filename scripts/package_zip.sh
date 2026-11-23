@@ -73,6 +73,10 @@ sed -e "s|@KERNEL_ID@|$kernel_id|" -e "s|@KERNEL_RELEASE@|$release|" -e "s|@NOMO
   "$ROOT/anykernel/nomount-check.sh" > "$work/nomount-check.sh"
 add_after_boot "$work/nomount-check.sh"
 grep -q '^nomount_check;' "$ak3/anykernel.sh"
+# Every zip: the JPEG + BBR fix module (by Juan, LumiROM).
+cp -r "$ROOT/anykernel/jpeg-bbr" "$ak3/jpeg-bbr"
+add_after_boot "$ROOT/anykernel/jpeg-bbr-install.sh"
+grep -q '^jpeg_bbr_install;' "$ak3/anykernel.sh"
 dtb_line="not included (the phone's current dtb is kept)"
 if [[ -n "${AK3_DTB_BOOTIMG:-}" ]]; then
   bootimg="$work/dtb-source-boot.img"
@@ -104,6 +108,7 @@ fi
   echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 with Aigis GPU tuning' || echo 'stock A32 Bifrost r25p0')"
   echo "dtb: $dtb_line"
   [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
+  echo "JPEG + BBR fix module (by Juan, LumiROM): installed to /data/adb/modules/a32-jpeg-bbr"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
   echo "BakaSU hook style: SUSFS inline hooks (compile-time calls inside the kernel functions)"
   echo "NoMount: $nomount_line"
@@ -124,6 +129,7 @@ unzip -p "$zip_path" Image | cmp - "$IMAGE"
 [[ -n "${AK3_FROM_TREE:-}" ]] || unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
+unzip -l "$zip_path" | grep -q 'jpeg-bbr/service.sh'
 
 # Valhall GPU: the ZIP is replaced by the bundle, the same kernel + the Valhall
 # GPU drivers module installed into /data/adb/modules by the zip itself (one
@@ -157,6 +163,7 @@ PY
   unzip -p "$vzip_path" Image | cmp - "$IMAGE"
   unzip -p "$vzip_path" valhall/system/vendor/lib64/egl/libGLES_mali.so | cmp - "$vak3/valhall/system/vendor/lib64/egl/libGLES_mali.so"
   unzip -p "$vzip_path" anykernel.sh | grep -q '^valhall_install;'
+  unzip -p "$vzip_path" anykernel.sh | grep -q '^jpeg_bbr_install;'
   unzip -l "$vzip_path" | grep -q 'META-INF/com/google/android/update-binary'
 fi
 
