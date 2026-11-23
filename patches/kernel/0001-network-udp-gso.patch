@@ -1,3 +1,5 @@
+Network fix by Juan (LumiROM): GSO only for UDP sockets (IPv4 and IPv6).
+
 diff --git a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
 index d66f56d66..c16efed8a 100755
 --- a/net/ipv4/ip_output.c
