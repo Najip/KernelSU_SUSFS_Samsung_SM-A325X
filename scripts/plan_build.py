@@ -9,9 +9,11 @@ Environment (set by the workflow's pick job):
   COMMIT_MODE    Latest, Verified or Promoted
   NM_ONLY        true = NoMount module only
   REUSE          (Upstream check) JSON, per kernel {"mode": kernel|nomount|reuse,
-                 "run": <run id>}: kernel = build it; nomount = keep the kernel
-                 files of that run and build only NoMount (from its kernel
-                 kit); reuse = keep all its files
+                 "run": <run id or run link>}: kernel = build it; nomount = keep
+                 the kernel files of that run and build only NoMount (from its
+                 kernel kit); reuse = keep all its files.
+                 By hand also just a run link or number (= nomount for every
+                 kernel), or "all <run link>" (= reuse).
   NOMOUNT_MODE, NOMOUNT_REF, NETWORK_FIX,
   VALHALL_GPU, AIGIS_COMPILER, BRANCH
 
@@ -30,6 +32,7 @@ Writes to $GITHUB_OUTPUT:
                 (Promoted, reuse) and that run per kernel (JSON)
 """
 import json
+import re
 import os
 import subprocess
 import sys
@@ -75,6 +78,41 @@ def summary(text):
             handle.write(text + "\n")
 
 
+RUN_RE = re.compile(r"(?:github\.com/([^/\s]+/[^/\s]+)/actions/runs/)?(\d{6,})")
+
+
+def run_of(value, repo):
+    """Run id from a run number or a pasted run link (.../actions/runs/<id>[/job/...])."""
+    m = RUN_RE.search(str(value))
+    if not m:
+        fail(f"reuse: '{value}' is not a run link or run number.")
+    if m.group(1) and repo and m.group(1).lower() != repo.lower():
+        fail(f"reuse: that run is from {m.group(1)}, not {repo}.")
+    return m.group(2)
+
+
+def parse_reuse(text, sources, repo):
+    """The reuse box: JSON (Upstream check), or a run link / number by hand."""
+    text = text.strip()
+    if not text:
+        return {}
+    if text.startswith("{"):
+        plan = json.loads(text)
+        for v in plan.values():
+            if v.get("run"):
+                v["run"] = run_of(v["run"], repo)
+        return plan
+    mode = "nomount"
+    word = text.split()[0].lower()
+    if word in ("all", "reuse", "nomount"):
+        mode = "reuse" if word in ("all", "reuse") else "nomount"
+        text = text[len(word):]
+    rid = run_of(text, repo)
+    summary("reuse: " + ("keep all files" if mode == "reuse" else "keep the kernel, build a new NoMount module")
+            + f" of run {rid}")
+    return {src: {"mode": mode, "run": rid} for src in sources}
+
+
 def main():
     e = os.environ
     sources = ["aigis-bakasu"]
@@ -86,7 +124,7 @@ def main():
            "checkout_sha": e.get("GITHUB_SHA", ""), "build_kernel": "false",
            "collect_sources": "", "collect_runs": "{}"}
     entries = []
-    reuse = json.loads(e.get("REUSE") or "{}")
+    reuse = parse_reuse(e.get("REUSE", ""), sources, e.get("GITHUB_REPOSITORY", ""))
 
     if mode == "Promoted":
         found = run(["promoted_source.py", "find"], SOURCES=" ".join(sources))
