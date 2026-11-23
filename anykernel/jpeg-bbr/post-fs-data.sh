@@ -14,9 +14,10 @@ n=/dev/dma_heap/mtk_mm
 if [ -c $n ]; then
   chown system:system $n
   chmod 0444 $n
+  # Label only when the ROM left it unlabeled (plain "device"); a label the
+  # ROM sets on purpose is kept.
   case "$(ls -Z $n 2>/dev/null)" in
-    *dmabuf_system_heap_device*) ;;
-    *) chcon u:object_r:dmabuf_system_heap_device:s0 $n 2>/dev/null ;;
+    *:device:s0*) chcon u:object_r:dmabuf_system_heap_device:s0 $n 2>/dev/null ;;
   esac
   # Path on (Juan's odm patch, if still flashed, turns it off at boot).
   setprop debug.jpegfull.opt.switch 1
