@@ -578,6 +578,12 @@ jobs:
       - name: Put the files together
         run: |
           set -euo pipefail
+          # One matching artifact lands without its folder: put it back in one.
+          if [[ -d promoted ]] && ! compgen -G 'promoted/promoted-nomount-*/' >/dev/null && [[ -n "$(ls -A promoted)" ]]; then
+            src=${SOURCES%% *}
+            mkdir -p "promoted/promoted-nomount-$src"
+            find promoted -mindepth 1 -maxdepth 1 ! -name "promoted-nomount-$src" -exec mv {} "promoted/promoted-nomount-$src/" \;
+          fi
           for src in $SOURCES; do
             if [[ -d "promoted/promoted-nomount-$src" ]]; then
               # Only the module built now, not the one of the Latest run.
@@ -639,8 +645,10 @@ jobs:
       - name: Download release files
         uses: actions/download-artifact@v8
         with:
-          pattern: release-files*
-          path: files
+          # One kernel: by name, into its own folder (a pattern that matches only
+          # one artifact puts its files straight into the path, without a folder).
+          name: release-files-aigis-bakasu
+          path: files/release-files-aigis-bakasu
 
       - name: Download ${{ needs.manager.outputs.bakasu_apk }}
         if: needs.manager.outputs.bakasu_apk != ''
@@ -855,8 +863,10 @@ jobs:
       - name: Download the promoted sources
         uses: actions/download-artifact@v8
         with:
-          pattern: release-files*
-          path: files
+          # One kernel: by name, into its own folder (a pattern that matches only
+          # one artifact puts its files straight into the path, without a folder).
+          name: release-files-aigis-bakasu
+          path: files/release-files-aigis-bakasu
 
       - name: Pin the commits that built
         run: |
