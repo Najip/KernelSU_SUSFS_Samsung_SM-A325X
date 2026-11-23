@@ -76,7 +76,7 @@ on:
         type: string
         default: ''
       reuse:
-        description: 'Leave empty for a normal build (the Upstream check fills it itself). Paste a run link (or its number) = keep the kernel ZIP of that run and build only a new NoMount module. all <run link> = keep all files of that run. Needs commit mode Latest'
+        description: 'Leave empty for a normal build (the Upstream check fills it itself). Paste a run link (or its number) = keep the kernel ZIP of that run, and its NoMount module too when it has one from the chosen NoMount branch (else a new one is built). nomount <run link> = always build a new NoMount module. Needs commit mode Latest'
         type: string
         default: ''
 
