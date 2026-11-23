@@ -1,7 +1,7 @@
 
-## A32 JPEG + BBR fix (by Juan, LumiROM): installs the small root module
+## A32 JPEG + BBR fix (BBR and first JPEG fix by Juan, LumiROM): installs the small root module
 ## a32-jpeg-bbr (folder jpeg-bbr/ of this zip) straight into /data/adb/modules.
-## Fixes blank JPEG photos on One UI 9 ports and keeps TCP on BBR.
+## Fixes blank JPEG photos on One UI 9 ports (apps get access to mtk_mm) and keeps TCP on BBR.
 jpeg_bbr_install() {
   local mod=/data/adb/modules/a32-jpeg-bbr;
   ui_print " " "Installing the JPEG + BBR fix module...";

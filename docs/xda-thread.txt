@@ -29,7 +29,7 @@ A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
 [*][B]NoMount[/B] by maxsteeel, installed by the kernel ZIP (or built in)
 [*]Network fix (UDP GSO) by Juan (LumiROM), no LTO
-[*]JPEG + BBR fix by Juan (LumiROM): fixes blank JPEG photos in Telegram and other apps on One UI 9 ports, keeps TCP on BBR (a small module installed by the kernel ZIP)
+[*]JPEG + BBR fix: fixes blank JPEG photos in Telegram and other apps on One UI 9 ports (lets apps use the kernel's mtk_mm memory heap), keeps TCP on BBR. A small module installed by the kernel ZIP, based on Juan's (LumiROM) fix
 [/LIST]
 [B]Why BakaSU now?[/B] Until 22 Nov 2026 this kernel used xxKSU (backslashxx). Its developer archived xxKSU on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. I switched to BakaSU, which is actively developed. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped. Old xxKSU builds stay on the releases page.
 Tested on: SM-A325F, LumiROM 9 (Android 17). Other A325 models and ROMs should work but are not tested by me.
@@ -111,13 +111,13 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 
 [SIZE=5][B]Credits[/B][/SIZE]
 [LIST]
-[*]SlamZDank for the Aigis kernel
+[*]SlamZDank for the Aigis kernel, its mtk_mm memory heap and finding the real cause of the blank JPEGs
 [*]The BakaSU developers for BakaSU
 [*]backslashxx for xxKSU and mzggr0914 for the A32 kernel tree (used in earlier builds), Samsung-MT6769-Devs for the SLM base
 [*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
 [*]maxsteeel for NoMount and lkmloader
 [*]osm0sis for AnyKernel3
-[*]Juan (LumiROM) for the network fix (UDP GSO), the mzggr tuning (earlier builds) and the JPEG + BBR fix
+[*]Juan (LumiROM) for the network fix (UDP GSO), the mzggr tuning (earlier builds), the BBR fix and the first JPEG fix
 [*]Perplexity Computer for helping build the kernel and its pipeline
 [/LIST]
 
