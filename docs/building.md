@@ -18,7 +18,7 @@
    - **Network fix**: ticked by default. Untick to build without the UDP GSO network fix. Allowed with every release type.
    - **Commit mode**: `Latest` by default. See [Commit modes](commit-modes.md).
    - **Release**: `CI` by default, so nothing is published. `Pre-release` publishes a pre-release, `Release` publishes a full release, and `Release from last pre-release` turns the newest pre-release into the full Release without building. Both attach the NoMount module built in the same run (see [Commit modes and releases](commit-modes.md)).
-   - **NoMount**: `lkm` by default, a separate module (`NoMount-...-aigis-....zip` and `nomount-4.14-aigis.ko`, or `mzggr`) built for this exact kernel. `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`), and `no` leaves it out.
+   - **NoMount**: `lkm` by default: the module built for this exact kernel goes inside the kernel ZIP (folder `nomount/`, installed by TWRP) and is also kept as a separate module (`NoMount-...-aigis-....zip` and `nomount-4.14-aigis.ko`, or `mzggr`). `integrate` builds NoMount into the kernel itself (the kernel ZIP name gets `-nm`). There is no kernel-only choice.
    - **NoMount branch**: `master` by default, or `dev`. Used for both `lkm` and `integrate`.
    - **NoMount only**: unticked by default. Tick it to build only the NoMount module, no kernel ZIP (see [NoMount without a kernel compile](building.md#nomount-without-a-kernel-compile)).
    - **Build hook benchmark**: unticked by default. Tick it only when you want the `hook-bench` tool; the kernel does not need it.

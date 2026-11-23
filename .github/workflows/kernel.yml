@@ -62,12 +62,11 @@ on:
           - main
         default: aigis
       nomount:
-        description: 'NoMount. lkm = separate module (ZIP + .ko) built for this kernel (default). integrate = built into the kernel. no = not included'
+        description: 'NoMount. lkm = module built for this kernel, inside the kernel ZIP and also as a separate ZIP + .ko (default). integrate = built into the kernel'
         type: choice
         options:
           - lkm
           - integrate
-          - 'no'
         default: lkm
       nomount_branch:
         description: 'NoMount branch'
@@ -523,6 +522,13 @@ jobs:
           echo "NM_ZIP=$(ls "$PACKAGE_DIR"/nomount/NoMount-*.zip)" >> "$GITHUB_ENV"
           echo "NM_KO=$PACKAGE_DIR/nomount/nomount-4.14-$KERNEL_SOURCE.ko" >> "$GITHUB_ENV"
 
+      - name: Put the NoMount module into the flashable ZIP (installed by TWRP)
+        if: env.BUILD_KERNEL == 'true' && env.BUILD_NOMOUNT == 'true' && env.NOMOUNT_MODE == 'lkm'
+        run: |
+          set -euo pipefail
+          bash scripts/bundle_nomount.sh "$ZIP_PATH" "$NM_ZIP" "$PACKAGE_DIR/build-info.txt" "$INFO_FILE" 2>&1 | tee -a "$BUILD_LOG"
+          (cd "$PACKAGE_DIR" && sha256sum "$(basename "$ZIP_PATH")" > SHA256SUMS.txt)
+
       - name: Check the module matches the promoted kernel
         if: env.BUILD_KERNEL != 'true' && matrix.kernel_release != ''
         env:
@@ -808,6 +814,14 @@ jobs:
             files=("$d"/nomount/*)
             if [[ "$NOMOUNT_MODE" == lkm ]]; then
               ((${#files[@]})) || { echo "::error::The NoMount module of the $src kernel was not built."; exit 1; }
+            fi
+            if [[ "$NOMOUNT_MODE" == lkm ]]; then
+              # Every kernel ZIP carries the NoMount module built for it.
+              nmz=("$d"/nomount/NoMount-*.zip)
+              ((${#nmz[@]} == 1)) || { echo "::error::Expected one NoMount ZIP for the $src kernel, found ${#nmz[@]}."; exit 1; }
+              for kz in "$d"/*.zip; do
+                bash scripts/bundle_nomount.sh "$kz" "${nmz[0]}" "$d/build-info.txt"
+              done
             fi
             for f in "${files[@]}"; do
               n=$(basename "$f")
