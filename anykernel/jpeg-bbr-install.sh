@@ -16,7 +16,7 @@ jpeg_bbr_install() {
   chown -R 0:0 $mod;
   chmod 755 $mod;
   chmod 644 $mod/module.prop;
-  chmod 755 $mod/post-fs-data.sh $mod/service.sh;
+  chmod 755 $mod/post-fs-data.sh $mod/service.sh $mod/rom-check.sh;
   chcon -R u:object_r:system_file:s0 $mod 2>/dev/null;
   ui_print "JPEG + BBR fix module installed ($mod).";
 }
