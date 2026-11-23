@@ -17,7 +17,7 @@ The old xxKSU pipeline (Aigis and mzggr, hook styles, benchmark) is kept, frozen
 - Upstream NoMount, built for this exact kernel. The kernel ZIP carries it and installs or replaces it when you flash; it is also released as a separate ZIP. Or built into the kernel with the `integrate` option.
 - Valhall GPU with Aigis' drivers module (default), or the stock A32 GPU. Aigis' own CPU/GPU tuning.
 - Network fix by Juan (LumiROM): UDP-only GSO for IPv4 and IPv6, ticked by default. No LTO.
-- JPEG + BBR fix by Juan (LumiROM): every kernel ZIP installs the small root module `a32-jpeg-bbr`. It fixes blank JPEG photos in Telegram and other apps on One UI 9 ports and keeps TCP on BBR (the vendor switches it to bic).
+- JPEG + BBR fix: every kernel ZIP installs the small root module `a32-jpeg-bbr`. It fixes blank JPEG photos in Telegram and other apps on One UI 9 ports by letting apps use the kernel's `mtk_mm` memory heap, and keeps TCP on BBR (the vendor switches it to bic). Based on Juan's (LumiROM) fix.
 - Built by `Najip@github`: shown in `/proc/version`, `uname -a` and About phone. The **uname tag** (default `-forkby-gh.Najip`) is added to `uname -r`.
 
 Details: [Kernel details](docs/kernels.md).
@@ -72,7 +72,8 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu): SUSFS, and [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) for the non-GKI 4.14 port.
 - [maxsteeel/nomount](https://github.com/maxsteeel/nomount) and [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader): NoMount LKM.
 - [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3): flashable ZIP.
-- Juan (LumiROM): the network fix (UDP GSO), the mzggr tuning (earlier builds) and the JPEG + BBR fix.
+- Juan (LumiROM): the network fix (UDP GSO), the mzggr tuning (earlier builds), the BBR fix and the first JPEG fix.
+- SlamZDank also for the `mtk_mm` memory heap in Aigis and for finding the real cause of the blank JPEGs.
 - Earlier builds: [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) (xxKSU, archived 22 Nov 2026) and [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) (the Alt. kernel), see the `xxksu` branch.
 
 ## License

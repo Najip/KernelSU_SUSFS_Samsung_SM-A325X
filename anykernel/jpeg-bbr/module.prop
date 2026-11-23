@@ -1,6 +1,6 @@
 id=a32-jpeg-bbr
 name=A32 JPEG + BBR fix
-version=v1
-versionCode=1
-author=Juan (LumiROM), packaged by Najip
-description=One UI 9 ports on the A32 4G: fixes blank JPEG photos (Telegram and other apps) and keeps TCP on BBR. Installed by the A325X kernel ZIP.
+version=v2
+versionCode=2
+author=Najip, BBR and first JPEG workaround by Juan (LumiROM)
+description=One UI 9 ports on the A32 4G: fixes blank JPEG photos (Telegram and others) by giving apps access to the kernel mtk_mm memory heap, and keeps TCP on BBR. Installed by the A325X kernel ZIP.
