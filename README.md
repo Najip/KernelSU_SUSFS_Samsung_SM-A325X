@@ -51,7 +51,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 ## Quick start
 
 1. **Build**: on GitHub, open **Actions** > **Build Kernel** > **Run workflow**, keep the defaults and press **Run workflow**. Download the kernel ZIP from **Artifacts** when it is green. Or take a ready ZIP from [Releases](../../releases).
-2. **Flash**: back up `boot`, flash the kernel ZIP in TWRP / OrangeFox (it also installs the matching NoMount module), reboot, and install the BakaSU manager app (`BakaSU_...apk`, on the release page). Coming from xxKSU: see [Moving from xxKSU](docs/flashing.md#moving-from-xxksu).
+2. **Flash**: back up `boot`, flash the kernel ZIP in TWRP / OrangeFox (it also installs the matching NoMount module), reboot, and install the BakaSU manager app (`BakaSU_...apk`, on the release page). Recommended modules: BRENE for SUSFS (turn off BakaSU's built-in SUSFS settings when you use it) and HMA-OSS for the SUSFS priority UID filter, see [Flashing](docs/flashing.md). Coming from xxKSU: see [Moving from xxKSU](docs/flashing.md#moving-from-xxksu).
 
 ## More docs
 

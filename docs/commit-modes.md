@@ -35,6 +35,13 @@ It stops with "Release must use Verified" when that pre-release was not built fr
 
 With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14-aigis-bakasu.ko` built in the same run to the release page, plus the BakaSU manager `.apk`. The README sources table is updated only by a full `Release`.
 
-## XDA changelog
+## XDA posts
 
-Every full Release (`Release`, or `Release from last pre-release`) also gets `XDA-changelog-<tag>.txt`: the release notes as an XDA post (BBCode), with the download link and the long build info folded into a spoiler. Download it from the release page, copy everything, and paste it at the top of the changelog post of the XDA thread. Pre-releases do not get it. The thread template is in [`docs/xda-thread.txt`](xda-thread.txt).
+Every full Release (`Release`, or `Release from last pre-release`) also gets `XDA-posts-<tag>.txt` (BBCode, made by `scripts/xda_posts.py`):
+
+- **Post #2, changelog**: this release in full (the long build info folded into a spoiler), then a list of the older full Releases with links.
+- **Post #3, updates**: the text of [`docs/xda-updates.txt`](xda-updates.txt) (news, known issues, recommended modules) plus a line with the newest stable release. I edit that file by hand when there is news.
+
+Download it from the release page, then on XDA edit post #2 and replace all of it, and the same for post #3. Pre-releases do not get it. For any release by hand: `python3 scripts/xda_posts.py --release <tag>`.
+
+The thread title and post #1 are in [`docs/xda-thread.txt`](xda-thread.txt) and are pasted once by hand.

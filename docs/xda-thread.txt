@@ -2,6 +2,9 @@ XDA THREAD TEMPLATE (BBCode)
 Forum: https://xdaforums.com/f/samsung-galaxy-a32-4g.12143/
 Paste each part into the XDA editor as it is (it understands BBCode).
 Lines starting with ">>" are notes for me, do not paste them.
+>> Title and post #1 are pasted once (edit them by hand when something big changes).
+>> Posts #2 and #3 are made by scripts/xda_posts.py: every full Release attaches
+>> XDA-posts-<tag>.txt with both.
 
 >> TITLE (thread title box)
 [KERNEL][A325F/M/N] KernelSU (BakaSU) + SUSFS 2.4.0 kernel
@@ -21,7 +24,7 @@ You flash this at your own risk. Read this post before flashing.
 [SIZE=5][B]About[/B][/SIZE]
 A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [LIST]
-[*][B]Aigis kernel[/B] by SlamZDank: Valhall GPU with its drivers module, Aigis' own CPU/GPU tuning
+[*][B]Aigis kernel[/B] by SlamZDank, Linux 4.14.357: Valhall GPU with its drivers module, Aigis' own CPU/GPU tuning
 [*][B]BakaSU[/B] (KernelSU fork for non-GKI kernels), SUSFS inline hooks
 [*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
 [*][B]NoMount[/B] by maxsteeel, installed by the kernel ZIP (or built in)
@@ -34,10 +37,15 @@ Tested on: SM-A325F, LumiROM 9 (Android 17). Other A325 models and ROMs should w
 
 [SIZE=5][B]Downloads[/B][/SIZE]
 [LIST]
-[*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases/latest']Latest release[/URL] (stable)
+[*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases/latest']Latest release[/URL] (stable, tested by me)
 [*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases']All releases and pre-releases[/URL] (pre-releases = automatic test builds of new upstream commits)
 [/LIST]
-Each release has: the kernel ZIP, the matching NoMount module ZIP (already inside the kernel ZIP too), and the BakaSU manager app ([ICODE]BakaSU_...apk[/ICODE]).
+Each release has:
+[LIST]
+[*]Kernel ZIP: [ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]
+[*]NoMount module (already inside the kernel ZIP too): [ICODE]NoMount-...-aigis-bakasu-...zip[/ICODE]
+[*]BakaSU manager app: [ICODE]BakaSU_...apk[/ICODE]
+[/LIST]
 
 [SIZE=5][B]Installation[/B][/SIZE]
 [LIST=1]
@@ -62,10 +70,13 @@ Recommended, and the kernel ZIP already installs it. If you flash the separate N
 [B]Can I use other KernelSU managers (official, Next, SukiSU, xxKSU)?[/B]
 No, use the BakaSU manager from the release. Other managers do not match this kernel.
 
-[B]Which SUSFS module should I use?[/B]
-[B]BRENE is always recommended[/B] as the SUSFS userspace module: [URL='https://github.com/rrr333nnn333/BRENE']rrr333nnn333/BRENE[/URL]. It always keeps up to date with simonpunk's SUSFS updates, so it matches the SUSFS v2.4.0 in this kernel.
-
-[COLOR=rgb(226, 80, 65)][B]Warning: do NOT use sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not made for this kernel's SUSFS version and can break root hiding or cause problems. If it is installed, remove it in the BakaSU manager, reboot, then install BRENE.
+[B]Which SUSFS modules should I use?[/B]
+[LIST]
+[*][B]BRENE[/B] ([URL='https://github.com/rrr333nnn333/BRENE']rrr333nnn333/BRENE[/URL]): the recommended SUSFS userspace module. It keeps up with simonpunk's SUSFS, so it matches the SUSFS in this kernel.
+[*][B]HMA-OSS[/B] ([URL='https://github.com/frknkrc44/HMA-OSS']frknkrc44/HMA-OSS[/URL]): hides your app list. Use it as the userspace side of the SUSFS priority UID filter.
+[*][B]BakaSU's built-in SUSFS settings[/B]: usable on their own, but [B]turn them off when you use BRENE[/B], so the two do not conflict.
+[/LIST]
+[COLOR=rgb(226, 80, 65)][B]Not recommended: sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not updated often and does not work with the latest SUSFS (neither simonpunk's nor JackA1ltman's 4.14 port). If it is installed, remove it in the BakaSU manager, reboot, then install BRENE.
 
 [B]Release or pre-release?[/B]
 Releases are tested by me on my phone. Pre-releases are built automatically when an upstream source changes and are not tested yet.
@@ -113,31 +124,10 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 [B]Created:[/B] (XDA fills this in)
 [B]Last updated:[/B] (XDA fills this in)
 
->> ==================== POST #2: CHANGELOG ====================
->> Paste the XDA-changelog-<tag>.txt from each full Release at the TOP
->> of this post (newest first). Keep older entries below.
-
-[CENTER][SIZE=6][B]Changelog[/B][/SIZE][/CENTER]
-Newest first. Full details for each version are on its [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases']GitHub release[/URL] page.
-
-(paste XDA-changelog-<tag>.txt here)
-
->> ==================== POST #3: UPDATES ====================
-
-[CENTER][SIZE=6][B]Updates and announcements[/B][/SIZE][/CENTER]
-Known issues, plans and news will be posted here.
-
-[B]2026-11-23: Switched to BakaSU[/B]
-[LIST]
-[*]xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so new builds use BakaSU.
-[*]The Alt. kernel (mzggr) is dropped: it was xxKSU-only and is not developed anymore.
-[*]Use the BakaSU manager from the release; the kernel ZIP installs NoMount by itself.
-[/LIST]
-
-[B]Known issues[/B]
-[LIST]
-[*]None reported yet.
-[/LIST]
+>> ==================== POSTS #2 AND #3 ====================
+>> #2 = changelog, #3 = updates. Take them from XDA-posts-<tag>.txt on each
+>> full Release (or run: python3 scripts/xda_posts.py --release <tag>).
+>> The text of post #3 is kept in docs/xda-updates.txt.
 
 >> ==================== POSTS #4 to #20: RESERVED ====================
 >> XDA shows 20 posts per page, so posts #4 to #20 fill the first page.
