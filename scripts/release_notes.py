@@ -110,7 +110,7 @@ def new_commits(repo, old, new, path=None):
 
 SOURCES = [
     ("kernel", "Kernel source", None),
-    ("xxksu", "xxKSU", None),
+    ("xxksu", "BakaSU", None),  # key "xxksu" = the root module (name kept for older runs)
     ("susfs", "SUSFS patch (JackA1ltman)", "path"),
     ("build_repo", "This build repo", None),
 ]
@@ -126,7 +126,7 @@ def notes(cur_path, prev_path, info_path, out_path):
         s = cur[key]
         repo = slug(s["repo"])
         if key == "xxksu":
-            title = cur.get("root") or title  # the root module: xxKSU or BakaSU
+            title = cur.get("root") or title  # the root module (BakaSU; older releases: xxKSU)
         head = f"### {title}: [`{s['commit'][:8]}`](https://github.com/{repo}/commit/{s['commit']})"
         md.append(head)
         old = prev.get(key, {}).get("commit") if prev else None
@@ -163,20 +163,19 @@ def kernel_of(src):
     return "aigis" if "aigis" in src["kernel"]["repo"].lower() else "mzggr"
 
 
-# How each kernel is named in the README. Aigis is the main kernel (the one I
-# use every day); mzggr is the Alt. kernel. Both are released.
+# How the kernel is named in the README: Aigis with BakaSU, the only kernel
+# since xxKSU was archived (22 Nov 2026). The other names are older releases.
 KERNEL_ROLES = [
-    ("aigis", "Main kernel: Aigis"),
     ("aigis-bakasu", "Main kernel: Aigis (BakaSU)"),
-    ("mzggr", "Alt. kernel: mzggr"),
+    ("aigis", "Main kernel: Aigis (xxKSU, older release)"),
+    ("mzggr", "Alt. kernel: mzggr (older release)"),
 ]
 
 
 def readme(readme_path, tag, *paths):
-    """One sources table: the main kernel (Aigis), the Alt. kernel (mzggr),
-    then xxKSU, the SUSFS patch and the xxKSU manager app, which are shared by
-    both kernels (one row each; two rows only if the kernels used different
-    commits). manager.json sits next to the first sources.json."""
+    """One sources table: the kernel (Aigis BakaSU), then BakaSU, the SUSFS
+    patch and the BakaSU manager app. manager-bakasu.json sits next to the
+    first sources.json."""
     rows = ["| Part | Used by | Source | Branch / version | Commit | Commit date |",
             "|---|---|---|---|---|---|"]
 
@@ -195,14 +194,9 @@ def readme(readme_path, tag, *paths):
         found[kernel_of(cur)] = cur
     present = [(key, title) for key, title in KERNEL_ROLES if key in found]
     for key, title in KERNEL_ROLES:
-        # Aigis BakaSU is optional (Root flavor BakaSU / All): no empty row.
-        if key == "aigis-bakasu" and key not in found:
-            continue
         if key in found:
             k = found[key]["kernel"]
             row("Kernel", title, k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
-        else:
-            rows.append(f"| Kernel | {title} | Not in this release | | | |")
     def used_by(group):
         if len(group) == 1:
             return group[0][1]

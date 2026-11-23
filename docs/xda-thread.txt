@@ -4,11 +4,11 @@ Paste each part into the XDA editor as it is (it understands BBCode).
 Lines starting with ">>" are notes for me, do not paste them.
 
 >> TITLE (thread title box)
-[KERNEL][A325F/M/N] KernelSU (xxKSU) + SUSFS 2.4.0 kernel
+[KERNEL][A325F/M/N] KernelSU (BakaSU) + SUSFS 2.4.0 kernel
 
 >> ==================== POST #1 (OP) ====================
 
-[CENTER][SIZE=7][B]KernelSU (xxKSU) + SUSFS 2.4.0 kernel[/B][/SIZE]
+[CENTER][SIZE=7][B]KernelSU (BakaSU) + SUSFS 2.4.0 kernel[/B][/SIZE]
 [SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]
 
 [SIZE=5][B]Disclaimer[/B][/SIZE]
@@ -21,16 +21,13 @@ You flash this at your own risk. Read this post before flashing.
 [SIZE=5][B]About[/B][/SIZE]
 A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [LIST]
-[*][B]xxKSU[/B] (KernelSU fork by backslashxx for non-GKI kernels), manual hooks
+[*][B]Aigis kernel[/B] by SlamZDank: Valhall GPU with its drivers module, Aigis' own CPU/GPU tuning
+[*][B]BakaSU[/B] (KernelSU fork for non-GKI kernels), SUSFS inline hooks
 [*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
-[*][B]NoMount[/B] by maxsteeel, as a matching module (or built in)
+[*][B]NoMount[/B] by maxsteeel, installed by the kernel ZIP (or built in)
 [*]Network fix (UDP GSO), no LTO
 [/LIST]
-Two kernels are released, flash only one:
-[LIST]
-[*][B]Main kernel: Aigis[/B] (by SlamZDank). The one I use every day. Valhall GPU with its drivers module, Aigis' own CPU/GPU tuning.
-[*][B]Alt. kernel: mzggr[/B] (by mzggr0914). Stock A32 GPU, with my performance tuning (GPU 1100 MHz, undervolt, BORE, 250 Hz, schedutil, BBR).
-[/LIST]
+[B]Why BakaSU now?[/B] Until 22 Nov 2026 this kernel used xxKSU (backslashxx). Its developer archived xxKSU on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. I switched to BakaSU, which is actively developed. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped. Old xxKSU builds stay on the releases page.
 Tested on: SM-A325F, LumiROM 9 (Android 17). Other A325 models and ROMs should work but are not tested by me.
 
 Every build runs on GitHub Actions from public sources, so anyone can check and rebuild it.
@@ -40,35 +37,35 @@ Every build runs on GitHub Actions from public sources, so anyone can check and 
 [*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases/latest']Latest release[/URL] (stable)
 [*][URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases']All releases and pre-releases[/URL] (pre-releases = automatic test builds of new upstream commits)
 [/LIST]
-Each release has: the kernel ZIPs, the matching NoMount module ZIPs, and the xxKSU manager app ([ICODE]KernelSU_...apk[/ICODE]).
+Each release has: the kernel ZIP, the matching NoMount module ZIP (already inside the kernel ZIP too), and the BakaSU manager app ([ICODE]BakaSU_...apk[/ICODE]).
 
 [SIZE=5][B]Installation[/B][/SIZE]
 [LIST=1]
 [*]Unlocked bootloader and TWRP or OrangeFox are required.
 [*][B]Back up your current boot partition[/B] in recovery (Backup > Boot). This is your way back.
-[*]Flash ONE kernel ZIP ([ICODE]A325X-Aigis-...zip[/ICODE] or [ICODE]A325X-mzggr-...zip[/ICODE]) in recovery.
-[*]Reboot and install the xxKSU manager app from the same release.
-[*]In the manager, flash the NoMount ZIP made for the same kernel ([ICODE]...-aigis-...[/ICODE] or [ICODE]...-mzggr-...[/ICODE]) as a module, then reboot.
+[*]Flash the kernel ZIP ([ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]) in recovery. It also installs the matching NoMount module.
+[*]Reboot and install the BakaSU manager app from the same release.
+[*]Coming from my xxKSU kernel: uninstall the old xxKSU manager app, then check your modules and root apps in the BakaSU manager.
 [/LIST]
 Bootloop? Go back to recovery and restore the boot backup (or flash your stock boot.img).
 
 [SIZE=5][B]FAQ[/B][/SIZE]
-[B]Which kernel should I pick?[/B]
-Aigis if you want the Valhall GPU and the kernel I use daily. mzggr if you want the stock GPU with extra tuning. If mzggr freezes or reboots under load, your phone may not like the undervolt; use Aigis.
+[B]Where is xxKSU / the mzggr kernel?[/B]
+xxKSU was archived by its developer on 22 Nov 2026, so I stopped building it, and the mzggr kernel needed xxKSU. The last xxKSU builds (up to build-20261122-98) stay on the releases page, but they get no more updates.
 
 [B]What is the -vgpu / -valhall ZIP?[/B]
-The Aigis kernel with the Valhall GPU. It also installs the Valhall GPU drivers module, so no extra step is needed.
+The kernel with the Valhall GPU (default). It also installs the Valhall GPU drivers module, so no extra step is needed.
 
 [B]Do I need the NoMount module?[/B]
-Recommended. Always use the NoMount ZIP from the same release and for the same kernel. The kernel ZIP warns you if the installed one does not match.
+Recommended, and the kernel ZIP already installs it. If you flash the separate NoMount ZIP, use the one from the same release.
 
-[B]Can I use other KernelSU managers (official, Next, SukiSU, BakaSU)?[/B]
-No, use the xxKSU manager from the release. Other managers do not match this kernel.
+[B]Can I use other KernelSU managers (official, Next, SukiSU, xxKSU)?[/B]
+No, use the BakaSU manager from the release. Other managers do not match this kernel.
 
 [B]Which SUSFS module should I use?[/B]
 [B]BRENE is always recommended[/B] as the SUSFS userspace module: [URL='https://github.com/rrr333nnn333/BRENE']rrr333nnn333/BRENE[/URL]. It always keeps up to date with simonpunk's SUSFS updates, so it matches the SUSFS v2.4.0 in this kernel.
 
-[COLOR=rgb(226, 80, 65)][B]Warning: do NOT use sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not made for this kernel's SUSFS version and can break root hiding or cause problems. If it is installed, remove it in the KernelSU manager, reboot, then install BRENE.
+[COLOR=rgb(226, 80, 65)][B]Warning: do NOT use sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not made for this kernel's SUSFS version and can break root hiding or cause problems. If it is installed, remove it in the BakaSU manager, reboot, then install BRENE.
 
 [B]Release or pre-release?[/B]
 Releases are tested by me on my phone. Pre-releases are built automatically when an upstream source changes and are not tested yet.
@@ -93,9 +90,8 @@ Termux (booted, rooted): run [ICODE]su -c sh /sdcard/Download/collect-logs.sh[/I
 [SIZE=5][B]Source code (GPL-2.0)[/B][/SIZE]
 [LIST]
 [*]Build repo (patches, configs, build scripts): [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X']Najip/KernelSU_SUSFS_Samsung_SM-A325X[/URL]
-[*]Main kernel tree: [URL='https://github.com/SlamZDank/Aigis-Kernel-A32']SlamZDank/Aigis-Kernel-A32[/URL]
-[*]Alt. kernel tree: [URL='https://github.com/mzggr0914/android_kernel_a325x_bakasu']mzggr0914/android_kernel_a325x_bakasu[/URL]
-[*]xxKSU: [URL='https://github.com/backslashxx/KernelSU']backslashxx/KernelSU[/URL]
+[*]Kernel tree: [URL='https://github.com/SlamZDank/Aigis-Kernel-A32']SlamZDank/Aigis-Kernel-A32[/URL]
+[*]BakaSU: [URL='https://github.com/Baka-SU/BakaSU']Baka-SU/BakaSU[/URL]
 [*]SUSFS: [URL='https://gitlab.com/simonpunk/susfs4ksu']simonpunk/susfs4ksu[/URL], 4.14 port: [URL='https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd']JackA1ltman/NonGKI_Kernel_Build_2nd[/URL]
 [*]NoMount: [URL='https://github.com/maxsteeel/nomount']maxsteeel/nomount[/URL]
 [/LIST]
@@ -104,8 +100,8 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 [SIZE=5][B]Credits[/B][/SIZE]
 [LIST]
 [*]SlamZDank for the Aigis kernel
-[*]mzggr0914 for the A32 kernel tree, and Samsung-MT6769-Devs for the SLM base
-[*]backslashxx for xxKSU
+[*]The BakaSU developers for BakaSU
+[*]backslashxx for xxKSU and mzggr0914 for the A32 kernel tree (used in earlier builds), Samsung-MT6769-Devs for the SLM base
 [*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
 [*]maxsteeel for NoMount and lkmloader
 [*]osm0sis for AnyKernel3
@@ -129,6 +125,13 @@ Newest first. Full details for each version are on its [URL='https://github.com/
 
 [CENTER][SIZE=6][B]Updates and announcements[/B][/SIZE][/CENTER]
 Known issues, plans and news will be posted here.
+
+[B]2026-11-23: Switched to BakaSU[/B]
+[LIST]
+[*]xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so new builds use BakaSU.
+[*]The Alt. kernel (mzggr) is dropped: it was xxKSU-only and is not developed anymore.
+[*]Use the BakaSU manager from the release; the kernel ZIP installs NoMount by itself.
+[/LIST]
 
 [B]Known issues[/B]
 [LIST]

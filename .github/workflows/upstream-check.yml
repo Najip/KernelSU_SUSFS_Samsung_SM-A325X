@@ -1,15 +1,13 @@
 name: Upstream check
 run-name: Upstream check${{ github.event_name == 'workflow_dispatch' && ' (manual)' || '' }}
 
-# Three times a day: did the Aigis kernel, the mzggr kernel, xxKSU, BakaSU
-# (main), Jack's SUSFS 4.14
-# patch or NoMount (master only) get new commits since the last
-# check? The newest commits seen are saved in configs/upstream-state.json on
-# the default branch. When something is new, only that is rebuilt (commit mode
-# Latest, release type Pre-release, NoMount master), in one Build Kernel run
-# with every file (Kernel both, Root flavor All): xxKSU = the xxKSU kernels,
-# BakaSU = Aigis BakaSU, SUSFS = all kernels, one kernel tree = that kernel,
-# NoMount = only the NoMount modules; the rest comes from an earlier run.
+# Three times a day: did the Aigis kernel, BakaSU (main), Jack's SUSFS 4.14
+# patch or NoMount (master only) get new commits since the last check? The
+# newest commits seen are saved in configs/upstream-state.json on the default
+# branch. When something is new, one Build Kernel run (commit mode Latest,
+# release type Pre-release, NoMount master) rebuilds the kernel (kernel tree,
+# BakaSU or SUSFS changed) or only the NoMount module (NoMount changed).
+# xxKSU (archived 22 Nov 2026) and the mzggr kernel are no longer watched.
 on:
   schedule:
     # 07:00, 15:00 and 23:00 in Jakarta (UTC+7)
@@ -31,7 +29,7 @@ concurrency:
 
 env:
   GH_TOKEN: ${{ github.token }}
-  # Branch the CI build runs on (it needs the Kernel "both" option). Set the
+  # Branch the CI build runs on. Set the
   # repo variable UPSTREAM_BUILD_REF to change it; when that branch no longer
   # exists, the default branch is used.
   BUILD_REF: ${{ vars.UPSTREAM_BUILD_REF || github.event.repository.default_branch }}

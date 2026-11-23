@@ -4,33 +4,25 @@
   upstream_check.py <sources.conf> <state.json>
   upstream_check.py start <state.json> <plan.json> <owner/repo> <branch>
 
-Watched:
-  mzggr kernel  KERNEL_REPO / KERNEL_REF of KERNEL_SOURCE=mzggr
-  aigis kernel  KERNEL_REPO / KERNEL_REF of KERNEL_SOURCE=aigis
-                Both kernels: commits that only touch their root module or
-                NoMount (the KernelSU / BakaSU / KSUN / SukiSU / NoMount
-                submodules or folders, .gitmodules) or only docs (README,
-                *.md, docs/, .github/) are ignored. The build replaces the
-                root module with xxKSU and builds NoMount itself, so those do
-                not change our kernel. Every other kernel change counts.
-  xxksu         KSU_REPO / KSU_REF
-  bakasu        BakaSU (KSU_REPO / KSU_REF of KERNEL_SOURCE=aigis-bakasu, the
-                BAKASU_BRANCH of sources.conf, main), for Aigis BakaSU.
+Watched (Aigis with BakaSU is the only kernel; xxKSU was archived on
+22 Nov 2026 and is no longer watched, nor the mzggr kernel):
+  aigis kernel  KERNEL_REPO / KERNEL_REF. Commits that only touch its root
+                module or NoMount (the KernelSU / BakaSU / KSUN / SukiSU /
+                NoMount submodules or folders, .gitmodules) or only docs
+                (README, *.md, docs/, .github/) are ignored: the build fetches
+                BakaSU itself and builds NoMount itself.
+  bakasu        BakaSU (KSU_REPO / KSU_REF, the BAKASU_BRANCH of sources.conf, main)
   susfs         SUSFS_REPO / SUSFS_REF, only commits that touched SUSFS_PATCH
-                (the 4.14 patch the build uses; the rest of that repo is
-                other devices and does not change the kernel)
-  nomount       NOMOUNT_REPO, master branch only (manual builds still default
-                to dev). Commits that only touch docs (README, *.md, docs/,
-                .github/) are ignored.
+                (the 4.14 patch the build uses)
+  nomount       NOMOUNT_REPO, master branch only. Commits that only touch docs
+                are ignored.
 
-Only what changed is rebuilt, in one Build Kernel run (Kernel both, Root
-flavor All, Latest, NoMount master) that publishes a Pre-release with every file. The plan
-(plan= in $GITHUB_OUTPUT) says per kernel: kernel = build it (xxKSU or SUSFS
-changed: both; one kernel tree changed: that one), nomount = keep its kernel
-ZIP from the last automatic run and build only NoMount (NoMount changed),
-reuse = keep all its files. "start" picks the earlier run (the last
-automatic run, or the one that last built that kernel) and builds the kernel
-anyway when that run did not succeed or its files have expired.
+Only what changed is rebuilt, in one Build Kernel run (Latest, Pre-release,
+NoMount master). The plan (plan= in $GITHUB_OUTPUT) says: kernel = build it
+(kernel tree, BakaSU or SUSFS changed), nomount = keep the kernel ZIP of an
+earlier run and build only NoMount (NoMount changed). "start" picks the
+earlier run and builds the kernel anyway when that run did not succeed or its
+files have expired.
 
 The state file keeps the newest commit seen of each source and a short
 history of the changes found. The first check only saves the commits
@@ -213,15 +205,13 @@ def emit(pairs):
 
 
 def main(conf_path, state_path):
-    mz, ag, bk = conf(conf_path, "mzggr"), conf(conf_path, "aigis"), conf(conf_path, "aigis-bakasu")
+    bk = conf(conf_path, "aigis-bakasu")
     watched = {
-        "mzggr": ("mzggr kernel", slug(mz["KERNEL_REPO"]), mz["KERNEL_REF"], None),
-        "aigis": ("Aigis kernel", slug(ag["KERNEL_REPO"]), ag["KERNEL_REF"], None),
-        "xxksu": ("xxKSU", slug(mz["KSU_REPO"]), mz["KSU_REF"], None),
+        "aigis": ("Aigis kernel", slug(bk["KERNEL_REPO"]), bk["KERNEL_REF"], None),
         "bakasu": ("BakaSU", slug(bk["KSU_REPO"]), bk["KSU_REF"], None),
-        "susfs": ("Jack's SUSFS (4.14 patch)", slug(mz["SUSFS_REPO"]), mz["SUSFS_REF"], mz["SUSFS_PATCH"]),
-        # NoMount: master only (the Build Kernel default stays dev for manual builds).
-        "nomount": ("NoMount", slug(mz["NOMOUNT_REPO"]), "master", None),
+        "susfs": ("Jack's SUSFS (4.14 patch)", slug(bk["SUSFS_REPO"]), bk["SUSFS_REF"], bk["SUSFS_PATCH"]),
+        # NoMount: master only.
+        "nomount": ("NoMount", slug(bk["NOMOUNT_REPO"]), "master", None),
     }
     state_file = Path(state_path)
     state = json.loads(state_file.read_text()) if state_file.exists() else {}
@@ -247,7 +237,7 @@ def main(conf_path, state_path):
                 changed.append(key)
                 report += [f"### {label}: now watching {repo} `{ref}`", f"- `{cur['commit'][:8]}` {cur['subject']}", ""]
             print(f"{label}: {repo}@{ref} {cur['commit'][:12]} (saved)")
-        elif prev["commit"] != cur["commit"] and key in ("mzggr", "aigis", "nomount") and \
+        elif prev["commit"] != cur["commit"] and key in ("aigis", "nomount") and \
                 (split := kernel_commits(repo, prev["commit"], cur["commit"],
                                          docs_path if key == "nomount" else ignored_path)) is not None:
             relevant, ignored = split
@@ -297,39 +287,27 @@ def main(conf_path, state_path):
           "moved": str(moved).lower(), "plan": json.dumps(plan, separators=(",", ":"))})
 
 
-KERNELS = ("aigis", "aigis-bakasu", "mzggr")  # build order: the main kernel first
+KERNELS = ("aigis-bakasu",)
 
 
 def build_plan(changed):
     """Per kernel: kernel (build), nomount (keep the kernel, build NoMount) or reuse."""
     c = set(changed)
-    full = set(KERNELS) if "susfs" in c else set()
-    if "xxksu" in c:
-        full |= {"aigis", "mzggr"}
-    if "bakasu" in c:
-        full.add("aigis-bakasu")
-    if "aigis" in c:
-        full |= {"aigis", "aigis-bakasu"}  # the same Aigis tree
-    if "mzggr" in c:
-        full.add("mzggr")
+    full = {"aigis-bakasu"} if c & {"aigis", "bakasu", "susfs"} else set()
     if not full and "nomount" not in changed:
         return {}
     return {k: "kernel" if k in full else ("nomount" if "nomount" in changed else "reuse") for k in KERNELS}
 
 
 FILE_NAMES = {
-    "aigis-kernel": "Main kernel ZIP (Aigis)",
-    "aigis-bakasu-kernel": "Main kernel ZIP with BakaSU (Aigis BakaSU)",
-    "mzggr-kernel": "Alt. kernel ZIP (mzggr)",
-    "aigis-nomount": "NoMount module for Aigis",
-    "aigis-bakasu-nomount": "NoMount module for Aigis BakaSU",
-    "mzggr-nomount": "NoMount module for mzggr",
+    "aigis-bakasu-kernel": "Kernel ZIP (Aigis with BakaSU)",
+    "aigis-bakasu-nomount": "NoMount module for it",
 }
 
 
 def title_ok(title):
     """Is this run-name the Build Kernel run the upstream check starts?"""
-    return (title.startswith("A325X xxKSU/BakaSU + SUSFS kernel (Aigis + mzggr) (root All)") and "(Latest) (upstream)" in title
+    return (title.startswith("A325X BakaSU + SUSFS kernel (Aigis)") and "(Latest) (upstream)" in title
             and "NoMount lkm-master" in title and "+ Pre-release" in title)
 
 
@@ -347,7 +325,7 @@ def usable(repo, rid, kernel):
         return False
     arts = json.loads(subprocess.check_output(
         ["gh", "api", f"repos/{repo}/actions/runs/{rid}/artifacts?per_page=100"], text=True)).get("artifacts", [])
-    name = "release-files" if kernel == "mzggr" else f"release-files-{kernel}"
+    name = f"release-files-{kernel}"
     ok = any(a["name"] == name and not a.get("expired") for a in arts)
     if not ok:
         print(f"Run {rid}: {name} has expired, not used for {kernel}.")
@@ -381,7 +359,7 @@ def start(state_path, plan_path, repo, ref):
         ["gh", "run", "list", "--repo", repo, "--workflow", "kernel.yml", "--limit", "20",
          "--json", "url", "--jq", ".[].url"], text=True).split())
     subprocess.check_call(["gh", "workflow", "run", "kernel.yml", "--repo", repo, "--ref", ref,
-                           "-f", "kernel_source=both", "-f", "root_flavor=All", "-f", "commit_mode=Latest", "-f", "release_type=Pre-release",
+                           "-f", "commit_mode=Latest", "-f", "release_type=Pre-release",
                            "-f", "nomount_branch=master", "-f", "nomount_only=false",
                            "-f", f"reuse={json.dumps(reuse, separators=(',', ':'))}"])
     url = title = ""

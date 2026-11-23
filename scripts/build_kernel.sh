@@ -4,10 +4,8 @@
 #   KERNEL_DIR   kernel tree (required)
 #   OUT_DIR      build output folder (required)
 #   TOOLCHAIN    AOSP Clang 14 folder (made by fetch_aosp_clang.sh if missing)
-#   PERF_TUNING  true = merge configs/a325x-tuning.config too
-#   KSU_HOOK     manual (default), syscall_table or branch_link
 #   EXTRA_MODULE_DIR  optional out-of-tree module folder to build afterwards
-#                     (used by the NoMount LKM workflow)
+#                     (used for NoMount-only builds)
 #   NOMOUNT_MODE      integrate = also merge configs/nomount-integrate.config
 #   KERNEL_KIT        folder with .config, Module.symvers and kernel.release
 #                     from an earlier full build of this exact kernel. Then the
@@ -19,8 +17,6 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/scripts/aosp_clang14.conf"
 : "${KERNEL_DIR:?KERNEL_DIR is required}"
 : "${OUT_DIR:?OUT_DIR is required}"
-PERF_TUNING=${PERF_TUNING:-false}
-KSU_HOOK=${KSU_HOOK:-manual}
 KERNEL_TOOLCHAIN=${KERNEL_TOOLCHAIN:-aosp}
 if [[ "$KERNEL_TOOLCHAIN" == zyc ]]; then
   TOOLCHAIN=${TOOLCHAIN:-"$ROOT/.toolchains/zyc-clang"}
@@ -97,8 +93,7 @@ done
 export ARCH=arm64
 export PATH="$TOOLCHAIN/bin:$PATH"
 export LD_LIBRARY_PATH="$TOOLCHAIN/lib64:$TOOLCHAIN/lib:${LD_LIBRARY_PATH:-}"
-# Same toolchain setup as the booting Najip/android_kernel_a325F_bakasu xxksu
-# build: Clang 14 + ld.lld, GNU as for the assembler (LLVM_IAS=0), no LTO.
+# AOSP toolchain setup (compiler "main"): Clang 14 + ld.lld, GNU as for the assembler (LLVM_IAS=0), no LTO.
 export CC="$TOOLCHAIN/bin/clang" LD="$TOOLCHAIN/bin/ld.lld"
 export AR="$TOOLCHAIN/bin/llvm-ar" NM="$TOOLCHAIN/bin/llvm-nm"
 export STRIP="$TOOLCHAIN/bin/llvm-strip" OBJCOPY="$TOOLCHAIN/bin/llvm-objcopy"
@@ -118,12 +113,7 @@ fi
 cd "$KERNEL_DIR"
 base=()
 for f in $KERNEL_FRAGMENTS; do base+=("arch/arm64/configs/$f"); done
-if [[ "$ROOT_FLAVOR" == bakasu ]]; then
-  fragments=("$ROOT/configs/a325x-bakasu-susfs.config")
-else
-  fragments=("$ROOT/configs/a325x-xxksu-susfs.config" "$ROOT/configs/hooks/$KSU_HOOK.config")
-fi
-[[ "$PERF_TUNING" == true ]] && fragments+=("$ROOT/configs/a325x-tuning.config")
+fragments=("$ROOT/configs/a325x-bakasu-susfs.config")
 [[ "${NOMOUNT_MODE:-lkm}" == integrate ]] && fragments+=("$ROOT/configs/nomount-integrate.config")
 
 if [[ -n "${KERNEL_KIT:-}" ]]; then
@@ -180,15 +170,8 @@ test -s "$OUT_DIR/vmlinux"
 test -s "$OUT_DIR/arch/arm64/boot/Image"
 "$READELF" -h "$OUT_DIR/vmlinux" | grep -q AArch64
 "$NM" --defined-only "$OUT_DIR/vmlinux" > "$OUT_DIR/kernel-symbols.txt"
-hook_symbols=""  # BakaSU passes KSU_HOOK=inline, which has its own list below
-case "$KSU_HOOK" in
-  manual) hook_symbols="ksu_handle_sys_execve" ;;
-  syscall_table) hook_symbols="hook_aarch64_execve hook_aarch64_reboot" ;;
-  branch_link) hook_symbols="bl_hack_init_thread ksu_do_faccessat hook_aarch64_execve" ;;
-esac
-root_symbols="ksu_handle_newfstat_ret $hook_symbols xxksu_parent_sucompat_enabled"
 # BakaSU: the SUSFS inline hook calls (see BakaSU kernel/tools/inline_hook_check.mk)
-[[ "$ROOT_FLAVOR" == bakasu ]] && root_symbols="ksu_handle_execveat ksu_handle_setresuid ksu_handle_faccessat ksu_handle_stat"
+root_symbols="ksu_handle_execveat ksu_handle_setresuid ksu_handle_faccessat ksu_handle_stat"
 for symbol in erofs_fs_type ksu_handle_sys_reboot $root_symbols \
     susfs_set_priority_uid_filter susfs_is_priority_uid_filtered; do
   grep -Eq "[[:space:]]$symbol$" "$OUT_DIR/kernel-symbols.txt" || {

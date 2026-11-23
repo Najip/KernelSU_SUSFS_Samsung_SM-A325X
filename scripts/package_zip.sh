@@ -3,14 +3,11 @@
 #
 #   KERNEL_DIR, OUT_DIR, INFO_DIR  same as the other scripts (required)
 #   PACKAGE_DIR  where the ZIP and txt files go (required)
-#   PERF_TUNING, KSU_HOOK  only used for the file name / build info
 # Prints nothing special; writes $PACKAGE_DIR/zip-name.txt with the ZIP name.
 set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/scripts/sources.conf"
 : "${KERNEL_DIR:?}" "${OUT_DIR:?}" "${INFO_DIR:?}" "${PACKAGE_DIR:?}"
-PERF_TUNING=${PERF_TUNING:-false}
-KSU_HOOK=${KSU_HOOK:-manual}
 IMAGE="$OUT_DIR/arch/arm64/boot/Image"
 test -s "$IMAGE"
 
@@ -25,20 +22,16 @@ if [[ -n "${AK3_FROM_TREE:-}" ]]; then
   rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/dtbo.img" "$ak3/README.md"
   ak3_line="$AK3_FROM_TREE folder of the kernel tree (Image only)"
 else
-  git init -q "$ak3"
-  git -C "$ak3" fetch -q --depth=1 "$AK3_REPO" "$AK3_COMMIT"
-  git -C "$ak3" checkout -q --detach FETCH_HEAD
-  rm -rf -- "$ak3/.git" "$ak3/.github" "$ak3"/Image* "$ak3"/zImage* "$ak3/README.md"
-  cp "$ROOT/anykernel/anykernel.sh" "$ak3/anykernel.sh"
-  ak3_line="$AK3_REPO @ $AK3_COMMIT"
+  echo "AK3_FROM_TREE is not set (the Aigis kernel packs with its own AnyKernel folder)" >&2; exit 1
 fi
 
 read_json() { python3 -c "import json,sys; d=json.load(open('$INFO_DIR/sources.json')); print(d$1)"; }
 susfs=$(read_json '["susfs"]["version"]')
 kshort=$(read_json '["kernel"]["commit"][:8]')
-# Root module (xxKSU or BakaSU): its short commit, x<sha> or b<sha> in the name.
+# Root module (BakaSU): its short commit, b<sha> in the name. (The sources.json
+# key "xxksu" means the root module of the kernel; kept for older runs.)
 xshort=$(read_json '["xxksu"]["commit"][:8]')
-rletter=x; [[ "$ROOT_FLAVOR" == bakasu ]] && rletter=b
+rletter=b
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
 # Kernel ID: the same for every build of this exact kernel; the NoMount module
@@ -46,11 +39,6 @@ release=$(cat "$OUT_DIR/include/config/kernel.release")
 kernel_id=$(bash "$ROOT/scripts/kernel_id.sh" "$OUT_DIR")
 date=$(date -u +%Y%m%d)
 suffix=
-case "$KSU_HOOK" in
-  syscall_table) suffix=-sct ;;
-  branch_link) suffix=-bl ;;
-esac
-[[ "$PERF_TUNING" == true ]] && suffix=$suffix-tuning
 [[ "${VALHALL_GPU:-false}" == true ]] && suffix=$suffix-vgpu
 [[ "${KERNEL_SOURCE%-bakasu}" == aigis && "$KERNEL_TOOLCHAIN" == aosp ]] && suffix=$suffix-aospclang
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
@@ -68,7 +56,6 @@ cp "$IMAGE" "$ak3/Image"
 # Flasher additions, run after the kernel is written:
 #  - every zip: NoMount check (warns when the installed NoMount LKM was not
 #    built for this kernel, by kernel ID)
-#  - mzggr zip (stock A32 GPU): deletes the Aigis Valhall GPU drivers module
 add_after_boot() {
   python3 - "$ak3/anykernel.sh" "$1" <<'PY'
 import sys
@@ -85,7 +72,6 @@ PY
 sed -e "s|@KERNEL_ID@|$kernel_id|" -e "s|@KERNEL_RELEASE@|$release|" -e "s|@NOMOUNT_MODE@|${NOMOUNT_MODE:-lkm}|" \
   "$ROOT/anykernel/nomount-check.sh" > "$work/nomount-check.sh"
 add_after_boot "$work/nomount-check.sh"
-[[ "$KERNEL_SOURCE" == mzggr ]] && add_after_boot "$ROOT/anykernel/gpu-cleanup.sh"
 grep -q '^nomount_check;' "$ak3/anykernel.sh"
 dtb_line="not included (the phone's current dtb is kept)"
 if [[ -n "${AK3_DTB_BOOTIMG:-}" ]]; then
@@ -115,20 +101,11 @@ fi
     echo "Toolchain: $(grep -m1 "clang version" "$OUT_DIR/toolchain-source.txt") + ld.lld + GNU as (no LTO)"
   fi
   echo "AnyKernel3: $ak3_line"
-  if [[ "${KERNEL_SOURCE%-bakasu}" == aigis ]]; then
-    echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 with Aigis GPU tuning' || echo 'stock A32 Bifrost r25p0 (same as the mzggr kernel)')"
-  else
-    echo "GPU: stock A32 Bifrost r25p0"
-  fi
+  echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 with Aigis GPU tuning' || echo 'stock A32 Bifrost r25p0')"
   echo "dtb: $dtb_line"
   [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
-  if [[ "$ROOT_FLAVOR" == bakasu ]]; then
-    echo "BakaSU hook style: SUSFS inline hooks (compile-time calls inside the kernel functions)"
-  else
-    echo "xxKSU hook style: $KSU_HOOK"
-  fi
-  echo "Performance tuning: $PERF_TUNING"
+  echo "BakaSU hook style: SUSFS inline hooks (compile-time calls inside the kernel functions)"
   echo "NoMount: $nomount_line"
   echo "Patches applied:"
   sed 's/^/  - /' "$INFO_DIR/applied-patches.txt"

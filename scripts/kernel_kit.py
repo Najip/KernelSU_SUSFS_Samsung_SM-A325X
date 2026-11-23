@@ -104,7 +104,7 @@ def find(k):
 def in_run(run_id):
     repo = os.environ["GITHUB_REPOSITORY"]
     arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
-    src = os.environ.get("KERNEL_SOURCE", "mzggr")
+    src = os.environ.get("KERNEL_SOURCE", "aigis-bakasu")
     bakasu = lambda n: n.startswith("kernel-kit-aigis-bakasu-")
     if src == "aigis-bakasu":
         pick(arts, bakasu)

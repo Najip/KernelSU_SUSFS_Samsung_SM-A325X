@@ -3,10 +3,10 @@
 
   promoted_source.py find
     Finds the most recent successful "Build Kernel" run with commit mode
-    Latest and the default kernel options (hook manual, NoMount not built in,
-    not a NoMount-only run, Aigis compiler aigis) on $BRANCH
-    that built every kernel in $SOURCES ("mzggr", "aigis" or both) and whose
-    files have not expired yet. Runner, release type, tuning, the Aigis GPU
+    Latest and the default kernel options (NoMount not built in, not a
+    NoMount-only run, compiler aigis) on $BRANCH that built every kernel in
+    $SOURCES ("aigis-bakasu"; older runs: "mzggr", "aigis") and whose
+    files have not expired yet. Runner, release type, the Aigis GPU
     (Valhall or stock) and whether the NoMount LKM was built do not matter. Writes
     source_run, source_url and source_sha to $GITHUB_OUTPUT.
 
@@ -40,6 +40,9 @@ ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis",
 
 def built_sources(title):
     """Kernels a Build Kernel run built, from its run-name (older runs: mzggr)."""
+    # Runs since xxKSU was dropped (22 Nov 2026) build Aigis BakaSU only.
+    if title.startswith("A325X BakaSU + SUSFS kernel (Aigis)"):
+        return {"aigis-bakasu"}
     if "(Aigis + mzggr)" in title or "(mzggr + Aigis)" in title:  # older runs: mzggr + Aigis
         built = {"mzggr", "aigis"}
     elif "(Aigis)" in title:
@@ -84,7 +87,8 @@ def find():
         # run-name contains "(Latest)" for commit mode Latest.
         if "(Latest)" not in title:
             continue
-        if ("[manual]" not in title or "integrate" in title or "LKM only" in title
+        # Older xxKSU runs: only the default hook (manual).
+        if ("[syscall_table]" in title or "[branch_link]" in title or "integrate" in title or "LKM only" in title
                 or "(main compiler)" in title):
             print(f"Skipping run {run['id']} ({title}): not the default options.")
             continue
@@ -107,9 +111,9 @@ def find():
         })
         return
     kernels = " and ".join(sorted(wanted))
-    message = (f"Nothing to promote: no successful Latest build of {kernels} with the default options (hook manual, "
-               f"NoMount not built in, Aigis compiler aigis) with files left on {branch}. Run Build Kernel with commit "
-               f"mode Latest and Kernel {'both' if len(wanted) > 1 else kernels} first, then run Promoted again.")
+    message = (f"Nothing to promote: no successful Latest build of {kernels} with the default options "
+               f"(NoMount not built in, compiler aigis) with files left on {branch}. Run Build Kernel with commit "
+               f"mode Latest first, then run Promoted again.")
     print(f"::warning title=Nothing promoted::{message}")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:

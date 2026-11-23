@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md)
 
-Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of three ways. The pins are saved in `configs/verified.json`.
+Every build picks the commits of the kernel, BakaSU and the SUSFS patch in one of three ways. The pins are saved in `configs/verified.json`.
 
 | Mode | What it builds | When to use it |
 |---|---|---|
@@ -10,11 +10,9 @@ Every build picks the commits of the kernel, xxKSU and the SUSFS patch in one of
 | `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. A full `Release` only works in this mode. |
 | `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
 
-Tuning is allowed in every release type, and `Promoted` takes builds with or without tuning.
+The pins were reset when I switched to BakaSU (23 Nov 2026), because the old ones were for xxKSU. Until the first `Promoted` run after that, `Verified` stops with "No verified commits yet": run `Latest`, test it, then `Promoted`.
 
-`Verified` keeps separate pins for each kernel. The Aigis pins come from a `Promoted` run with Kernel `aigis` or `both`; before that, `Verified` with Aigis stops with "No verified Aigis commits yet".
-
-Which `Latest` runs `Promoted` accepts: hook style `manual`, NoMount `lkm` (not `integrate`; older runs with `no` too), not a **NoMount only** run and **Compiler** `aigis`, and it must have built every kernel you picked (Kernel `both` needs a `Latest` run with `both`; `mzggr` or `aigis` also accept a `both` run). The runner (your PC or GitHub), tuning, **Valhall GPU** (Promoted keeps the GPU of that run), the release type and the benchmark tick do not matter. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
+Which `Latest` runs `Promoted` accepts: a BakaSU build with NoMount `lkm` (not `integrate`), not a **NoMount only** run, and **Compiler** `aigis`. The runner (my PC or GitHub), **Valhall GPU** (Promoted keeps the GPU of that run) and the release type do not matter. Older xxKSU runs are never taken. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
 
 How `Promoted` gets the NoMount module:
 
@@ -22,7 +20,7 @@ How `Promoted` gets the NoMount module:
 - If it has none (older runs with NoMount `no`) or one from the other branch, `Promoted` builds the module from that run's saved kernel kit, without compiling the kernel. Older runs from before the kit existed fall back to compiling the kernel once, only to match the module.
 - The release step puts the NoMount module into every kernel ZIP that does not carry it yet (it must have the same kernel ID). Kernel ZIPs from before this TWRP install cannot take it: build the kernel again. `integrate` is not allowed with `Promoted`.
 
-With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The hook style and tuning options are ignored in `Promoted`; they come from the `Latest` run.
+With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The kernel options are ignored in `Promoted`; they come from the `Latest` run.
 
 A full `Release` with `Latest` or `Promoted` stops with the message "Release must use Verified". Use `Pre-release` for those, or switch to `Verified`.
 
@@ -35,7 +33,7 @@ It stops with "Release must use Verified" when that pre-release was not built fr
 
 "What's new" in a full Release always compares with the previous full Release; a pre-release compares with the previous release of any kind. A previous release of another kernel repo makes it a "First release".
 
-With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14-<kernel>.ko` built in the same run to the release page, plus the xxKSU manager `.apk`. The README sources table is updated only by a full `Release`.
+With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `nomount-4.14-aigis-bakasu.ko` built in the same run to the release page, plus the BakaSU manager `.apk`. The README sources table is updated only by a full `Release`.
 
 ## XDA changelog
 

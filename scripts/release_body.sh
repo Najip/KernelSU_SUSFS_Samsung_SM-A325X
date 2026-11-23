@@ -3,10 +3,8 @@
 #
 #   release_body.sh <release folder> <tag prefix> <type> <this tag> <out.md>
 #
-# <release folder> has sources.json, build-info.txt (the mzggr kernel, else the
-# first kernel), sources-<kernel>.json / build-info-<kernel>.txt for the other
-# kernels (aigis, aigis-bakasu) and files named like the release ZIPs (only the
-# names are used).
+# <release folder> has sources.json, build-info.txt (the kernel: Aigis with
+# BakaSU) and files named like the release ZIPs (only the names are used).
 # <type> Release: "what's new" since the previous full Release.
 # <type> Pre-release: since the previous release of any kind.
 # The previous release must use the same kernel repo, otherwise it is a first release.
@@ -40,52 +38,37 @@ info_of() {
 }
 python3 "$here/release_notes.py" notes "$dir/sources.json" "$prev_json" "$dir/build-info.txt" "$out"
 shopt -s nullglob
-others=("$dir"/sources-*.json)
-if ((${#others[@]})); then
-  {
-    echo
-    echo "## Kernels in this release"
-    echo "Pick one kernel ZIP and flash it. NoMount: flash the NoMount ZIP made for that kernel."
-    for z in "$dir"/*.zip; do
-      n=$(basename "$z")
-      case "$n" in
-        NoMount-*) ;;
-        *-Aigis-BakaSU-*-vgpu*.zip) echo "- \`$n\`: main kernel (Aigis) with BakaSU as root instead of xxKSU, Valhall GPU, drivers module included (needs the BakaSU manager; details: $(info_of aigis-bakasu))" ;;
-        *-Aigis-BakaSU-*) echo "- \`$n\`: main kernel (Aigis) with BakaSU as root instead of xxKSU (needs the BakaSU manager; details: $(info_of aigis-bakasu))" ;;
-        *-Aigis-*-valhall.zip) echo "- \`$n\`: main kernel (Aigis) with the Valhall GPU and its drivers module" ;;
-        *-Aigis-*-vgpu*.zip) echo "- \`$n\`: main kernel (Aigis by SlamZDank, the one I use every day) with the Valhall GPU, drivers module included (details: $(info_of aigis))" ;;
-        *-Aigis-*) echo "- \`$n\`: main kernel (Aigis by SlamZDank, the one I use every day) (details: $(info_of aigis))" ;;
-        *) echo "- \`$n\`: Alt. kernel (mzggr by mzggr0914) (details: $(info_of mzggr))" ;;
-      esac
-    done
-    for z in "$dir"/NoMount-*.zip; do
-      n=$(basename "$z")
-      case "$n" in *-aigis-bakasu-*) k="main kernel with BakaSU (Aigis BakaSU)" ;; *-aigis-*) k="main kernel (Aigis)" ;; *-mzggr-*) k="Alt. kernel (mzggr)" ;; *) k= ;; esac
-      echo "- \`$n\`: NoMount module${k:+ for the $k}"
-    done
-  } >> "$out"
-fi
+{
+  echo
+  echo "## Files in this release"
+  echo "Root is BakaSU: xxKSU was archived by its developer on 22 Nov 2026, so the xxKSU and Alt. kernel (mzggr) builds stopped."
+  echo "The kernel ZIP already carries its NoMount module (installed or replaced when you flash, see docs/flashing.md)."
+  for z in "$dir"/*.zip; do
+    n=$(basename "$z")
+    case "$n" in
+      NoMount-*) echo "- \`$n\`: the same NoMount module as a separate ZIP (for the manager)" ;;
+      *-vgpu*.zip) echo "- \`$n\`: main kernel (Aigis by SlamZDank) with BakaSU, Valhall GPU, drivers module included (details: $(info_of aigis-bakasu))" ;;
+      *) echo "- \`$n\`: main kernel (Aigis by SlamZDank) with BakaSU (details: $(info_of aigis-bakasu))" ;;
+    esac
+  done
+} >> "$out"
 shopt -s nullglob
 apks=("$dir"/*.apk)
 if ((${#apks[@]})); then
   {
     echo
     echo "## Manager apps"
-    if [[ -f "$dir/manager.json" || -f "$dir/manager-bakasu.json" ]]; then
+    if [[ -f "$dir/manager-bakasu.json" ]]; then
       python3 - "$dir" <<'PY2'
 import json, os, sys
 d = sys.argv[1]
-if os.path.exists(os.path.join(d, "manager.json")):
-    m = json.load(open(os.path.join(d, "manager.json")))
-    print(f"- `{m['apk']}`: xxKSU manager, from the latest xxKSU release [{m['tag']}]({m['url']}). "
-          "Install it to manage root on the xxKSU kernels.")
 if os.path.exists(os.path.join(d, "manager-bakasu.json")):
     m = json.load(open(os.path.join(d, "manager-bakasu.json")))
     print(f"- `{m['apk']}`: BakaSU manager, from the BakaSU build [{m['tag']}]({m['url']}) of the same BakaSU "
-          f"commit `{m['commit'][:12]}` as the kernel. Install it (instead of the xxKSU one) on the BakaSU kernel.")
+          f"commit `{m['commit'][:12]}` as the kernel. Install it to manage root (it replaces the xxKSU manager).")
 PY2
     else
-      for a in "${apks[@]}"; do echo "- \`$(basename "$a")\`: xxKSU manager. Install it to manage root."; done
+      for a in "${apks[@]}"; do echo "- \`$(basename "$a")\`: BakaSU manager. Install it to manage root."; done
     fi
   } >> "$out"
 fi
@@ -101,7 +84,7 @@ for name in sorted(n for n in os.listdir(d) if n.startswith("sources") and n.end
     s = json.load(open(os.path.join(d, name)))
     kernel = s.get("source") or ("aigis" if "aigis" in s["kernel"]["repo"].lower() else "mzggr")
     label = labels.get(kernel, kernel)
-    parts = [(label, s["kernel"]), (s.get("root") or "xxKSU", s["xxksu"]), ("SUSFS patch", s["susfs"]), ("This repo (patches, build scripts)", s.get("build_repo"))]
+    parts = [(label, s["kernel"]), (s.get("root") or "Root module", s["xxksu"]), ("SUSFS patch", s["susfs"]), ("This repo (patches, build scripts)", s.get("build_repo"))]
     for what, x in parts:
         if not x or (what, x["commit"]) in seen:
             continue
