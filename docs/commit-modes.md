@@ -7,7 +7,7 @@ Every build picks the commits of the kernel, BakaSU and the SUSFS patch in one o
 | Mode | What it builds | When to use it |
 |---|---|---|
 | `Latest` (default) | The newest commit of each source. | Trying out new upstream changes. |
-| `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. A full `Release` only works in this mode. |
+| `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. Release type `Release` (build and publish in one run) only works in this mode; `Release from pre-release` does not need it. |
 | `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
 
 The pins were reset when I switched to BakaSU (23 Nov 2026), because the old ones were for xxKSU. Until the first `Promoted` run after that, `Verified` stops with "No verified commits yet": run `Latest`, test it, then `Promoted`.
@@ -22,14 +22,14 @@ How `Promoted` gets the NoMount module:
 
 With **Release** set to `CI`, the files are kept as artifacts of the `Promoted` run. With `Pre-release`, they are published as a pre-release. The kernel options are ignored in `Promoted`; they come from the `Latest` run.
 
-A full `Release` with `Latest` or `Promoted` stops with the message "Release must use Verified". Use `Pre-release` for those, or switch to `Verified`.
+Building a full `Release` directly (release type `Release`) needs commit mode `Verified`; with `Latest` or `Promoted` it stops with "Release must use Verified". Publish a `Pre-release` instead and turn it into the Release as below.
 
-**Release from last pre-release** (no build): test first, then publish exactly what you flashed.
+**Release from pre-release** (no build): test first, then publish exactly what you flashed. Any pre-release works, also one built with `Latest` (for example an automatic upstream pre-release) that was never Verified.
 
-1. Run Build Kernel with commit mode `Verified` and release type `Pre-release`, and flash that pre-release.
-2. When it works, run Build Kernel again with commit mode `Verified` and release type `Release from last pre-release`. The newest pre-release of this branch becomes the full Release (same ZIPs, notes rewritten as "what's new since the last Release") and the README sources table is updated. Kernel options are ignored here.
+1. Flash a pre-release and test it.
+2. When it works, run Build Kernel with release type `Release from pre-release`. Put its tag in **Pre-release tag** (for example `build-20261124-120`), or leave it empty for the newest pre-release of this branch. Commit mode and kernel options are ignored. That pre-release becomes the full Release (same ZIPs, notes rewritten as "what's new since the last Release", XDA posts attached) and the README sources table is updated.
 
-It stops with "Release must use Verified" when that pre-release was not built from the commits in `configs/verified.json` (for example a `Latest` pre-release, or one made before a newer `Promoted`).
+The run summary says whether it was built from the Verified commits (information only, it never stops the run). It stops only when the tag does not exist, is already a full Release, or has no BakaSU kernel ZIP (pre-releases from before the switch to BakaSU on 23 Nov 2026). Publishing does not change `configs/verified.json`; run `Promoted` if you also want new Verified pins.
 
 "What's new" in a full Release always compares with the previous full Release; a pre-release compares with the previous release of any kind. A previous release of another kernel repo makes it a "First release".
 
@@ -37,7 +37,7 @@ With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `no
 
 ## XDA posts
 
-Every full Release (`Release`, or `Release from last pre-release`) also gets `XDA-posts-<tag>.txt` (BBCode, made by `scripts/xda_posts.py`):
+Every full Release (`Release`, or `Release from pre-release`) also gets `XDA-posts-<tag>.txt` (BBCode, made by `scripts/xda_posts.py`):
 
 - **Post #2, changelog**: this release in full (the long build info folded into a spoiler), then a list of the older full Releases with links.
 - **Post #3, updates**: the text of [`docs/xda-updates.txt`](xda-updates.txt) (news, known issues, recommended modules) plus a line with the newest stable release. I edit that file by hand when there is news.
