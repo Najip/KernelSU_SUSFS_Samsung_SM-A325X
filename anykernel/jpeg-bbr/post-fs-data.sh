@@ -10,21 +10,31 @@
 #    its normal heap (0444 system:system). Tested with tools/mtk-mm-test.sh.
 #    Without mtk_mm (other kernels): fall back to Juan's (LumiROM) workaround,
 #    debug.jpegfull.opt.switch=0, which turns that path off.
-n=/dev/dma_heap/mtk_mm
-if [ -c $n ]; then
-  chown system:system $n
-  chmod 0444 $n
-  # Label only when the ROM left it unlabeled (plain "device"); a label the
-  # ROM sets on purpose is kept.
-  case "$(ls -Z $n 2>/dev/null)" in
-    *:device:s0*) chcon u:object_r:dmabuf_system_heap_device:s0 $n 2>/dev/null ;;
-  esac
-  # Path on (Juan's odm patch, if still flashed, turns it off at boot).
-  setprop debug.jpegfull.opt.switch 1
-else
-  setprop debug.jpegfull.opt.switch 0
-fi
 # 2) BBR (by Juan, LumiROM): the kernel default. The vendor's
 #    networksetting.rc sets bic later, so service.sh sets BBR again.
-grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null \
-  && echo bbr > /proc/sys/net/ipv4/tcp_congestion_control
+#
+# Each part is skipped when the ROM already does it (rom-check.sh); when the
+# ROM does both, the module removes itself.
+MODDIR=${0%/*}
+. "$MODDIR/rom-check.sh"
+[ $ROM_DONE = 1 ] && exit 0
+n=/dev/dma_heap/mtk_mm
+if [ $ROM_JPEG = 0 ]; then
+  if [ -c $n ]; then
+    chown system:system $n
+    chmod 0444 $n
+    # Label only when the ROM left it unlabeled (plain "device"); a label the
+    # ROM sets on purpose is kept.
+    case "$(ls -Z $n 2>/dev/null)" in
+      *:device:s0*) chcon u:object_r:dmabuf_system_heap_device:s0 $n 2>/dev/null ;;
+    esac
+    # Path on (Juan's odm patch, if still flashed, turns it off at boot).
+    setprop debug.jpegfull.opt.switch 1
+  else
+    setprop debug.jpegfull.opt.switch 0
+  fi
+fi
+if [ $ROM_BBR = 0 ]; then
+  grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null \
+    && echo bbr > /proc/sys/net/ipv4/tcp_congestion_control
+fi
