@@ -1,45 +1,20 @@
 name: Build Kernel
-run-name: ${{ inputs.release_type == 'Release from last pre-release' && 'A325X publish the last pre-release as Release' || '' }}${{ inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || (inputs.root_flavor == 'BakaSU' && 'A325X BakaSU + SUSFS kernel' || (inputs.root_flavor == 'All' && 'A325X xxKSU/BakaSU + SUSFS kernel' || 'A325X xxKSU + SUSFS kernel')))) || '' }}${{ inputs.kernel_source == 'aigis' && ' (Aigis)' || (inputs.kernel_source == 'both' && ' (Aigis + mzggr)' || '') }}${{ inputs.root_flavor == 'BakaSU' && ' (root BakaSU)' || (inputs.root_flavor == 'All' && ' (root All)' || '') }}${{ inputs.root_flavor != 'xxKSU' && inputs.bakasu_branch != '' && inputs.bakasu_branch != 'main' && format(' (BakaSU {0})', inputs.bakasu_branch) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.root_flavor != 'BakaSU' && format(' [{0}]', inputs.ksu_hook) || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.perf_tuning && inputs.kernel_source != 'aigis' && ' (tuning)' || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.kernel_source != 'mzggr' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.reuse != '' && ' (upstream)' || '' }}${{ inputs.nomount == 'no' && ' no NoMount' || format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.release_type == 'Release from last pre-release' && 'A325X publish the last pre-release as Release' || '' }}${{ inputs.release_type != 'Release from last pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X BakaSU + SUSFS kernel')) || '' }} (Aigis)${{ inputs.bakasu_branch != '' && inputs.bakasu_branch != 'main' && format(' (BakaSU {0})', inputs.bakasu_branch) || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ inputs.reuse != '' && ' (upstream)' || '' }}${{ format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from last pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
-# Every source (kernel, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
+# Every source (Aigis kernel, BakaSU, SUSFS patch, NoMount) is downloaded fresh during the run.
+# Only the main kernel (Aigis) with BakaSU is built here. xxKSU was archived by
+# its developer on 22 Nov 2026; the xxKSU builds and the Alt. kernel (mzggr)
+# are kept, frozen, in the xxksu branch.
 on:
   workflow_dispatch:
     inputs:
-      kernel_source:
-        description: 'Kernel. aigis = main kernel, Aigis by SlamZDank (default). mzggr = Alt. kernel, mzggr0914. both = build both (all ZIPs, one release)'
-        type: choice
-        options:
-          - aigis
-          - mzggr
-          - both
-        default: aigis
-      root_flavor:
-        description: 'Root flavor. xxKSU = default. BakaSU = the main kernel (Aigis) with BakaSU (SUSFS inline hooks) instead of xxKSU, Aigis only. All = the xxKSU kernels plus Aigis BakaSU'
-        type: choice
-        options:
-          - xxKSU
-          - BakaSU
-          - All
-        default: xxKSU
       bakasu_branch:
-        description: 'BakaSU branch (Root flavor BakaSU or All only). main = default'
+        description: 'BakaSU branch. main = default'
         type: string
         default: main
       self_hosted:
         description: 'Prefer my own PC (self-hosted). If it is busy, a GitHub runner is used when that finishes sooner. Untick = GitHub runner'
-        type: boolean
-        default: true
-      ksu_hook:
-        description: 'xxKSU hook. manual = default. branch_link is currently unstable. BakaSU always uses its SUSFS inline hooks'
-        type: choice
-        options:
-          - manual
-          - syscall_table
-          - branch_link
-        default: manual
-      perf_tuning:
-        description: 'Performance tuning, mzggr kernel only (Aigis keeps its own tuning, ignored there): GPU 1100 MHz, CPU/CCI undervolt, BORE, 250 Hz, schedutil, fast charge, zstd zram, BBR, fq_codel'
         type: boolean
         default: true
       network_fix:
@@ -47,15 +22,15 @@ on:
         type: boolean
         default: true
       uname_tag:
-        description: 'Text added to the end of uname -r on both kernels (letters, digits, space, . _ + -; no /). Empty = none'
+        description: 'Text added to the end of uname -r (letters, digits, space, . _ + -; no /). Empty = none'
         type: string
         default: '-forkby-gh.Najip'
       valhall_gpu:
-        description: 'Aigis only: Valhall GPU, default ticked and allowed with every release type (Aigis r32p1 GPU code, r32p1 dtb, one zip with the kernel and the drivers module bundled). Unticked = stock A32 GPU'
+        description: 'Valhall GPU, default ticked and allowed with every release type (Aigis r32p1 GPU code, r32p1 dtb, one zip with the kernel and the drivers module bundled). Unticked = stock A32 GPU'
         type: boolean
         default: true
       compiler:
-        description: 'Aigis only: compiler. aigis = ZyC Clang 14.0.6 the Aigis CI way (default). main = AOSP Clang 14 as used for mzggr'
+        description: 'Compiler. aigis = ZyC Clang 14.0.6 the Aigis CI way (default). main = AOSP Clang 14'
         type: choice
         options:
           - aigis
@@ -96,10 +71,6 @@ on:
           - Release
           - Release from last pre-release
         default: CI
-      bench_tool:
-        description: 'Also build the hook benchmark tool (hook-bench artifact). Not needed to use the kernel'
-        type: boolean
-        default: false
       reuse:
         description: 'Leave empty (set by the Upstream check). Per kernel: kernel = build it, nomount = keep the kernel ZIP of an earlier run and build only NoMount, reuse = keep all files of an earlier run'
         type: string
@@ -111,16 +82,11 @@ permissions:
 
 
 env:
-  KERNEL_CHOICE: ${{ inputs.kernel_source || 'mzggr' }}
-  ROOT_FLAVOR: ${{ inputs.root_flavor || 'xxKSU' }}
   BAKASU_BRANCH: ${{ inputs.bakasu_branch || 'main' }}
-  # sources.conf ignores tuning for Aigis (it keeps its own tuning).
-  PERF_TUNING: ${{ inputs.perf_tuning }}
   VALHALL_GPU: ${{ inputs.valhall_gpu }}
   AIGIS_COMPILER: ${{ inputs.compiler || 'aigis' }}
   NETWORK_FIX: ${{ inputs.network_fix }}
   KERNEL_TAG: ${{ inputs.uname_tag }}
-  KSU_HOOK: ${{ inputs.ksu_hook || 'manual' }}
   NOMOUNT_MODE: ${{ inputs.nomount || 'lkm' }}
   NOMOUNT_REF: ${{ inputs.nomount_branch || 'master' }}
   GH_TOKEN: ${{ github.token }}
@@ -153,8 +119,8 @@ jobs:
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
           if [[ -n "$REUSE" ]]; then
-            [[ "$KERNEL_CHOICE" == both && "$MODE" == Latest && "$NM_ONLY" != true && "$NOMOUNT_MODE" == lkm ]] \
-              || fail "reuse needs Kernel both, commit mode Latest, NoMount lkm and NoMount only unticked."
+            [[ "$MODE" == Latest && "$NM_ONLY" != true && "$NOMOUNT_MODE" == lkm ]] \
+              || fail "reuse needs commit mode Latest, NoMount lkm and NoMount only unticked."
             [[ "$TYPE" == CI || "$TYPE" == Pre-release ]] || fail "reuse can only make a CI build or a Pre-release."
           fi
           if [[ ( "$TYPE" == Release || "$TYPE" == 'Release from last pre-release' ) && "$MODE" != Verified ]]; then
@@ -165,29 +131,16 @@ jobs:
             echo "No build: the newest pre-release becomes the full Release."
             exit 0
           fi
-          if [[ "$ROOT_FLAVOR" != xxKSU && "$KERNEL_CHOICE" == mzggr ]]; then
-            fail "BakaSU is built on the main kernel (Aigis) only. Choose Kernel aigis or both, or Root flavor xxKSU."
-          fi
-          if [[ "$ROOT_FLAVOR" != xxKSU ]]; then
-            [[ "$BAKASU_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "BakaSU branch '$BAKASU_BRANCH': letters, digits and . _ / - only."
-            git ls-remote --exit-code https://github.com/Baka-SU/BakaSU "refs/heads/$BAKASU_BRANCH" >/dev/null \
-              || fail "BakaSU has no branch '$BAKASU_BRANCH'. Use main (default) or another branch of Baka-SU/BakaSU."
-          elif [[ "$BAKASU_BRANCH" != main ]]; then
-            echo "::warning title=BakaSU branch ignored::The BakaSU branch is used only with Root flavor BakaSU or All."
-          fi
-          if [[ "$ROOT_FLAVOR" != xxKSU && "$KSU_HOOK" != manual ]]; then
-            echo "::warning title=Hook for xxKSU only::The xxKSU hook ($KSU_HOOK) is used for the xxKSU kernels only. BakaSU always uses its SUSFS inline hooks."
-          fi
-          if [[ "$PERF_TUNING" == true && "$KERNEL_CHOICE" != mzggr ]]; then
-            echo "::warning title=Tuning ignored for Aigis::Performance tuning is for the mzggr kernel only. The Aigis kernel is built without it (Aigis keeps its own tuning)."
-          fi
+          [[ "$BAKASU_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "BakaSU branch '$BAKASU_BRANCH': letters, digits and . _ / - only."
+          git ls-remote --exit-code https://github.com/Baka-SU/BakaSU "refs/heads/$BAKASU_BRANCH" >/dev/null \
+            || fail "BakaSU has no branch '$BAKASU_BRANCH'. Use main (default) or another branch of Baka-SU/BakaSU."
           if [[ "$NM_ONLY" == true ]]; then
             [[ "$NOMOUNT_MODE" == lkm ]] || fail "NoMount only needs the NoMount option lkm."
             [[ "$TYPE" == CI ]] || fail "NoMount only builds are not released. Choose CI."
             [[ "$MODE" != Promoted ]] || fail "NoMount only does not work with Promoted (Promoted already builds the module when it is missing)."
           fi
           if [[ "$MODE" == Promoted && "$NOMOUNT_MODE" == integrate ]]; then
-            fail "Promoted takes the kernel of a default Latest build, where NoMount is a separate LKM. Choose lkm or no."
+            fail "Promoted takes the kernel of a default Latest build, where NoMount is a separate LKM. Choose lkm."
           fi
           echo "Options are fine."
       - name: Choose self-hosted PC or GitHub runner
@@ -216,7 +169,6 @@ jobs:
       checkout_sha: ${{ steps.plan.outputs.checkout_sha }}
       collect_runs: ${{ steps.plan.outputs.collect_runs }}
       collect_sources: ${{ steps.plan.outputs.collect_sources }}
-      xxksu_manager: ${{ steps.plan.outputs.xxksu_manager }}
       bakasu_ref: ${{ steps.plan.outputs.bakasu_ref }}
       bakasu_branch: ${{ steps.plan.outputs.bakasu_branch }}
 
@@ -224,59 +176,13 @@ jobs:
     name: List manager APK
     needs: pick
     outputs:
-      apk: ${{ steps.get.outputs.apk }}
       bakasu_apk: ${{ steps.bakasu.outputs.apk }}
     if: inputs.release_type != 'Release from last pre-release'
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
-    env:
-      MANAGER_REPO: backslashxx/KernelSU
     steps:
-      - name: Get the xxKSU manager APK of the latest xxKSU release
-        id: get
-        if: needs.pick.outputs.xxksu_manager != 'false'
-        run: |
-          set -euo pipefail
-          # The latest release (not a pre-release) of xxKSU always has the manager APK.
-          rel=$(gh release view --repo "$MANAGER_REPO" --json tagName,url,publishedAt,assets)
-          tag=$(jq -r .tagName <<<"$rel")
-          apk=$(jq -r '[.assets[].name | select(endswith(".apk"))] | (map(select(endswith("-release.apk"))) + .)[0] // ""' <<<"$rel")
-          [[ -n "$apk" ]] || { echo "::error::The latest xxKSU release $tag has no .apk."; exit 1; }
-          mkdir manager
-          gh release download "$tag" --repo "$MANAGER_REPO" --pattern "$apk" --dir manager
-          unzip -l "manager/$apk" | grep -q AndroidManifest.xml || { echo "::error::$apk is not an Android app."; exit 1; }
-          sha=$(sha256sum "manager/$apk" | cut -d' ' -f1)
-          jq -n --arg repo "https://github.com/$MANAGER_REPO" --arg tag "$tag" --arg url "$(jq -r .url <<<"$rel")" \
-            --arg date "$(jq -r .publishedAt <<<"$rel")" --arg apk "$apk" --arg sha "$sha" \
-            '{repo: $repo, tag: $tag, url: $url, date: $date, apk: $apk, sha256: $sha}' > manager/manager.json
-          cat manager/manager.json
-          echo "apk=$apk" >> "$GITHUB_OUTPUT"
-          {
-            echo "### xxKSU manager: \`$apk\`"
-            echo "From the latest xxKSU release [$tag]($(jq -r .url <<<"$rel")), SHA256 \`$sha\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # The artifact has the APK's own name (archive: false, the .apk itself).
-      - name: Upload ${{ steps.get.outputs.apk }}
-        if: steps.get.outputs.apk != ''
-        uses: actions/upload-artifact@v7
-        with:
-          path: manager/${{ steps.get.outputs.apk }}
-          archive: false
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload manager.json (where the APK comes from)
-        if: steps.get.outputs.apk != ''
-        uses: actions/upload-artifact@v7
-        with:
-          name: xxksu-manager-info
-          path: manager/manager.json
-          if-no-files-found: error
-          retention-days: 30
-
       # BakaSU has no releases for its branch builds: its manager comes from BakaSU's own
       # "Build Manager" run of the same commit as the kernel (Manager-release
       # artifact, the arm64-v8a release APK, original name).
@@ -310,26 +216,21 @@ jobs:
           retention-days: 30
 
   build:
-    name: ${{ matrix.source }} - ${{ matrix.build_kernel == 'true' && (matrix.source == 'aigis-bakasu' && 'Build BakaSU + SUSFS kernel' || 'Build xxKSU + SUSFS kernel') || 'Build the NoMount module' }}
+    name: ${{ matrix.source }} - ${{ matrix.build_kernel == 'true' && 'Build BakaSU + SUSFS kernel' || 'Build the NoMount module' }}
     needs: pick
     if: needs.pick.outputs.build_any == 'true'
     runs-on: ${{ needs.pick.outputs.runner }}
     strategy:
       fail-fast: false
-      # My PC builds one kernel at a time anyway; one job at a time keeps the
-      # plan order (Aigis first, then mzggr). GitHub runners build in parallel.
-      max-parallel: ${{ fromJSON(needs.pick.outputs.runner == 'self-hosted' && '1' || '4') }}
       matrix:
         include: ${{ fromJSON(needs.pick.outputs.matrix) }}
     env:
       SELF_HOSTED: ${{ needs.pick.outputs.runner == 'self-hosted' }}
       KERNEL_SOURCE: ${{ matrix.source }}
-      # Artifact name suffix: none for mzggr (as before), -aigis for Aigis,
-      # -aigis-bakasu for Aigis BakaSU.
-      SFX: ${{ matrix.source != 'mzggr' && format('-{0}', matrix.source) || '' }}
-      # Promoted: same hook style and tuning as the Latest run it takes the kernel from.
+      # Artifact name suffix: -aigis-bakasu (the same names as before).
+      SFX: ${{ format('-{0}', matrix.source) }}
+      # Kernel kit key part (always "inline" for BakaSU).
       KSU_HOOK: ${{ matrix.ksu_hook }}
-      PERF_TUNING: ${{ matrix.perf_tuning }}
       NETWORK_FIX: ${{ matrix.network_fix }}
       # Promoted: the Aigis GPU (Valhall or stock) of the Latest run.
       VALHALL_GPU: ${{ matrix.valhall_gpu }}
@@ -511,7 +412,7 @@ jobs:
         if: env.BUILD_NOMOUNT == 'true'
         run: |
           set -euo pipefail
-          # Same commits, hook style and tuning as the kernel. Either the kernel
+          # Same commits and settings as the kernel. Either the kernel
           # compiled in this job, or the saved kernel kit of that kernel.
           if [[ -n "${KIT_DIR:-}" ]]; then
             NOMOUNT_KIT=$KIT_DIR bash scripts/build_nomount.sh "$PACKAGE_DIR/nomount" 2>&1 | tee -a "$BUILD_LOG"
@@ -538,17 +439,6 @@ jobs:
           got=$(cat "$OUT_DIR/include/config/kernel.release")
           echo "Kernel release here: $got, promoted kernel: $WANT_RELEASE"
           [[ "$got" == "$WANT_RELEASE" ]] || { echo "::error::Kernel release differs from the promoted kernel."; exit 1; }
-
-      - name: Build hook benchmark
-        if: inputs.bench_tool && env.BUILD_KERNEL == 'true' && matrix.first == 'true'
-        run: |
-          set -euo pipefail
-          mkdir -p "$BUILD_WORK/bench"
-          "$TOOLCHAIN/bin/clang" --target=aarch64-linux-gnu -O2 -static -nostdlib -ffreestanding \
-            -fno-stack-protector -fno-builtin -fno-pic -fuse-ld=lld -Wl,--build-id=none -Wl,-z,norelro \
-            -o "$BUILD_WORK/bench/hook-bench" tools/hook-bench.c
-          cp tools/hook-bench.sh "$BUILD_WORK/bench/"
-          echo "BENCH_DIR=$BUILD_WORK/bench" >> "$GITHUB_ENV"
 
       - name: Upload flashable ZIP
         if: env.BUILD_KERNEL == 'true'
@@ -592,14 +482,6 @@ jobs:
           path: ${{ env.NM_KO }}
           archive: false
           if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload hook benchmark
-        if: inputs.bench_tool && env.BUILD_KERNEL == 'true' && matrix.first == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: hook-bench
-          path: ${{ env.BENCH_DIR }}
           retention-days: 30
 
       - name: Upload the kernel kit
@@ -690,8 +572,8 @@ jobs:
         run: |
           set -euo pipefail
           for src in $SOURCES; do
-            if [[ -d "promoted/promoted-nomount-$src" || "$NOMOUNT_MODE" == no ]]; then
-              # Only the module built now (or none), not the one of the Latest run.
+            if [[ -d "promoted/promoted-nomount-$src" ]]; then
+              # Only the module built now, not the one of the Latest run.
               find "source/$src" -path '*/nomount/*' -type f -delete
             fi
             if [[ -d "promoted/promoted-nomount-$src" ]]; then
@@ -706,22 +588,6 @@ jobs:
             run=$(jq -r --arg s "$src" '.[$s]' <<<"$RUNS")
             echo "${{ inputs.commit_mode == 'Promoted' && 'Promoted' || 'Kernel ZIP taken' }} from: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run" >> "release/$src/build-info.txt"
           done
-      - name: Keep the mzggr files for the release job
-        if: contains(needs.pick.outputs.collect_sources, 'mzggr')
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-files
-          path: release/mzggr/
-          if-no-files-found: error
-          retention-days: 30
-      - name: Keep the Aigis files for the release job
-        if: contains(format(' {0} ', needs.pick.outputs.collect_sources), ' aigis ')
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-files-aigis
-          path: release/aigis/
-          if-no-files-found: error
-          retention-days: 30
       - name: Keep the Aigis BakaSU files for the release job
         if: contains(format(' {0} ', needs.pick.outputs.collect_sources), ' aigis-bakasu ')
         uses: actions/upload-artifact@v7
@@ -767,20 +633,6 @@ jobs:
           pattern: release-files*
           path: files
 
-      - name: Download ${{ needs.manager.outputs.apk }}
-        if: needs.manager.outputs.apk != ''
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.manager.outputs.apk }}
-          path: release
-
-      - name: Download manager.json
-        if: needs.manager.outputs.apk != ''
-        uses: actions/download-artifact@v8
-        with:
-          name: xxksu-manager-info
-          path: release
-
       - name: Download ${{ needs.manager.outputs.bakasu_apk }}
         if: needs.manager.outputs.bakasu_apk != ''
         uses: actions/download-artifact@v8
@@ -801,15 +653,13 @@ jobs:
           ls -lR files
           shopt -s nullglob
           mkdir -p release
-          # mzggr (else the first kernel) keeps the plain names (build-info.txt,
-          # sources.json); the others get -aigis / -aigis-bakasu, whatever the
-          # build order. NoMount files always name their kernel.
-          plain=mzggr
-          [[ " $SOURCES " == *" mzggr "* ]] || plain=${SOURCES%% *}
+          # The kernel keeps the plain names (build-info.txt, sources.json).
+          # NoMount files always name their kernel.
+          plain=${SOURCES%% *}
           for src in $SOURCES; do
             sfx=
             [[ $src == "$plain" ]] || sfx=-$src
-            d=files/release-files$([[ $src == mzggr ]] || echo "-$src")
+            d=files/release-files-$src
             [[ -d "$d" ]] || { echo "::error::No release files for the $src kernel."; exit 1; }
             files=("$d"/nomount/*)
             if [[ "$NOMOUNT_MODE" == lkm ]]; then
@@ -834,12 +684,6 @@ jobs:
             mv "$d/build-info.txt" "release/build-info$sfx.txt"
             mv "$d/sources.json" "release/sources$sfx.json"
           done
-          if [[ "${{ needs.pick.outputs.xxksu_manager }}" != false ]]; then
-            apk="${{ needs.manager.outputs.apk }}"
-            [[ -n "$apk" && -f "release/$apk" ]] || { echo "::error::No xxKSU manager APK ($apk)."; exit 1; }
-            [[ "$(sha256sum "release/$apk" | cut -d' ' -f1)" == "$(jq -r .sha256 release/manager.json)" ]] \
-              || { echo "::error::$apk does not match manager.json."; exit 1; }
-          fi
           if [[ -n "${{ needs.pick.outputs.bakasu_ref }}" ]]; then
             apk="${{ needs.manager.outputs.bakasu_apk }}"
             [[ -n "$apk" && -f "release/$apk" ]] || { echo "::error::No BakaSU manager APK ($apk)."; exit 1; }
@@ -868,24 +712,11 @@ jobs:
       - name: Publish release
         run: |
           set -euo pipefail
-          # Title: the Aigis xxKSU kernel ZIP first (main kernel), then "+ BakaSU"
-          # and "+ mzggr" for the other kernels in it.
-          aigis= baka= mz=
+          # Title: the name of the kernel ZIP (without -valhall).
+          name=
           for z in release/A325X-*.zip; do
-            b=$(basename "$z" .zip)
-            case "$b" in
-              *-Aigis-BakaSU-*) [[ -n "$baka" ]] || baka=${b%-valhall} ;;
-              *-Aigis-*) [[ -n "$aigis" ]] || aigis=${b%-valhall} ;;
-              *) mz=$b ;;
-            esac
+            b=$(basename "$z" .zip); name=${b%-valhall}; break
           done
-          if [[ -n "$aigis" ]]; then
-            name=$aigis; [[ -z "$baka" ]] || name="$name + BakaSU"; [[ -z "$mz" ]] || name="$name + mzggr"
-          elif [[ -n "$baka" ]]; then
-            name=$baka; [[ -z "$mz" ]] || name="$name + mzggr"
-          else
-            name=$mz
-          fi
           [[ -n "$name" ]] || { echo "::error::No kernel ZIP in the release."; exit 1; }
           shopt -s nullglob
           assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-changelog-*.txt)

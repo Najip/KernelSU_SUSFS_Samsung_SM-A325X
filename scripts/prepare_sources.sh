@@ -3,9 +3,7 @@
 #
 #   KERNEL_DIR   where the kernel tree goes (required). Reused if it exists.
 #   INFO_DIR     where sources.json / applied-patches.txt are written (required)
-#   PERF_TUNING  true = also apply the optional tuning patch (default false)
 #   NETWORK_FIX  true = apply the UDP GSO network fix (default true)
-#   KSU_HOOK     xxKSU hook style: manual (default), syscall_table, branch_link (currently unstable)
 #   KERNEL_REF / KSU_REF / SUSFS_REF override scripts/sources.conf
 #   KERNEL_BRANCH / KSU_BRANCH / SUSFS_BRANCH  branch name recorded in sources.json
 #                when the ref above is a pinned commit (Verified mode)
@@ -17,24 +15,12 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/scripts/sources.conf"
 : "${KERNEL_DIR:?KERNEL_DIR is required}"
 : "${INFO_DIR:?INFO_DIR is required}"
-PERF_TUNING=${PERF_TUNING:-false}
-KSU_HOOK=${KSU_HOOK:-manual}
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 NOMOUNT_REF=${NOMOUNT_REF:-master}
 case "$NOMOUNT_MODE" in
   no|lkm|integrate) ;;
   *) echo "Unknown NOMOUNT_MODE '$NOMOUNT_MODE' (use no, lkm or integrate)" >&2; exit 1 ;;
 esac
-# BakaSU builds always use its SUSFS inline hooks (calls placed in the kernel
-# functions at compile time, like xxKSU manual); KSU_HOOK is ignored there.
-[[ "$ROOT_FLAVOR" == bakasu ]] && KSU_HOOK=manual
-case "$KSU_HOOK" in
-  manual|syscall_table|branch_link) ;;
-  *) echo "Unknown KSU_HOOK '$KSU_HOOK' (use manual, syscall_table or branch_link)" >&2; exit 1 ;;
-esac
-if [[ "${TUNING_IGNORED:-false}" == true ]]; then
-  echo "::warning title=Tuning ignored::Performance tuning is for the mzggr kernel only; building $KERNEL_REPO without it (it keeps its own tuning)." >&2
-fi
 mkdir -p "$INFO_DIR"
 INFO_DIR=$(cd -- "$INFO_DIR" && pwd)
 
@@ -77,15 +63,15 @@ kernel_sha=$(git rev-parse HEAD)
 kernel_date=$(git show -s --format=%cI HEAD)
 kernel_subject=$(git show -s --format=%s HEAD)
 # The tree ships its own KernelSU submodule and an in-tree NoMount; this build
-# uses xxKSU (fetched below) and the separate NoMount LKM instead.
+# uses BakaSU (fetched below) and the separate NoMount LKM instead.
 rm -rf -- out KernelSU NoMount fs/nomount .gitmodules drivers/kernelsu
 
 applied=()
-log "Converting the tree to the xxKSU + SUSFS layout"
+log "Converting the tree to the BakaSU + SUSFS layout"
 git apply --whitespace=nowarn "$ROOT/patches/$KERNEL_BASE_PATCH"
 applied+=("$KERNEL_BASE_PATCH")
 if [[ -n "${KERNEL_GPU_PATCH:-}" ]]; then
-  log "GPU: stock A32 stack (Bifrost r25p0, from the mzggr kernel)"
+  log "GPU: stock A32 stack (Bifrost r25p0, taken from the mzggr kernel)"
   git apply --whitespace=nowarn "$ROOT/patches/$KERNEL_GPU_PATCH"
   applied+=("$KERNEL_GPU_PATCH")
 fi
@@ -113,7 +99,7 @@ git apply --whitespace=nowarn "$ROOT/patches/susfs/0001-jack-core-local-addition
 applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12} (core files)" "susfs/0001-jack-core-local-additions.patch")
 
 log "$ROOT_NAME: $KSU_REPO ($KSU_REF)"
-if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+{
   # BakaSU's version code is its commit count (30000 + count + 700), the same
   # number its manager shows, so it needs the full history and tags. Always a
   # fresh copy: a reused one may hold the history of another BakaSU branch.
@@ -152,52 +138,24 @@ if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   else
     git -C KernelSU checkout -q -f --detach "origin/$bakasu_branch"
   fi
-else
-  fetch "$KSU_REPO" "$KSU_REF" KernelSU
-fi
+}
 ksu_sha=$(git -C KernelSU rev-parse HEAD)
 ksu_date=$(git -C KernelSU show -s --format=%cI HEAD)
 ksu_subject=$(git -C KernelSU show -s --format=%s HEAD)
-if [[ "$ROOT_FLAVOR" == bakasu ]]; then
-  ksu_version=$((30000 + $(git -C KernelSU rev-list --count HEAD) + 700))
-  ksu_tag=$(git -C KernelSU describe --abbrev=0 --tags 2>/dev/null || true)
-else
-  ksu_version=$(grep -o 'KSU_VERSION=[0-9]*' KernelSU/kernel/Makefile | head -n1 | cut -d= -f2)
-  ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
-fi
-
-if [[ "$ROOT_FLAVOR" == xxksu ]]; then
-  log "Applying xxKSU patches"
-  for p in "$ROOT"/patches/kernelsu/*.patch; do
-    echo "  $(basename "$p")"
-    git -C KernelSU apply --whitespace=nowarn "$p"
-    applied+=("kernelsu/$(basename "$p")")
-  done
-fi
+ksu_version=$((30000 + $(git -C KernelSU rev-list --count HEAD) + 700))
+ksu_tag=$(git -C KernelSU describe --abbrev=0 --tags 2>/dev/null || true)
 ln -sfn ../KernelSU/kernel drivers/kernelsu
 
-if [[ "$ROOT_FLAVOR" == bakasu ]]; then
-  log "Hook style: BakaSU SUSFS inline hooks"
-  applied+=("hook style: BakaSU SUSFS inline (kernel calls BakaSU directly, next to the SUSFS hooks)")
-  # BakaSU (since 2b558ca5, 16 Nov 2026) no longer has the my_* SELinux hide
-  # functions the kernel's own hooks called. On 4.14 BakaSU hooks those
-  # places itself ("auto" mode), so take the kernel's hooks out.
-  for p in "$ROOT"/patches/bakasu/*.patch; do
-    echo "  bakasu/$(basename "$p")"
-    git apply --whitespace=nowarn "$p"
-    applied+=("bakasu/$(basename "$p")")
-  done
-elif [[ "$KSU_HOOK" != manual ]]; then
-  log "Hook style: $KSU_HOOK"
-  # xxKSU hooks these syscalls itself; skip the kernel's own calls to it.
-  echo "  hooks/0001-hookless-skip-parent-hooks.patch"
-  git apply "$ROOT/patches/hooks/0001-hookless-skip-parent-hooks.patch"
-  applied+=("hooks/0001-hookless-skip-parent-hooks.patch ($KSU_HOOK)")
-else
-  log "Hook style: manual"
-  applied+=("hook style: manual (kernel calls xxKSU directly)")
-fi
+log "Hook style: BakaSU SUSFS inline hooks"
+applied+=("hook style: BakaSU SUSFS inline (kernel calls BakaSU directly, next to the SUSFS hooks)")
+# BakaSU (since 2b558ca5, 16 Nov 2026) no longer has the my_* SELinux hide
+# functions the kernel's own hooks called. On 4.14 BakaSU hooks those
+# places itself ("auto" mode), so take the kernel's hooks out.
+for p in "$ROOT"/patches/bakasu/*.patch; do
+  echo "  bakasu/$(basename "$p")"
+  git apply --whitespace=nowarn "$p"
+  applied+=("bakasu/$(basename "$p")")
+done
 
 log "Applying kernel patches"
 netfix="$ROOT/patches/kernel/0001-network-udp-gso.patch"
@@ -225,11 +183,6 @@ elif [[ "$netfix_in_tree" == true ]]; then
   applied+=("0001-network-udp-gso.patch reverted (unticked)")
 else
   echo "  network fix unticked: 0001-network-udp-gso.patch not applied"
-fi
-if [[ "$PERF_TUNING" == true ]]; then
-  echo "  0002-optional-tuning.patch (tuning ticked)"
-  git apply "$ROOT/patches/kernel/0002-optional-tuning.patch"
-  applied+=("0002-optional-tuning.patch")
 fi
 nomount_sha=
 if [[ "$NOMOUNT_MODE" == integrate ]]; then

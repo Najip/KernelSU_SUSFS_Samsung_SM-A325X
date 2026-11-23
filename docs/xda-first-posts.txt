@@ -41,21 +41,28 @@ This release does not include the manager. Use xxKSU manager [URL='https://githu
 [CENTER][SIZE=6][B]Updates and announcements[/B][/SIZE][/CENTER]
 News, plans and known issues are posted here. The newest stable build is always the [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases/latest']latest release[/URL].
 
+[B]2026-11-23: Switched to BakaSU[/B]
+[LIST]
+[*]xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. New builds use [URL='https://github.com/Baka-SU/BakaSU']BakaSU[/URL] (actively developed KernelSU fork, SUSFS inline hooks) on the Aigis kernel.
+[*]The Alt. kernel (mzggr) is dropped: it was xxKSU-only and is not developed anymore.
+[*]Use the BakaSU manager app from the release, and uninstall the old xxKSU manager. The kernel ZIP now installs the matching NoMount module by itself.
+[*]The first BakaSU builds come as pre-releases; a full release follows after I test it. Old xxKSU releases stay on the releases page, without updates.
+[/LIST]
+
 [B]2026-11-22: Thread opened[/B]
 [LIST]
 [*]First stable release: build-20261120-79 (see the changelog post).
 [*]New upstream commits are built automatically as pre-releases on the [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/releases']releases page[/URL]. They are not tested by me yet; use them only if you want to help test.
-[*]Next releases will also attach the xxKSU manager app and a short changelog.
+[*]Next releases will also attach the manager app and a short changelog.
 [/LIST]
 
 [B]Known issues[/B]
 [LIST]
-[*]mzggr kernel: the undervolt was tuned on one phone. If it freezes or reboots under load, use the Aigis kernel.
 [*]Only tested on SM-A325F with LumiROM 9 (Android 17). Reports from A325M / A325N and other ROMs are welcome.
 [/LIST]
 
 [B]Recommended modules[/B]
 [LIST]
 [*]SUSFS userspace: [URL='https://github.com/rrr333nnn333/BRENE']BRENE[/URL]. Do not use sidex15's susfs4ksu-module.
-[*]NoMount: the NoMount ZIP from the same release, for the same kernel.
+[*]NoMount: installed by the kernel ZIP; the separate NoMount ZIP is in the same release.
 [/LIST]

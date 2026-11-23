@@ -2,7 +2,7 @@
 # Builds the NoMount module for the kernel sources already chosen.
 #
 # Expects the same environment as a kernel build (KERNEL_DIR is created here),
-# plus NOMOUNT_REF (dev or master) and KSU_HOOK / PERF_TUNING.
+# plus NOMOUNT_REF (master or dev).
 # NOMOUNT_REUSE_BUILD=true reuses a kernel compiled in this job;
 # NOMOUNT_KIT=<folder> uses a kernel kit instead of compiling the kernel.
 # The last argument is the folder the ZIP and nomount-4.14.ko are copied to.
@@ -121,17 +121,13 @@ sed -i "s/^version=.*/version=${base_ver} (${count}-${nshort}, LKM ${KVER})/" "$
 sed -i "s/^description=.*/& Built for kernel ID ${kernel_id}./" "$mod/module.prop"
 sed -i '/^kernelId=/d' "$mod/module.prop"
 echo "kernelId=$kernel_id" >> "$mod/module.prop"
-suffix=
-[[ "${PERF_TUNING:-false}" == true ]] && suffix=-tuning
-name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-${KERNEL_SOURCE:-mzggr}-k${kshort}-n${nshort}${suffix}"
+name="NoMount-${base_ver}-${NOMOUNT_REF}-lkm-${KVER}-${KERNEL_SOURCE}-k${kshort}-n${nshort}"
 {
-  echo "NoMount LKM for A325X xxKSU + SUSFS kernel"
+  echo "NoMount LKM for A325X BakaSU + SUSFS kernel"
   echo "NoMount: $NOMOUNT_REPO branch $NOMOUNT_REF @ $sha ($count commits)"
   echo "lkmloader: $LKMLOADER_REPO @ $lkm_sha"
   echo "Built for kernel release: $release"
   echo "Built for kernel ID: $kernel_id"
-  echo "xxKSU hook style: ${KSU_HOOK:-}"
-  echo "Performance tuning kernel: ${PERF_TUNING:-false}"
   echo "Kernel sources used:"
   python3 -c "import json;d=json.load(open('$INFO_DIR/sources.json'));[print(f'  {k}: {v[\"repo\"]} @ {v[\"commit\"]}') for k,v in d.items() if isinstance(v,dict)]"
   [[ -n "${GITHUB_RUN_ID:-}" ]] && echo "Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
@@ -144,8 +140,8 @@ unzip -l "$artifacts/$name.zip" | grep -q 'bin/lkmloader-arm64'
 unzip -l "$artifacts/$name.zip" | grep -q 'module.prop'
 
 mkdir -p "$dest"
-# File names say which kernel they are for (aigis or mzggr).
-ko_name="nomount-$KVER-${KERNEL_SOURCE:-mzggr}.ko"
+# File names say which kernel they are for (aigis-bakasu).
+ko_name="nomount-$KVER-${KERNEL_SOURCE}.ko"
 cp -v "$artifacts/$name.zip" "$dest/"
 cp -v "$artifacts/nomount-$KVER.ko" "$dest/$ko_name"
 [[ -s "$dest/$name.zip" && -s "$dest/$ko_name" ]] || { echo "Copy into $dest failed" >&2; ls -l "$dest"; exit 1; }

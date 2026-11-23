@@ -6,11 +6,10 @@
     Writes kernel_ref, ksu_ref, susfs_ref, the matching *_branch values and
     commit_mode to $GITHUB_OUTPUT (and to stdout).
 
-    KERNEL_SOURCE=mzggr|aigis|aigis-bakasu picks the kernel (default mzggr).
+    KERNEL_SOURCE=aigis-bakasu (the default and only kernel; older pins: mzggr, aigis).
     Latest and Promoted use the branch tips in scripts/sources.conf.
     Verified uses configs/verified.json and fails if a pin is missing: the
-    top-level kernel/xxksu/susfs entries for mzggr, the "aigis" entry for Aigis,
-    the "aigis-bakasu" entry for Aigis BakaSU ("xxksu" there = BakaSU).
+    "aigis-bakasu" entry ("xxksu" there = the root module, BakaSU).
 
   resolve_commits.py promote <configs/verified.json> <sources.json>...
     Rewrites the verified pins from the commits that were actually built.
@@ -114,11 +113,11 @@ def resolve():
         if not path.exists():
             fail("No verified commits yet. Run a build with commit mode Promoted after one you have tested.")
         data = json.loads(path.read_text())
-        source = os.environ.get("KERNEL_SOURCE", "mzggr")
+        source = os.environ.get("KERNEL_SOURCE", "aigis-bakasu")
         if source in NESTED:
             data = data.get(source) or {}
             if not data:
-                fail(f"No verified {NESTED[source]} commits yet. Run a Latest build of it, then Promoted with the same Kernel and Root flavor.")
+                fail(f"No verified {NESTED[source]} commits yet. Run a Latest build, then Promoted.")
         missing = []
         for key, repo_var, ref_var, ref_out, branch_out in SOURCES:
             item = data.get(key) or {}

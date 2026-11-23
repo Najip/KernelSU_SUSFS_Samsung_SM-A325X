@@ -6,7 +6,7 @@
 #   - Termux: su -c sh /sdcard/Download/collect-logs.sh
 #
 # Output: /sdcard/kernel-logs/<date-time>-<twrp|android>/ plus a .tar.gz of it.
-# summary.txt in it is the short report (kernel, root: xxKSU or BakaSU, SUSFS,
+# summary.txt in it is the short report (kernel, root: BakaSU or another manager, SUSFS,
 # modules, errors of the previous boot): send me that one first.
 # Best moment to run it in TWRP: right after a bootloop, entered with
 # Volume Down + Power, then Volume Up + Power (no full power-off), so the

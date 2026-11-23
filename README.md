@@ -1,33 +1,29 @@
 # KernelSU_SUSFS_Samsung_SM-A325X
 
-Android kernel for Samsung Galaxy A32 4G (SM-A325x series, codename `a32`, MediaTek MT6768) with xxKSU (a KernelSU fork by backslashxx for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount (as a separate LKM or built into the kernel). Tested only on: SM-A325F on LumiROM 9 (Android 17).
-
-It builds two kernels: the main kernel **Aigis** (the one I use every day) and the Alt. kernel **mzggr**. Both are released. Aigis can also be built with [BakaSU](https://github.com/Baka-SU/BakaSU) for root instead of xxKSU (the **Root flavor** option, see [Root flavors](#root-flavors)).
+Android kernel for Samsung Galaxy A32 4G (SM-A325x series, codename `a32`, MediaTek MT6768): the **Aigis** kernel by SlamZDank with [BakaSU](https://github.com/Baka-SU/BakaSU) for root (a KernelSU fork for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount. Tested only on: SM-A325F on LumiROM 9 (Android 17).
 
 This repo stores no kernel source. The GitHub Actions workflows download every source fresh, patch it and build a flashable ZIP.
 
-## The two kernels
+## Why BakaSU, not xxKSU
 
-Every build can make two kernels. Both are released, so you can pick either one.
+Until 22 Nov 2026 I built with xxKSU (backslashxx/KernelSU). Its developer archived that repo on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. Since then I build only Aigis with BakaSU, which is actively developed and supports SUSFS on 4.14. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped too.
 
-| | Main kernel: Aigis | Alt. kernel: mzggr |
-|---|---|---|
-| Who uses it | Me, every day | Built and released too |
-| Root in the upstream tree | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU | [BakaSU](https://github.com/Baka-SU/BakaSU), replaced by xxKSU |
-| Kernel tree | [Aigis by SlamZDank](https://github.com/SlamZDank/Aigis-Kernel-A32), branch `bpf-5.15-legion` | [mzggr0914](https://github.com/mzggr0914/android_kernel_a325x_bakasu), branch `common` |
-| **Kernel** dropdown | `aigis` (default) | `mzggr` (`both` builds the two) |
-| Kernel ZIP name | `A325X-Aigis-...zip` | `A325X-mzggr-...zip` |
-| GPU | Valhall GPU with its drivers module (ticked by default), or stock | Stock A32 GPU |
-| Tuning | Aigis' own CPU/GPU tuning | Our **Performance tuning** (ticked by default) |
-| Compiler | ZyC Clang 14 (as Aigis builds it), or AOSP Clang 14 | AOSP Clang 14 |
-| NoMount file | `NoMount-...-aigis-...zip`, `nomount-4.14-aigis.ko` | `NoMount-...-mzggr-...zip`, `nomount-4.14-mzggr.ko` |
-| Details file in a release | `build-info-aigis.txt`, `sources-aigis.json` | `build-info.txt`, `sources.json` |
+The old xxKSU pipeline (Aigis and mzggr, hook styles, benchmark) is kept, frozen, in the [`xxksu` branch](../../tree/xxksu). Older releases with xxKSU stay on the [Releases](../../releases) page.
 
-Flash one kernel ZIP only, and the NoMount ZIP made for that same kernel.
+## What the kernel gets
+
+- BakaSU for root, from its `main` branch, with its SUSFS inline hooks (calls compiled into the kernel, the fastest style that works with SUSFS). The BakaSU manager app of the same BakaSU commit is in every release.
+- SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
+- Upstream NoMount, built for this exact kernel. The kernel ZIP carries it and installs or replaces it when you flash; it is also released as a separate ZIP. Or built into the kernel with the `integrate` option.
+- Valhall GPU with Aigis' drivers module (default), or the stock A32 GPU. Aigis' own CPU/GPU tuning.
+- Network fix (UDP-only GSO for IPv4 and IPv6), ticked by default. No LTO.
+- Built by `Najip@github`: shown in `/proc/version`, `uname -a` and About phone. The **uname tag** (default `-forkby-gh.Najip`) is added to `uname -r`.
+
+Details: [Kernel details](docs/kernels.md).
 
 ## Sources used
 
-This table is refreshed automatically each time a full Release is published. xxKSU, the SUSFS patch and the manager app are the same for both kernels, so each has one row. BakaSU rows appear when the release has the Aigis BakaSU kernel.
+This table is refreshed automatically each time a full Release is published (the one below is from the last xxKSU release until the first BakaSU Release).
 
 <!-- SOURCES:START -->
 Last release: [build-20261122-98](../../releases/tag/build-20261122-98)
@@ -45,66 +41,38 @@ Other parts (pinned in this repo):
 
 | Part | Source | Version |
 |---|---|---|
-| Toolchain | AOSP Clang prebuilt | clang-r450784d (Clang 14.0.6), see `scripts/aosp_clang14.conf`. Used by mzggr, and by Aigis with **Compiler** `main` |
-| Flasher | [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3) | `af770f7b16cf8f8eb7c68614b2a693b3b361c90c` |
+| Toolchain | ZyC Clang 14.0.6 (as the Aigis CI builds it), or AOSP Clang prebuilt clang-r450784d with **Compiler** `main` | see `scripts/zyc_clang14.conf`, `scripts/aosp_clang14.conf` |
+| Flasher | The Aigis tree's own `AnyKernel` folder (AnyKernel3) | from the kernel commit |
 | NoMount LKM | [maxsteeel/nomount](https://github.com/maxsteeel/nomount) | `master` (default) or `dev`, chosen when you run the workflow |
 | LKM loader | [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader) | latest at build time |
 
 Upstream repos and branches are set in `scripts/sources.conf`.
 
-## Root flavors
-
-The **Root flavor** dropdown picks the root module. It works next to the **Kernel** dropdown.
-
-| Root flavor | What you get |
-|---|---|
-| `xxKSU` (default) | xxKSU on every kernel picked in **Kernel**, as before |
-| `BakaSU` | Aigis with BakaSU only: `A325X-Aigis-BakaSU-SUSFS-v2.4.0-...zip`. mzggr is not built with BakaSU (skipped with a warning) |
-| `All` | Everything at once: Aigis xxKSU, Aigis BakaSU, and mzggr when **Kernel** is `both` |
-
-BakaSU comes from its `main` branch (the **BakaSU branch** box of Build Kernel, `main` by default). It always uses BakaSU's SUSFS inline hooks, its fastest hook style that works with SUSFS, and the BakaSU manager app is taken from the BakaSU **Build Manager** run of the same commit, for example `BakaSU_v4.2.0-rc3_35284-arm64-v8a-release.apk`. Install the manager that matches the kernel you flash, and the NoMount ZIP made for that kernel (`NoMount-...-aigis-bakasu-...zip`). Details: [Kernel details](docs/kernels.md#aigis-with-bakasu).
-
-## What both kernels get
-
-- xxKSU for root, replacing the tree's own root module at build time. Both upstream kernels ship [BakaSU](https://github.com/Baka-SU/BakaSU) by default, as the `KernelSU` submodule (Aigis' `.gitmodules` still uses BakaSU's old name, ReSukiSU, which now leads to the same repo).
-- xxKSU hook style, chosen when you run the workflow (see [Hook styles](docs/hook-styles.md)). The default is `manual` (`branch_link` is currently unstable). No LSM hooking in any style.
-- SUSFS v2.4.0: the core files (`fs/susfs.c`, `susfs.h`, `susfs_def.h`) come from JackA1ltman's patch. All features on: sus path, sus mount, sus kstat, spoof uname, spoof cmdline, open redirect, sus map, priority UID filter, hide symbols, logging.
-- Upstream NoMount, replacing the tree's own NoMount: a separate LKM by default, or built in with the `integrate` option.
-- Network fix (UDP-only GSO for IPv4 and IPv6). A tick, ticked by default, allowed with every release type (and with `Promoted`, which keeps the setting of the build it takes).
-- No LTO.
-- Built by `Najip@github`: shown in `/proc/version`, `uname -a` and About phone. The **uname tag** (default `-forkby-gh.Najip`) is added to `uname -r`.
-
-Kernel-specific details: [Kernel details](docs/kernels.md). The Aigis BakaSU kernel gets the same, with BakaSU instead of xxKSU.
-
 ## Quick start
 
 1. **Build**: on GitHub, open **Actions** > **Build Kernel** > **Run workflow**, keep the defaults and press **Run workflow**. Download the kernel ZIP from **Artifacts** when it is green. Or take a ready ZIP from [Releases](../../releases).
-2. **Flash**: back up `boot`, flash the kernel ZIP in TWRP / OrangeFox, reboot, and install the manager app of the same root (`KernelSU_...apk` for xxKSU, `BakaSU_...apk` for BakaSU, on the release page). With NoMount `lkm`, flash the NoMount ZIP made for the same kernel as a module in the manager.
+2. **Flash**: back up `boot`, flash the kernel ZIP in TWRP / OrangeFox (it also installs the matching NoMount module), reboot, and install the BakaSU manager app (`BakaSU_...apk`, on the release page). Coming from xxKSU: see [Moving from xxKSU](docs/flashing.md#moving-from-xxksu).
 
 ## More docs
 
 | Page | What it covers |
 |---|---|
-| [Kernel details](docs/kernels.md) | What is special about the main kernel (Aigis) and the Alt. kernel (mzggr) |
+| [Kernel details](docs/kernels.md) | The Aigis kernel with BakaSU: GPU, compiler, hooks, version, manager |
 | [Building](docs/building.md) | Every Build Kernel option, the artifacts, and building only the NoMount module |
-| [Hook styles](docs/hook-styles.md) | `manual`, `syscall_table`, `branch_link`, what fails with which, and the benchmark |
 | [Commit modes and releases](docs/commit-modes.md) | `Latest`, `Verified`, `Promoted`, pre-releases and full Releases |
 | [Upstream check](docs/upstream-check.md) | The automatic check for new upstream commits, and which commits it ignores |
-| [Flashing and logs](docs/flashing.md) | Flashing, the NoMount and GPU checks in the flasher, collecting phone logs and shortening build logs |
+| [Flashing and logs](docs/flashing.md) | Flashing, moving from xxKSU, the NoMount check in the flasher, collecting phone logs and shortening build logs |
 | [Repo layout](docs/repo-layout.md) | What each file and folder in this repo is |
 | [Licenses](docs/licenses.md) | This repo's license and the license of every upstream part |
 
 ## Credits
 
-- [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32): the main kernel tree (Aigis).
-- [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu): the Alt. kernel tree (A32 4G BakaSU kernel with 4.14 SUSFS hooks).
-- [Samsung-MT6769-Devs/android_kernel_samsung_mt6768](https://github.com/Samsung-MT6769-Devs/android_kernel_samsung_mt6768): the SLM MT6768 kernel source the mzggr tree is based on.
-- [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU): xxKSU.
-- [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU): the root module both upstream trees ship (replaced by xxKSU here), and the root of the Aigis BakaSU kernel.
+- [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32): the kernel tree (Aigis).
+- [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU): root (kernel part and manager app).
 - [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu): SUSFS, and [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) for the non-GKI 4.14 port.
 - [maxsteeel/nomount](https://github.com/maxsteeel/nomount) and [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader): NoMount LKM.
 - [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3): flashable ZIP.
-- [Najip/android_kernel_a325F_bakasu](https://github.com/Najip/android_kernel_a325F_bakasu/tree/xxksu): the xxKSU + SUSFS conversion this repo reproduces.
+- Earlier builds: [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) (xxKSU, archived 22 Nov 2026) and [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) (the Alt. kernel), see the `xxksu` branch.
 
 ## License
 
