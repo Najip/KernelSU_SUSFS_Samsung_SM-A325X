@@ -73,7 +73,7 @@ sed -e "s|@KERNEL_ID@|$kernel_id|" -e "s|@KERNEL_RELEASE@|$release|" -e "s|@NOMO
   "$ROOT/anykernel/nomount-check.sh" > "$work/nomount-check.sh"
 add_after_boot "$work/nomount-check.sh"
 grep -q '^nomount_check;' "$ak3/anykernel.sh"
-# Every zip: the JPEG + BBR fix module (by Juan, LumiROM).
+# Every zip: the JPEG + BBR fix module (mtk_mm access for apps; BBR by Juan, LumiROM).
 cp -r "$ROOT/anykernel/jpeg-bbr" "$ak3/jpeg-bbr"
 add_after_boot "$ROOT/anykernel/jpeg-bbr-install.sh"
 grep -q '^jpeg_bbr_install;' "$ak3/anykernel.sh"
@@ -108,7 +108,7 @@ fi
   echo "GPU: $([[ "${VALHALL_GPU:-false}" == true ]] && echo 'Aigis Valhall r32p1 with Aigis GPU tuning' || echo 'stock A32 Bifrost r25p0')"
   echo "dtb: $dtb_line"
   [[ -n "${VALHALL_DRIVERS_URL:-}" ]] && echo "Valhall GPU drivers module (only if your vendor lacks them): $VALHALL_DRIVERS_URL"
-  echo "JPEG + BBR fix module (by Juan, LumiROM): installed to /data/adb/modules/a32-jpeg-bbr"
+  echo "JPEG + BBR fix module $(sed -n 's/^version=//p' "$ROOT/anykernel/jpeg-bbr/module.prop") (apps get access to /dev/dma_heap/mtk_mm; BBR by Juan, LumiROM): installed to /data/adb/modules/a32-jpeg-bbr"
   echo "Network fix (UDP GSO): $([[ "${NETWORK_FIX:-true}" == true ]] && echo applied || echo 'not applied')"
   echo "BakaSU hook style: SUSFS inline hooks (compile-time calls inside the kernel functions)"
   echo "NoMount: $nomount_line"
