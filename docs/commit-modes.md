@@ -49,3 +49,13 @@ The thread title and post #1 are in [`docs/xda-thread.txt`](xda-thread.txt) and 
 ## Telegram post
 
 Every full Release also gets `Telegram-post-<tag>.txt` (plain text, one message, made by `scripts/telegram_post.py`): one line about the kernel, my news from [`docs/xda-updates.txt`](xda-updates.txt) dated since the previous full Release, the notable Aigis / BakaSU / SUSFS changes (version bumps and translations left out), and the download link. I copy it and post it by hand in the Telegram groups. For any release by hand: `python3 scripts/telegram_post.py --release <tag>`.
+
+Automatic posting (optional, only to a channel or group of my own): the release also sends that text with a Telegram bot when two settings exist. Until then the step is skipped and nothing fails.
+
+1. In Telegram, open @BotFather, send `/newbot` and copy the bot token.
+2. Add the bot to my channel as an admin (allowed to post messages).
+3. Save the token as a repo secret and the channel as a repo variable:
+   `gh secret set TELEGRAM_BOT_TOKEN -R Najip/KernelSU_SUSFS_Samsung_SM-A325X` (paste the token), then
+   `gh variable set TELEGRAM_CHAT_ID -R Najip/KernelSU_SUSFS_Samsung_SM-A325X -b @mychannel` (a private channel uses its number, like `-100...`).
+
+Other people's groups (for example BakaSU's) only accept a bot if their admins add it, so I post there by hand.
