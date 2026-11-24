@@ -45,3 +45,7 @@ Every full Release (`Release`, or `Release from pre-release`) also gets `XDA-pos
 Download it from the release page, then on XDA edit post #2 and replace all of it, and the same for post #3. Pre-releases do not get it. For any release by hand: `python3 scripts/xda_posts.py --release <tag>`.
 
 The thread title and post #1 are in [`docs/xda-thread.txt`](xda-thread.txt) and are pasted once by hand.
+
+## Telegram post
+
+Every full Release also gets `Telegram-post-<tag>.txt` (plain text, one message, made by `scripts/telegram_post.py`): one line about the kernel, my news from [`docs/xda-updates.txt`](xda-updates.txt) dated since the previous full Release, the notable Aigis / BakaSU / SUSFS changes (version bumps and translations left out), and the download link. I copy it and post it by hand in the Telegram groups. For any release by hand: `python3 scripts/telegram_post.py --release <tag>`.
