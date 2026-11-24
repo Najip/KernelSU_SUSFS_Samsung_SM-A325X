@@ -718,6 +718,8 @@ jobs:
           if [[ "${{ inputs.release_type }}" == Release ]]; then
             python3 scripts/xda_posts.py notes.md "$tag" \
               "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "release/XDA-posts-$tag.txt"
+            python3 scripts/telegram_post.py notes.md "$tag" \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "release/Telegram-post-$tag.txt"
           fi
 
       - name: Publish release
@@ -730,7 +732,7 @@ jobs:
           done
           [[ -n "$name" ]] || { echo "::error::No kernel ZIP in the release."; exit 1; }
           shopt -s nullglob
-          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-posts-*.txt)
+          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-posts-*.txt release/Telegram-post-*.txt)
           # Create the tag first, then the release without --target. With --target,
           # GitHub wants the "workflows" permission (which this token cannot get)
           # when workflow files changed on the branch after this commit: HTTP 403
@@ -819,7 +821,9 @@ jobs:
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest --notes-file notes.md
           python3 scripts/xda_posts.py notes.md "$TAG" \
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "XDA-posts-$TAG.txt"
-          gh release upload "$TAG" "XDA-posts-$TAG.txt" --repo "$GITHUB_REPOSITORY" --clobber
+          python3 scripts/telegram_post.py notes.md "$TAG" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "Telegram-post-$TAG.txt"
+          gh release upload "$TAG" "XDA-posts-$TAG.txt" "Telegram-post-$TAG.txt" --repo "$GITHUB_REPOSITORY" --clobber
           echo "### Published $TAG as the full Release" >> "$GITHUB_STEP_SUMMARY"
           echo "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 

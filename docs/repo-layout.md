@@ -15,6 +15,7 @@
 | `docs/xda-thread.txt` | XDA thread title and post #1 (BBCode), pasted by hand |
 | `docs/xda-updates.txt` | Text of XDA post #3 (news, known issues, recommended modules), edited by hand |
 | `scripts/xda_posts.py` | Makes `XDA-posts-<tag>.txt` (XDA posts #2 and #3) for every full Release |
+| `scripts/telegram_post.py` | Makes `Telegram-post-<tag>.txt` (a short Telegram message) for every full Release |
 | `scripts/xda_changelog.py` | Turns the release notes into BBCode (used by `xda_posts.py`) |
 | `tools/extract_log.py` | Makes a short version of a GitHub Actions build log (opens a file picker) |
 | `patches/base/` | Turns Aigis into the BakaSU + SUSFS inline-hook layout, and the stock GPU option |
