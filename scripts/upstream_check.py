@@ -4,8 +4,7 @@
   upstream_check.py <sources.conf> <state.json>
   upstream_check.py start <state.json> <plan.json> <owner/repo> <branch>
 
-Watched (Aigis with BakaSU is the only kernel; xxKSU was archived on
-22 Nov 2026 and is no longer watched, nor the mzggr kernel):
+Watched (Aigis with BakaSU is the only kernel):
   aigis kernel  KERNEL_REPO / KERNEL_REF. Commits that only touch its root
                 module or NoMount (the KernelSU / BakaSU / KSUN / SukiSU /
                 NoMount submodules or folders, .gitmodules) or only docs
@@ -93,7 +92,7 @@ def patch_digest(repo, sha):
 
 
 def drop_rebased(repo, old, new, data, commits):
-    """A rewritten branch (backslashxx rebases xxKSU on every update): the
+    """A rewritten branch (some upstreams rebase on every update): the
     compare lists the whole rebased stack again under new hashes. A commit
     whose title + author were already in the old commit's history is left out
     when its code change is the same, or marked "updated" when it changed.

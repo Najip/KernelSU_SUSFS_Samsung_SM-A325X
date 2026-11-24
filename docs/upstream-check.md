@@ -9,7 +9,6 @@ The **Upstream check** workflow runs three times a day (07:00, 15:00 and 23:00 J
 - Jack's SUSFS (`mainline`), only commits that changed the 4.14 patch the build uses
 - NoMount (`master` only; the `dev` branch is not watched)
 
-xxKSU and the mzggr kernel are no longer watched: xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026), and mzggr was xxKSU-only and is not developed anymore.
 
 The newest commits it has seen are saved in `configs/upstream-state.json` on the default branch, with a short history of what changed. The first check only saves them, and so does the first check after a new source is added to the list. When a later check finds a new commit, it starts one **Build Kernel** run with commit mode `Latest`, NoMount branch `master` and release type **Pre-release**, so every upstream update is published as a pre-release with all files (kernel ZIP, NoMount module, BakaSU manager APK). The new commits are listed in the run summary.
 

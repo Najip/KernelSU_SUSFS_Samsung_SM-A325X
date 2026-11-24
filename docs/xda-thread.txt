@@ -31,7 +31,6 @@ A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [*]Network fix (UDP GSO) by Juan (LumiROM), no LTO
 [*]JPEG + BBR fix: fixes blank JPEG photos in Telegram and other apps on One UI 9 ports (lets apps use the kernel's mtk_mm memory heap), keeps TCP on BBR. A small module installed by the kernel ZIP, based on Juan's (LumiROM) fix
 [/LIST]
-[B]Why BakaSU now?[/B] Until 22 Nov 2026 this kernel used xxKSU (backslashxx). Its developer archived xxKSU on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. I switched to BakaSU, which is actively developed. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped. Old xxKSU builds stay on the releases page.
 Tested on: SM-A325F, LumiROM 9 (Android 17). Other A325 models and ROMs should work but are not tested by me.
 
 Every build runs on GitHub Actions from public sources, so anyone can check and rebuild it.
@@ -54,21 +53,18 @@ Each release has:
 [*][B]Back up your current boot partition[/B] in recovery (Backup > Boot). This is your way back.
 [*]Flash the kernel ZIP ([ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]) in recovery. It also installs the matching NoMount module and the JPEG + BBR fix module.
 [*]Reboot and install the BakaSU manager app from the same release.
-[*]Coming from my xxKSU kernel: uninstall the old xxKSU manager app, then check your modules and root apps in the BakaSU manager.
+[*]Uninstall any other KernelSU manager app, then check your modules and root apps in the BakaSU manager.
 [/LIST]
 Bootloop? Go back to recovery and restore the boot backup (or flash your stock boot.img).
 
 [SIZE=5][B]FAQ[/B][/SIZE]
-[B]Where is xxKSU / the mzggr kernel?[/B]
-xxKSU was archived by its developer on 22 Nov 2026, so I stopped building it, and the mzggr kernel needed xxKSU. The last xxKSU builds (up to build-20261122-98) stay on the releases page, but they get no more updates.
-
 [B]What is the -vgpu / -valhall ZIP?[/B]
 The kernel with the Valhall GPU (default). It also installs the Valhall GPU drivers module, so no extra step is needed.
 
 [B]Do I need the NoMount module?[/B]
 Recommended, and the kernel ZIP already installs it. If you flash the separate NoMount ZIP, use the one from the same release.
 
-[B]Can I use other KernelSU managers (official, Next, SukiSU, xxKSU)?[/B]
+[B]Can I use other KernelSU managers (official, Next, SukiSU)?[/B]
 No, use the BakaSU manager from the release. Other managers do not match this kernel.
 
 [B]Which SUSFS modules should I use?[/B]
@@ -113,7 +109,7 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 [LIST]
 [*]SlamZDank for the Aigis kernel, its mtk_mm memory heap and finding the real cause of the blank JPEGs
 [*]The BakaSU developers for BakaSU
-[*]backslashxx for xxKSU and mzggr0914 for the A32 kernel tree (used in earlier builds), Samsung-MT6769-Devs for the SLM base
+[*]mzggr0914 for the A32 kernel tree (used in earlier builds), Samsung-MT6769-Devs for the SLM base
 [*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
 [*]maxsteeel for NoMount and lkmloader
 [*]osm0sis for AnyKernel3

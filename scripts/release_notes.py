@@ -26,6 +26,14 @@ def api(path):
         return json.load(resp)
 
 
+def load(path):
+    """A sources.json; builds before 24 Nov 2026 named the root module "xxksu"."""
+    data = json.load(open(path))
+    if "ksu" not in data and "xxksu" in data:
+        data["ksu"] = data.pop("xxksu")
+    return data
+
+
 def slug(url):
     return url.rstrip("/").removeprefix("https://github.com/").removesuffix(".git")
 
@@ -52,7 +60,7 @@ def patch_digest(repo, sha):
 
 
 def drop_rebased(repo, old, new, data, commits):
-    """A rewritten branch (backslashxx rebases xxKSU on every update): the
+    """A rewritten branch (some upstreams rebase on every update): the
     compare lists the whole rebased stack again under new hashes. A commit
     whose title + author were already in the old commit's history is left out
     when its code change is the same, or marked "updated" when it changed.
@@ -110,23 +118,23 @@ def new_commits(repo, old, new, path=None):
 
 SOURCES = [
     ("kernel", "Kernel source", None),
-    ("xxksu", "BakaSU", None),  # key "xxksu" = the root module (name kept for older runs)
+    ("ksu", "BakaSU", None),  # key "ksu" = the root module
     ("susfs", "SUSFS patch (JackA1ltman)", "path"),
     ("build_repo", "This build repo", None),
 ]
 
 
 def notes(cur_path, prev_path, info_path, out_path):
-    cur = json.load(open(cur_path))
-    prev = json.load(open(prev_path)) if prev_path != "-" and os.path.exists(prev_path) else None
+    cur = load(cur_path)
+    prev = load(prev_path) if prev_path != "-" and os.path.exists(prev_path) else None
     md = ["## What's new since the last release" if prev else "## First release", ""]
     for key, title, path_key in SOURCES:
         if key not in cur:
             continue
         s = cur[key]
         repo = slug(s["repo"])
-        if key == "xxksu":
-            title = cur.get("root") or title  # the root module (BakaSU; older releases: xxKSU)
+        if key == "ksu":
+            title = cur.get("root") or title  # the root module (BakaSU)
         head = f"### {title}: [`{s['commit'][:8]}`](https://github.com/{repo}/commit/{s['commit']})"
         md.append(head)
         old = prev.get(key, {}).get("commit") if prev else None
@@ -163,12 +171,9 @@ def kernel_of(src):
     return "aigis" if "aigis" in src["kernel"]["repo"].lower() else "mzggr"
 
 
-# How the kernel is named in the README: Aigis with BakaSU, the only kernel
-# since xxKSU was archived (22 Nov 2026). The other names are older releases.
+# How the kernel is named in the README: Aigis with BakaSU, the only kernel.
 KERNEL_ROLES = [
     ("aigis-bakasu", "Main kernel: Aigis (BakaSU)"),
-    ("aigis", "Main kernel: Aigis (xxKSU, older release)"),
-    ("mzggr", "Alt. kernel: mzggr (older release)"),
 ]
 
 
@@ -190,7 +195,7 @@ def readme(readme_path, tag, *paths):
 
     found = {}
     for path in paths:
-        cur = json.load(open(path))
+        cur = load(path)
         found[kernel_of(cur)] = cur
     present = [(key, title) for key, title in KERNEL_ROLES if key in found]
     for key, title in KERNEL_ROLES:
@@ -203,10 +208,9 @@ def readme(readme_path, tag, *paths):
         return "Both kernels" if len(group) == 2 else "All kernels"
 
     root_version = lambda x: f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}"
-    # Root module: one group per flavor (xxKSU kernels, BakaSU kernel).
-    groups = [("xxKSU (root)", [p for p in present if p[0] != "aigis-bakasu"], "xxksu"),
-              ("BakaSU (root)", [p for p in present if p[0] == "aigis-bakasu"], "bakasu")]
-    shared = [(part, group, "xxksu", root_version) for part, group, _ in groups if group]
+    # Root module: BakaSU.
+    groups = [("BakaSU (root)", present, "bakasu")]
+    shared = [(part, group, "ksu", root_version) for part, group, _ in groups if group]
     shared.append(("SUSFS patch", present, "susfs", lambda f: f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`"))
     for part, group, name, version in shared:
         commits = {found[key][name]["commit"] for key, _ in group}
@@ -220,14 +224,14 @@ def readme(readme_path, tag, *paths):
     for part, group, flavor in groups:
         if not group:
             continue
-        # manager.json (xxKSU) and manager-bakasu.json sit next to the first sources.json.
-        manager = os.path.join(folder, "manager.json" if flavor == "xxksu" else "manager-bakasu.json")
+        # manager-bakasu.json sits next to the first sources.json.
+        manager = os.path.join(folder, "manager-bakasu.json")
         if not os.path.exists(manager):
             continue
         m = json.load(open(manager))
         repo = slug(m["repo"])
         name = part.replace(" (root)", "")
-        kind = "release" if flavor == "xxksu" else "Actions build"
+        kind = "Actions build"
         commit = m.get("commit") or ""
         commit_cell = f"[`{commit[:12]}`](https://github.com/{repo}/commit/{commit})" if commit else "-"
         rows.append(f"| {name} manager app | {used_by(group)} | [{repo}](https://github.com/{repo}) | "

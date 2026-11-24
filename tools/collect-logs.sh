@@ -115,7 +115,7 @@ else
   done
   save modules.txt sh -c 'for m in /data/adb/modules/*/module.prop; do [ -f "$m" ] || continue; d=${m%/module.prop}; s=; [ -f "$d/disable" ] && s=" (disabled)"; echo "$(basename "$d"): $(grep -m1 "^version=" "$m" | cut -d= -f2)$s"; done'
   save lsmod.txt cat /proc/modules
-  save managers.txt sh -c 'pm list packages -f 2>/dev/null | grep -iE "kernelsu|ksu|bakasu|xxksu"' 
+  save managers.txt sh -c 'pm list packages -f 2>/dev/null | grep -iE "kernelsu|ksu|bakasu"' 
 fi
 
 # Summary of what usually matters most.

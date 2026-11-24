@@ -60,6 +60,7 @@ def conf():
 def key():
     e = os.environ
     c = conf()
+    # "xxksu=" is only a label inside the key, kept so kits of earlier builds still match.
     parts = [f"kernel={e['KERNEL_REF']}", f"xxksu={e['KSU_REF']}", f"susfs={e['SUSFS_REF']}",
              f"hook={e.get('KSU_HOOK', 'manual')}", f"tuning={c.get('PERF_TUNING') or 'false'}",
              f"nomount={e.get('NOMOUNT_PART', 'separate')}"]

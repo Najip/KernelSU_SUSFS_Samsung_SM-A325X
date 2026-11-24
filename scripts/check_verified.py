@@ -17,18 +17,18 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from resolve_commits import NESTED, kernel_of  # noqa: E402
+from resolve_commits import NESTED, kernel_of, load_sources  # noqa: E402
 
 
 def main(verified_path, *paths, report=False):
     verified = json.load(open(verified_path))
     bad = []
     for path in paths:
-        src = json.load(open(path))
+        src = load_sources(path)
         source = kernel_of(src)
         pins = verified.get(source) or {} if source in NESTED else verified
         name = NESTED.get(source, "mzggr")
-        for key in ("kernel", "xxksu", "susfs"):
+        for key in ("kernel", "ksu", "susfs"):
             want = (pins.get(key) or {}).get("commit", "")
             have = (src.get(key) or {}).get("commit", "")
             if not want or want != have:

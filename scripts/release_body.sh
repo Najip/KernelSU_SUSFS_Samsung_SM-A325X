@@ -41,7 +41,6 @@ shopt -s nullglob
 {
   echo
   echo "## Files in this release"
-  echo "Root is BakaSU: xxKSU was archived by its developer on 22 Nov 2026, so the xxKSU and Alt. kernel (mzggr) builds stopped."
   echo "The kernel ZIP already carries its NoMount module (installed or replaced when you flash, see docs/flashing.md)."
   for z in "$dir"/*.zip; do
     n=$(basename "$z")
@@ -65,7 +64,7 @@ d = sys.argv[1]
 if os.path.exists(os.path.join(d, "manager-bakasu.json")):
     m = json.load(open(os.path.join(d, "manager-bakasu.json")))
     print(f"- `{m['apk']}`: BakaSU manager, from the BakaSU build [{m['tag']}]({m['url']}) of the same BakaSU "
-          f"commit `{m['commit'][:12]}` as the kernel. Install it to manage root (it replaces the xxKSU manager).")
+          f"commit `{m['commit'][:12]}` as the kernel. Install it to manage root.")
 PY2
     else
       for a in "${apks[@]}"; do echo "- \`$(basename "$a")\`: BakaSU manager. Install it to manage root."; done
@@ -84,7 +83,7 @@ for name in sorted(n for n in os.listdir(d) if n.startswith("sources") and n.end
     s = json.load(open(os.path.join(d, name)))
     kernel = s.get("source") or ("aigis" if "aigis" in s["kernel"]["repo"].lower() else "mzggr")
     label = labels.get(kernel, kernel)
-    parts = [(label, s["kernel"]), (s.get("root") or "Root module", s["xxksu"]), ("SUSFS patch", s["susfs"]), ("This repo (patches, build scripts)", s.get("build_repo"))]
+    parts = [(label, s["kernel"]), (s.get("root") or "Root module", s.get("ksu") or s.get("xxksu")), ("SUSFS patch", s["susfs"]), ("This repo (patches, build scripts)", s.get("build_repo"))]
     for what, x in parts:
         if not x or (what, x["commit"]) in seen:
             continue

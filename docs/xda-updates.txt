@@ -5,12 +5,12 @@
 
 [B]2026-11-23: Switched to BakaSU[/B]
 [LIST]
-[*]xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. New builds use [URL='https://github.com/Baka-SU/BakaSU']BakaSU[/URL] (actively developed KernelSU fork, SUSFS inline hooks) on the Aigis kernel.
-[*]The Alt. kernel (mzggr) is dropped: it was xxKSU-only and is not developed anymore.
-[*]Use the BakaSU manager app from the release, and uninstall the old xxKSU manager. The kernel ZIP now installs the matching NoMount module by itself.
+[*]Root is now [URL='https://github.com/Baka-SU/BakaSU']BakaSU[/URL] (actively developed KernelSU fork, SUSFS inline hooks) on the Aigis kernel.
+[*]The Alt. kernel (mzggr) is dropped, it is not developed anymore.
+[*]Use the BakaSU manager app from the release, and uninstall any other KernelSU manager. The kernel ZIP now installs the matching NoMount module by itself.
 [*]Recommended modules updated: BRENE for SUSFS (turn off BakaSU's built-in SUSFS settings when you use it), HMA-OSS for BRENE's app hiding (SUSFS priority UID filter). sidex15's susfs4ksu-module is not recommended.
 [*]New: JPEG + BBR fix. Blank JPEG photos in Telegram and other apps on One UI 9 ports are fixed, and TCP stays on BBR. The kernel ZIP installs it as the module "A32 JPEG + BBR fix". The Aigis kernel has the mtk_mm memory heap One UI 9 uses for photos, but the ROM keeps it root-only; the module lets apps use it. You do not need Juan's odm zip anymore; if you flashed it, the module overrides it, but better reflash your ROM's own odm. Thanks to Juan (LumiROM) for the first fix and SlamZDank for finding the cause.
-[*]First BakaSU release: see the changelog post. Old xxKSU releases stay on the releases page, without updates.
+[*]First BakaSU release: see the changelog post.
 [/LIST]
 
 [B]2026-11-22: Thread opened[/B]

@@ -3,9 +3,7 @@ run-name: ${{ inputs.release_type == 'Release from pre-release' && format('A325X
 
 # Run it: Actions -> Build Kernel -> Run workflow.
 # Every source (Aigis kernel, BakaSU, SUSFS patch, NoMount) is downloaded fresh during the run.
-# Only the main kernel (Aigis) with BakaSU is built here. xxKSU was archived by
-# its developer on 22 Nov 2026; the xxKSU builds and the Alt. kernel (mzggr)
-# are kept, frozen, in the xxksu branch.
+# Only the main kernel (Aigis) with BakaSU is built here.
 on:
   workflow_dispatch:
     inputs:
@@ -317,7 +315,10 @@ jobs:
         if: env.SELF_HOSTED == 'true'
         run: |
           set -euo pipefail
-          cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325-kernel/xxksu"
+          cache="${XDG_CACHE_HOME:-$HOME/.cache}/a325-kernel/toolchains"
+          # Older runs kept the toolchains in a325-kernel/xxksu: move them once.
+          old="${XDG_CACHE_HOME:-$HOME/.cache}/a325-kernel/xxksu"
+          [[ -d "$cache" || ! -d "$old" ]] || mv "$old" "$cache" 2>/dev/null || true
           mkdir -p "$cache"
           exec 9>"$cache/.lock"
           flock 9
@@ -396,7 +397,7 @@ jobs:
           cp "$OUT_DIR/.config" "$OUT_DIR/Module.symvers" "$kit/"
           cp "$OUT_DIR/include/config/kernel.release" "$kit/kernel.release"
           commit() { python3 -c "import json,sys;print(json.load(open(sys.argv[1]))[sys.argv[2]]['commit'])" "$INFO_DIR/sources.json" "$1"; }
-          KERNEL_REF=$(commit kernel); KSU_REF=$(commit xxksu); SUSFS_REF=$(commit susfs)
+          KERNEL_REF=$(commit kernel); KSU_REF=$(commit ksu); SUSFS_REF=$(commit susfs)
           export KERNEL_REF KSU_REF SUSFS_REF
           part=separate
           # A kernel with NoMount built in is a different kernel: own kit key.

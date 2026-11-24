@@ -35,4 +35,4 @@
 | `configs/` | Config fragments merged after the tree's own fragments |
 | `docs/` | These pages (the README sources table is the only part updated automatically) |
 
-The old xxKSU and mzggr files (hook styles, tuning, benchmark, xxKSU patches, the separate NoMount LKM workflow) are only in the [`xxksu` branch](../../../tree/xxksu).
+My older builds and their files are only in the [`xxksu` branch](../../../tree/xxksu).

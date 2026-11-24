@@ -40,7 +40,7 @@ ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis",
 
 def built_sources(title):
     """Kernels a Build Kernel run built, from its run-name (older runs: mzggr)."""
-    # Runs since xxKSU was dropped (22 Nov 2026) build Aigis BakaSU only.
+    # Runs since 23 Nov 2026 build Aigis BakaSU only.
     if title.startswith("A325X BakaSU + SUSFS kernel (Aigis)"):
         return {"aigis-bakasu"}
     if "(Aigis + mzggr)" in title or "(mzggr + Aigis)" in title:  # older runs: mzggr + Aigis
@@ -50,7 +50,7 @@ def built_sources(title):
     else:
         built = {"mzggr"}
     # Root flavor (newer runs): "(root BakaSU)" = Aigis BakaSU only,
-    # "(root All)" = the xxKSU kernels plus Aigis BakaSU.
+    # "(root All)" = the older kernels plus Aigis BakaSU.
     if "(root BakaSU)" in title:
         return {"aigis-bakasu"} if "aigis" in built else set()
     if "(root All)" in title and "aigis" in built:
@@ -87,7 +87,7 @@ def find():
         # run-name contains "(Latest)" for commit mode Latest.
         if "(Latest)" not in title:
             continue
-        # Older xxKSU runs: only the default hook (manual).
+        # Older runs: only the default options.
         if ("[syscall_table]" in title or "[branch_link]" in title or "integrate" in title or "LKM only" in title
                 or "(main compiler)" in title):
             print(f"Skipping run {run['id']} ({title}): not the default options.")
@@ -178,21 +178,23 @@ def info_value(text, label):
 def inspect(folder):
     zip_path, sources_path, info_path, nomount, _ = locate(folder)
     src = json.loads(sources_path.read_text())
+    if "ksu" not in src and "xxksu" in src:  # builds before 24 Nov 2026
+        src["ksu"] = src.pop("xxksu")
     info = info_path.read_text()
     out = {}
     for key, ref_out, branch_out in (("kernel", "kernel_ref", "kernel_branch"),
-                                     ("xxksu", "ksu_ref", "ksu_branch"),
+                                     ("ksu", "ksu_ref", "ksu_branch"),
                                      ("susfs", "susfs_ref", "susfs_branch")):
         item = src.get(key) or {}
         if not item.get("commit"):
             fail(f"sources.json of the Latest run has no {key} commit.")
         out[ref_out] = item["commit"]
         out[branch_out] = item.get("branch") or ""
-    hook = info_value(info, "xxKSU hook style") or "manual"
+    hook = "manual"  # the only hook option of this workflow (BakaSU uses its SUSFS inline hooks)
     tuning = info_value(info, "Performance tuning") or "false"
     nm_line = info_value(info, "NoMount")
-    if hook != "manual" or nm_line.startswith("built into"):
-        fail(f"The Latest run does not use the default options (hook {hook}, NoMount {nm_line or 'LKM'}).")
+    if nm_line.startswith("built into"):
+        fail(f"The Latest run does not use the default options (NoMount {nm_line}).")
     has_ko = any(p.suffix == ".ko" for p in nomount)
     nm_zips = [p.name for p in nomount if p.name.startswith("NoMount-") and p.suffix == ".zip"]
     has_nm_zip = bool(nm_zips)

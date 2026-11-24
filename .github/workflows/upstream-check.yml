@@ -7,7 +7,6 @@ run-name: Upstream check${{ github.event_name == 'workflow_dispatch' && ' (manua
 # branch. When something is new, one Build Kernel run (commit mode Latest,
 # release type Pre-release, NoMount master) rebuilds the kernel (kernel tree,
 # BakaSU or SUSFS changed) or only the NoMount module (NoMount changed).
-# xxKSU (archived 22 Nov 2026) and the mzggr kernel are no longer watched.
 on:
   schedule:
     # 07:00, 15:00 and 23:00 in Jakarta (UTC+7)

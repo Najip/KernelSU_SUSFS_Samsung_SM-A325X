@@ -10,9 +10,9 @@ Every build picks the commits of the kernel, BakaSU and the SUSFS patch in one o
 | `Verified` | The pinned commits saved by the last successful `Promoted` build. | Rebuilding something you already tested. No release type needs it. |
 | `Promoted` | Nothing new is compiled for the kernel. It takes the files of the most recent successful `Latest` run with the default kernel options (on the same branch) and saves that run's commits as the new `Verified` pins. | After you have flashed and tested the newest default `Latest` build and want to mark it as good. |
 
-The pins were reset when I switched to BakaSU (23 Nov 2026), because the old ones were for xxKSU. Until the first `Promoted` run after that, `Verified` stops with "No verified commits yet": run `Latest`, test it, then `Promoted`.
+The pins were reset on 23 Nov 2026. Until the first `Promoted` run after that, `Verified` stops with "No verified commits yet": run `Latest`, test it, then `Promoted`.
 
-Which `Latest` runs `Promoted` accepts: a BakaSU build with NoMount `lkm` (not `integrate`), not a **NoMount only** run, and **Compiler** `aigis`. The runner (my PC or GitHub), **Valhall GPU** (Promoted keeps the GPU of that run) and the release type do not matter. Older xxKSU runs are never taken. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
+Which `Latest` runs `Promoted` accepts: a BakaSU build with NoMount `lkm` (not `integrate`), not a **NoMount only** run, and **Compiler** `aigis`. The runner (my PC or GitHub), **Valhall GPU** (Promoted keeps the GPU of that run) and the release type do not matter. Runs older than 23 Nov 2026 are never taken. Runs with other options are skipped. If no run fits, `Promoted` ends with the warning "Nothing promoted" and changes nothing.
 
 How `Promoted` gets the NoMount module:
 

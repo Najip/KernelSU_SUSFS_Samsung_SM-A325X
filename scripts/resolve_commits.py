@@ -9,7 +9,7 @@
     KERNEL_SOURCE=aigis-bakasu (the default and only kernel; older pins: mzggr, aigis).
     Latest and Promoted use the branch tips in scripts/sources.conf.
     Verified uses configs/verified.json and fails if a pin is missing: the
-    "aigis-bakasu" entry ("xxksu" there = the root module, BakaSU).
+    "aigis-bakasu" entry ("ksu" there = the root module, BakaSU).
 
   resolve_commits.py promote <configs/verified.json> <sources.json>...
     Rewrites the verified pins from the commits that were actually built.
@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # key in sources.json, repo variable, branch variable in sources.conf
 SOURCES = (
     ("kernel", "KERNEL_REPO", "KERNEL_REF", "kernel_ref", "kernel_branch"),
-    ("xxksu", "KSU_REPO", "KSU_REF", "ksu_ref", "ksu_branch"),
+    ("ksu", "KSU_REPO", "KSU_REF", "ksu_ref", "ksu_branch"),
     ("susfs", "SUSFS_REPO", "SUSFS_REF", "susfs_ref", "susfs_branch"),
 )
 
@@ -38,9 +38,18 @@ SOURCES = (
 NESTED = {"aigis": "Aigis", "aigis-bakasu": "Aigis BakaSU"}
 
 
+def load_sources(path):
+    """A sources.json or a pins entry; builds before 24 Nov 2026 named the
+    root module "xxksu"."""
+    data = json.loads(Path(path).read_text())
+    if "ksu" not in data and "xxksu" in data:
+        data["ksu"] = data.pop("xxksu")
+    return data
+
+
 def kernel_of(src):
     """Which kernel a sources.json is for: its "source" field (newer builds),
-    else by kernel repo (older builds were xxKSU: aigis or mzggr)."""
+    else by kernel repo (older builds: aigis or mzggr)."""
     if src.get("source"):
         return src["source"]
     repo = ((src.get("kernel") or {}).get("repo") or "").lower()
@@ -192,7 +201,7 @@ def promote(verified_path, *sources_paths):
     mzggr = {k: v for k, v in old.items() if k not in ("note", "updated", "run", *NESTED)}
     nested = {k: old[k] for k in NESTED if old.get(k)}
     for path in sources_paths:
-        src = json.loads(Path(path).read_text())
+        src = load_sources(path)
         source = kernel_of(src)
         if source in NESTED:
             nested[source] = pins(src, load_conf(source))

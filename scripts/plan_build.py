@@ -4,8 +4,7 @@
   plan_build.py
 
 Environment (set by the workflow's pick job):
-  Only one kernel: Aigis with BakaSU (source aigis-bakasu). xxKSU (archived
-  22 Nov 2026) and the mzggr kernel are in the xxksu branch.
+  Only one kernel: Aigis with BakaSU (source aigis-bakasu).
   COMMIT_MODE    Latest, Verified or Promoted
   NM_ONLY        true = NoMount module only
   REUSE          (Upstream check) JSON, per kernel {"mode": kernel|nomount|reuse,
