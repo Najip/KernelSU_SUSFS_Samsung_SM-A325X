@@ -1,5 +1,6 @@
 XDA THREAD TEMPLATE (BBCode)
 Forum: https://xdaforums.com/f/samsung-galaxy-a32-4g.12143/
+Thread: https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs-2-4-0-samsung-a32-4g.4809753/
 Paste each part into the XDA editor as it is (it understands BBCode).
 Lines starting with ">>" are notes for me, do not paste them.
 >> Title and post #1 are pasted once (edit them by hand when something big changes).
