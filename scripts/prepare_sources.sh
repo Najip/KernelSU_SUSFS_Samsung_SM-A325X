@@ -184,6 +184,16 @@ elif [[ "$netfix_in_tree" == true ]]; then
 else
   echo "  network fix unticked: 0001-network-udp-gso.patch not applied"
 fi
+flashfix="$ROOT/patches/kernel/0002-flashlight-sm5714.patch"
+# Flashlight fixes by aartzz. Skipped if the tree already has them.
+if git apply --reverse --check "$flashfix" 2>/dev/null; then
+  echo "  0002-flashlight-sm5714.patch: already in the kernel tree"
+  applied+=("0002-flashlight-sm5714.patch (already in the tree)")
+else
+  echo "  0002-flashlight-sm5714.patch"
+  git apply --whitespace=nowarn "$flashfix"
+  applied+=("0002-flashlight-sm5714.patch")
+fi
 nomount_sha=
 if [[ "$NOMOUNT_MODE" == integrate ]]; then
   log "NoMount built into the kernel: $NOMOUNT_REPO ($NOMOUNT_REF)"

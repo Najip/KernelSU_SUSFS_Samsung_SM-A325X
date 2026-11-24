@@ -1,0 +1,34 @@
+Flashlight fixes by aartzz (samsung-mt6768-aosp, sm5714-fix branch):
+- do not arm the flash timeout in torch mode (79c8e882)
+- answer the FLASH_IOC_GET_HW_FAULT/_FAULT2 ioctls (9561a2a3)
+
+diff --git a/drivers/misc/mediatek/flashlight/flashlights-sm5714.c b/drivers/misc/mediatek/flashlight/flashlights-sm5714.c
+index 4147340..d44ff98 100644
+--- a/drivers/misc/mediatek/flashlight/flashlights-sm5714.c
++++ b/drivers/misc/mediatek/flashlight/flashlights-sm5714.c
+@@ -142,7 +142,7 @@ static int sm5714_ioctl(unsigned int cmd, unsigned long arg)
+ 		pr_debug("FLASH_IOC_SET_ONOFF(%d): %d\n",
+ 				channel, (int)fl_arg->arg);
+ 		if (fl_arg->arg == 1) {
+-			if (sm5714_timeout_ms) {
++			if (sm5714_timeout_ms && !sm5714_is_torch(sm5714_current_level)) {
+ 				s = sm5714_timeout_ms / 1000;
+ 				ns = sm5714_timeout_ms % 1000 * 1000000;
+ 				ktime = ktime_set(s, ns);
+@@ -210,6 +210,16 @@ static int sm5714_ioctl(unsigned int cmd, unsigned long arg)
+ 		pr_debug("FLASH_IOC_SET_VOLTAGE(%d)\n", channel);
+ 		break;
+ 
++	case FLASH_IOC_GET_HW_FAULT:
++		pr_debug("FLASH_IOC_GET_HW_FAULT(%d)\n", channel);
++		fl_arg->arg = 0;
++		break;
++
++	case FLASH_IOC_GET_HW_FAULT2:
++		pr_debug("FLASH_IOC_GET_HW_FAULT2(%d)\n", channel);
++		fl_arg->arg = 0;
++		break;
++
+ 	default:
+ 		pr_err("No such command and arg(%d): (%d, %d)\n",
+ 				channel, _IOC_NR(cmd), (int)fl_arg->arg);
