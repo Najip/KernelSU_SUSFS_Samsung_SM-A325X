@@ -76,7 +76,10 @@ def make(md, tag, url, date):
     older = [(t, d) for t, d in older_releases(tag) if num(t) < num(tag)]
     since = max(older, key=lambda r: num(r[0]))[1] if older else ""
     head = [
-        f"A32 4G kernel update: {tag} ({date})",
+        "KernelSU (BakaSU) + SUSFS 2.4.0 kernel",
+        "Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)",
+        "",
+        f"Update: {tag} ({date})",
         "",
         "Aigis kernel (SlamZDank) with BakaSU root, SUSFS v2.4.0 and NoMount, "
         "for the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.",
