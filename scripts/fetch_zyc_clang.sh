@@ -9,7 +9,22 @@ ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd)
 dest=${1:?give the toolchain folder}
 stamp="ZyC Clang: $ZYC_CLANG_REPO $ZYC_CLANG_RELEASE ($ZYC_CLANG_ASSET)"
 
+# The gcc wrappers run the clang next to them, so the folder can be moved.
+write_wrappers() {
+  local p
+  for p in aarch64-linux-gnu arm-linux-gnueabi; do
+    printf '#!/bin/sh\nexec "$(dirname "$0")/clang" --target=%s "$@"\n' "$p" > "$1/bin/$p-gcc"
+    printf '#!/bin/sh\nexec "$(dirname "$0")/clang++" --target=%s "$@"\n' "$p" > "$1/bin/$p-g++"
+    chmod +x "$1/bin/$p-gcc" "$1/bin/$p-g++"
+  done
+}
+
 if [[ -x "$dest/bin/clang" ]] && grep -qxF "$stamp" "$dest/zyc-source.txt" 2>/dev/null; then
+  # Older copies had wrappers with a fixed folder path (broken after a move).
+  if ! grep -qF 'dirname' "$dest/bin/aarch64-linux-gnu-gcc" 2>/dev/null; then
+    write_wrappers "$dest"
+    echo "gcc wrappers rewritten (folder-independent)"
+  fi
   cat "$dest/zyc-source.txt"
   exit 0
 fi
@@ -35,13 +50,7 @@ if [[ "$top" != "$dest.tmp" ]]; then mv "$top" "$dest.tmp.top"; rm -rf -- "$dest
 
 # Same wrappers as the Aigis CI ("ZyC clang provides clang/ld.lld but some
 # scripts expect CROSS_COMPILE gcc wrapper with target").
-for p in aarch64-linux-gnu arm-linux-gnueabi; do
-  if [[ ! -x "$dest.tmp/bin/$p-gcc" ]]; then
-    printf '#!/bin/sh\nexec "%s/bin/clang" --target=%s "$@"\n' "$dest" "$p" > "$dest.tmp/bin/$p-gcc"
-    printf '#!/bin/sh\nexec "%s/bin/clang++" --target=%s "$@"\n' "$dest" "$p" > "$dest.tmp/bin/$p-g++"
-    chmod +x "$dest.tmp/bin/$p-gcc" "$dest.tmp/bin/$p-g++"
-  fi
-done
+[[ -x "$dest.tmp/bin/aarch64-linux-gnu-gcc" ]] || write_wrappers "$dest.tmp"
 echo "$stamp" > "$dest.tmp/zyc-source.txt"
 rm -rf -- "$dest"
 mv "$dest.tmp" "$dest"
