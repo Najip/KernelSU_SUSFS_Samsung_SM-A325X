@@ -4,12 +4,6 @@ Android kernel for Samsung Galaxy A32 4G (SM-A325x series, codename `a32`, Media
 
 This repo stores no kernel source. The GitHub Actions workflows download every source fresh, patch it and build a flashable ZIP.
 
-## Why BakaSU, not xxKSU
-
-Until 22 Nov 2026 I built with xxKSU (backslashxx/KernelSU). Its developer archived that repo on 22 Nov 2026 (as of 23 Nov 2026 its future is unknown), so it gets no more fixes. Since then I build only Aigis with BakaSU, which is actively developed and supports SUSFS on 4.14. The Alt. kernel (mzggr) was xxKSU-only and is not developed anymore, so it is dropped too.
-
-The old xxKSU pipeline (Aigis and mzggr, hook styles, benchmark) is kept, frozen, in the [`xxksu` branch](../../tree/xxksu). Older releases with xxKSU stay on the [Releases](../../releases) page.
-
 ## What the kernel gets
 
 - BakaSU for root, from its `main` branch, with its SUSFS inline hooks (calls compiled into the kernel, the fastest style that works with SUSFS). The BakaSU manager app of the same BakaSU commit is in every release.
@@ -24,7 +18,7 @@ Details: [Kernel details](docs/kernels.md).
 
 ## Sources used
 
-This table is refreshed automatically each time a full Release is published (the one below is from the last xxKSU release until the first BakaSU Release).
+This table is refreshed automatically each time a full Release is published.
 
 <!-- SOURCES:START -->
 Last release: [build-20261123-122](../../releases/tag/build-20261123-122)
@@ -51,7 +45,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 ## Quick start
 
 1. **Build**: on GitHub, open **Actions** > **Build Kernel** > **Run workflow**, keep the defaults and press **Run workflow**. Download the kernel ZIP from **Artifacts** when it is green. Or take a ready ZIP from [Releases](../../releases).
-2. **Flash**: back up `boot`, flash the kernel ZIP in TWRP / OrangeFox (it also installs the matching NoMount module), reboot, and install the BakaSU manager app (`BakaSU_...apk`, on the release page). Recommended modules: BRENE for SUSFS (turn off BakaSU's built-in SUSFS settings when you use it) and HMA-OSS, which BRENE needs for hiding apps (SUSFS priority UID filter), see [Flashing](docs/flashing.md). Coming from xxKSU: see [Moving from xxKSU](docs/flashing.md#moving-from-xxksu).
+2. **Flash**: back up `boot`, flash the kernel ZIP in TWRP / OrangeFox (it also installs the matching NoMount module), reboot, and install the BakaSU manager app (`BakaSU_...apk`, on the release page). Recommended modules: BRENE for SUSFS (turn off BakaSU's built-in SUSFS settings when you use it) and HMA-OSS, which BRENE needs for hiding apps (SUSFS priority UID filter), see [Flashing](docs/flashing.md). Uninstall any other KernelSU manager app first.
 
 ## More docs
 
@@ -61,7 +55,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 | [Building](docs/building.md) | Every Build Kernel option, the artifacts, and building only the NoMount module |
 | [Commit modes and releases](docs/commit-modes.md) | `Latest`, `Verified`, `Promoted`, pre-releases and full Releases |
 | [Upstream check](docs/upstream-check.md) | The automatic check for new upstream commits, and which commits it ignores |
-| [Flashing and logs](docs/flashing.md) | Flashing, moving from xxKSU, the NoMount check in the flasher, collecting phone logs and shortening build logs |
+| [Flashing and logs](docs/flashing.md) | Flashing, the NoMount check in the flasher, collecting phone logs and shortening build logs |
 | [Repo layout](docs/repo-layout.md) | What each file and folder in this repo is |
 | [Licenses](docs/licenses.md) | This repo's license and the license of every upstream part |
 
@@ -74,7 +68,6 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3): flashable ZIP.
 - Juan (LumiROM): the network fix (UDP GSO), the mzggr tuning (earlier builds), the BBR fix and the first JPEG fix.
 - SlamZDank also for the `mtk_mm` memory heap in Aigis and for finding the real cause of the blank JPEGs.
-- Earlier builds: [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) (xxKSU, archived 22 Nov 2026) and [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) (the Alt. kernel), see the `xxksu` branch.
 
 ## License
 

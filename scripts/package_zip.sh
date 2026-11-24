@@ -29,8 +29,8 @@ read_json() { python3 -c "import json,sys; d=json.load(open('$INFO_DIR/sources.j
 susfs=$(read_json '["susfs"]["version"]')
 kshort=$(read_json '["kernel"]["commit"][:8]')
 # Root module (BakaSU): its short commit, b<sha> in the name. (The sources.json
-# key "xxksu" means the root module of the kernel; kept for older runs.)
-xshort=$(read_json '["xxksu"]["commit"][:8]')
+# key "ksu" means the root module of the kernel, BakaSU.)
+xshort=$(read_json '["ksu"]["commit"][:8]')
 rletter=b
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
@@ -96,7 +96,7 @@ fi
   echo "Kernel ID (NoMount match): $kernel_id"
   echo "uname tag: ${KERNEL_TAG:-none}"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
-  echo "$ROOT_NAME: $(read_json '["xxksu"]["repo"]') @ $(read_json '["xxksu"]["commit"]') (KSU_VERSION $(read_json '["xxksu"]["ksu_version"]'), latest tag $(read_json '["xxksu"]["tag"]'))"
+  echo "$ROOT_NAME: $(read_json '["ksu"]["repo"]') @ $(read_json '["ksu"]["commit"]') (KSU_VERSION $(read_json '["ksu"]["ksu_version"]'), latest tag $(read_json '["ksu"]["tag"]'))"
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"
   echo "Build repo commit: $repo_sha"
   if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then

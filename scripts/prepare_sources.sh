@@ -238,10 +238,10 @@ data = {
                "version": e["kernel_version"], "branch": e["kernel_branch"]},
     "source": e["KERNEL_SOURCE"],
     "root": e["ROOT_NAME"],
-    # "xxksu" = the root module of this kernel (xxKSU or BakaSU, see "root").
-    "xxksu": {"name": e["ROOT_NAME"], "repo": e["KSU_REPO"], "ref": e["KSU_REF"], "commit": e["ksu_sha"],
-              "date": e["ksu_date"], "subject": e["ksu_subject"],
-              "ksu_version": e["ksu_version"], "tag": e["ksu_tag"], "branch": e["ksu_branch"]},
+    # "ksu" = the root module of this kernel (BakaSU, see "root").
+    "ksu": {"name": e["ROOT_NAME"], "repo": e["KSU_REPO"], "ref": e["KSU_REF"], "commit": e["ksu_sha"],
+            "date": e["ksu_date"], "subject": e["ksu_subject"],
+            "ksu_version": e["ksu_version"], "tag": e["ksu_tag"], "branch": e["ksu_branch"]},
     "susfs": {"repo": e["SUSFS_REPO"], "ref": e["SUSFS_REF"], "commit": e["susfs_sha"],
               "path": e["SUSFS_PATCH"], "patch_date": e["susfs_patch_date"], "branch": e["susfs_branch"],
               "version": e["susfs_version"]},

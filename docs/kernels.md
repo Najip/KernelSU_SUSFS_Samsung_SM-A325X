@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md)
 
-One kernel is built: Aigis with BakaSU. xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026), so the xxKSU kernels and the Alt. kernel (mzggr, xxKSU only, no longer developed) stopped. They are kept, frozen, in the [`xxksu` branch](../../../tree/xxksu).
+One kernel is built: Aigis with BakaSU.
 
 ## Aigis kernel
 
@@ -19,4 +19,4 @@ One kernel is built: Aigis with BakaSU. xxKSU was archived by its developer on 2
 - The base patch `patches/base/0001-aigis-legion-to-bakasu-susfs.patch` puts the 4.14 SUSFS inline hooks into the Aigis tree in the places BakaSU expects. `patches/bakasu/0001-bakasu-auto-selinux-hide.patch` takes out the kernel's own SELinux hide hooks, since BakaSU (from 16 Nov 2026) hooks those places itself on 4.14. BakaSU itself is not patched (its build refuses a changed copy).
 - Version: BakaSU counts it from its git history (for example version code 35284, `v4.2.0-rc3-a049dee8`), so the manager shows the kernel as matching.
 - Manager app: taken from the BakaSU **Build Manager** run made from the same BakaSU commit (the `arm64-v8a` APK, under its original name). If that commit has no manager build (BakaSU only builds the manager when the app or kernel code changes), the newest earlier one is used and the run shows a warning.
-- NoMount: the module `NoMount-...-aigis-bakasu-...zip` is built for this kernel and also travels inside the kernel ZIP. Modules built for the old xxKSU kernels do not fit; the flasher replaces them.
+- NoMount: the module `NoMount-...-aigis-bakasu-...zip` is built for this kernel and also travels inside the kernel ZIP. Modules built for other kernels do not fit; the flasher replaces them.

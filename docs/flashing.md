@@ -26,15 +26,6 @@ After writing the kernel, the ZIP also checks your modules (when `/data` is moun
   - **Flashed in Android** (BakaSU/KernelSU manager, kernel flasher apps): the running module cannot be swapped, so the ZIP stages the one it carries, the same way the manager installs modules: the files go to `/data/adb/modules_update/nomount`, and `modules/nomount` gets the new `module.prop` and an `update` marker. At the next boot the root manager (ksud) deletes the old module and moves the new one in, before any module runs. A module you disabled stays disabled. The same metamodule and marked-for-removal rules apply.
   - With NoMount `integrate`, an installed NoMount LKM module gets a warning to remove it; nothing is installed or deleted.
 
-## Moving from xxKSU
-
-xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026), so my builds now use BakaSU. Coming from one of my older xxKSU kernels (Aigis or Alt./mzggr):
-
-1. Flash the new kernel ZIP in TWRP. Your old NoMount module has a different kernel ID, so it is replaced by the one in the ZIP. Other modules stay.
-2. Boot, install the BakaSU manager, then uninstall the old xxKSU manager app (only one manager should be installed).
-3. Open the BakaSU manager and check your modules and the apps allowed to use root; grant root again where it is missing.
-4. Coming from the Alt. (mzggr) kernel with the stock GPU: the new kernel uses the Valhall GPU by default and installs its drivers module.
-
 ## Collecting logs
 
 `tools/collect-logs.sh` gathers everything needed to debug a bootloop or a root problem. It runs both in TWRP and in booted Android (as root).
@@ -43,7 +34,7 @@ xxKSU was archived by its developer on 22 Nov 2026 (as of 23 Nov 2026), so my bu
 2. Run it:
    - TWRP: Advanced > Terminal, then `sh /sdcard/Download/collect-logs.sh`
    - Termux: `su -c sh /sdcard/Download/collect-logs.sh`
-3. Logs are saved to `/sdcard/kernel-logs/<date-time>-twrp` (or `-android`), plus a `.tar.gz` of the same folder. Start with `summary.txt`: it shows which root (BakaSU, or xxKSU on older kernels) and SUSFS version the kernel reports, whether NoMount is loaded, the installed modules and manager apps, and the root/SUSFS/NoMount kernel messages. Send the `.tar.gz`, or `summary.txt` if it is too big.
+3. Logs are saved to `/sdcard/kernel-logs/<date-time>-twrp` (or `-android`), plus a `.tar.gz` of the same folder. Start with `summary.txt`: it shows which root (BakaSU) and SUSFS version the kernel reports, whether NoMount is loaded, the installed modules and manager apps, and the root/SUSFS/NoMount kernel messages. Send the `.tar.gz`, or `summary.txt` if it is too big.
 
 After a bootloop, go straight to TWRP (Volume Down + Power, then Volume Up + Power, without powering off) so the crash log of the failed boot is still in memory. If `/sdcard` is not writable in TWRP, the script falls back to the SD card or `/data/local/tmp`.
 

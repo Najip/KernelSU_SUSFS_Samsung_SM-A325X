@@ -37,4 +37,4 @@ What I ask (a request, not a license condition): credit this repo when you reuse
 
 Every release lists the exact commits of the kernel, BakaSU, the SUSFS patch and this repo under **Source code (GPL-2.0)**, so anyone can rebuild the same kernel.
 
-Older releases (up to build-20261122-98) also used the Alt. kernel [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) (GPL-2.0) and xxKSU [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) (kernel part GPL-2.0, manager GPL-3.0); their source commits stay linked in those releases.
+Older releases (up to build-20261122-98) also used the Alt. kernel [mzggr0914/android_kernel_a325x_bakasu](https://github.com/mzggr0914/android_kernel_a325x_bakasu) (GPL-2.0) and xxKSU by backslashxx (kernel part GPL-2.0, manager GPL-3.0); their source commits stay listed in those releases.
