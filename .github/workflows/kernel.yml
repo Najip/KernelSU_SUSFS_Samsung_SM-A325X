@@ -723,6 +723,7 @@ jobs:
           fi
 
       - name: Publish release
+        id: publish
         run: |
           set -euo pipefail
           # Title: the name of the kernel ZIP (without -valhall).
@@ -745,6 +746,25 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "$name" --notes-file notes.md \
             $([[ "${{ inputs.release_type }}" == Release ]] || echo --prerelease)
+
+      - name: Post to Telegram (only when the bot is set up)
+        if: ${{ always() && steps.publish.outcome == 'success' && inputs.release_type == 'Release' }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          # Needs the repo secret TELEGRAM_BOT_TOKEN and the repo variable
+          # TELEGRAM_CHAT_ID (my channel, e.g. @mychannel); see docs/commit-modes.md.
+          if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
+            echo "Telegram bot not set up: skipped (post Telegram-post-$TAG.txt by hand)."; exit 0
+          fi
+          curl -fsS -o /dev/null "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text@release/Telegram-post-$TAG.txt" \
+            -d disable_web_page_preview=true
+          echo "Posted Telegram-post-$TAG.txt to $TELEGRAM_CHAT_ID."
 
       - name: Update README sources table
         if: inputs.release_type == 'Release'
@@ -815,6 +835,7 @@ jobs:
         run: python3 scripts/check_verified.py --report configs/verified.json release/sources*.json
 
       - name: Write release notes and publish
+        id: publish
         run: |
           set -euo pipefail
           scripts/release_body.sh release "$PREFIX" Release "$TAG" notes.md
@@ -826,6 +847,25 @@ jobs:
           gh release upload "$TAG" "XDA-posts-$TAG.txt" "Telegram-post-$TAG.txt" --repo "$GITHUB_REPOSITORY" --clobber
           echo "### Published $TAG as the full Release" >> "$GITHUB_STEP_SUMMARY"
           echo "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post to Telegram (only when the bot is set up)
+        if: ${{ always() && steps.publish.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          # Needs the repo secret TELEGRAM_BOT_TOKEN and the repo variable
+          # TELEGRAM_CHAT_ID (my channel, e.g. @mychannel); see docs/commit-modes.md.
+          if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
+            echo "Telegram bot not set up: skipped (post Telegram-post-$TAG.txt by hand)."; exit 0
+          fi
+          curl -fsS -o /dev/null "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text@Telegram-post-$TAG.txt" \
+            -d disable_web_page_preview=true
+          echo "Posted Telegram-post-$TAG.txt to $TELEGRAM_CHAT_ID."
 
       - name: Update README sources table
         run: |
