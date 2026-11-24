@@ -90,6 +90,7 @@ def make(md, tag, url, date):
     tail = [
         "",
         f"Download (kernel ZIP + BakaSU manager): {url}",
+        "XDA thread: https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs-2-4-0-samsung-a32-4g.4809753/",
         "Flash in TWRP or OrangeFox, back up boot first. The ZIP also installs the NoMount and JPEG fix modules.",
         f"All releases: {RELEASES}",
     ]

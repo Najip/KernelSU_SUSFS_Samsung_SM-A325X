@@ -2,6 +2,8 @@
 
 Android kernel for Samsung Galaxy A32 4G (SM-A325x series, codename `a32`, MediaTek MT6768): the **Aigis** kernel by SlamZDank with [BakaSU](https://github.com/Baka-SU/BakaSU) for root (a KernelSU fork for non-GKI kernels), SUSFS by simonpunk ported to non-GKI by JackA1ltman, and NoMount. Tested only on: SM-A325F on LumiROM 9 (Android 17).
 
+XDA thread: [[KERNEL] A325F/M/N BakaSU + SUSFS 2.4.0](https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs-2-4-0-samsung-a32-4g.4809753/)
+
 This repo stores no kernel source. The GitHub Actions workflows download every source fresh, patch it and build a flashable ZIP.
 
 ## What the kernel gets
