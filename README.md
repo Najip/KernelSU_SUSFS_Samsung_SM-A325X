@@ -13,6 +13,7 @@ This repo stores no kernel source. The GitHub Actions workflows download every s
 - Upstream NoMount, built for this exact kernel. The kernel ZIP carries it and installs or replaces it when you flash; it is also released as a separate ZIP. Or built into the kernel with the `integrate` option.
 - Valhall GPU with Aigis' drivers module (default), or the stock A32 GPU. Aigis' own CPU/GPU tuning.
 - Network fix by Juan (LumiROM): UDP-only GSO for IPv4 and IPv6, ticked by default. No LTO.
+- Flashlight fixes by aartzz: the torch no longer turns itself off after the flash timeout, and the camera's flash fault check gets an answer (no more "No such command" log spam). Always on.
 - JPEG + BBR fix: every kernel ZIP installs the small root module `a32-jpeg-bbr`. It fixes blank JPEG photos in Telegram and other apps on One UI 9 ports by letting apps use the kernel's `mtk_mm` memory heap, and keeps TCP on BBR (the vendor switches it to bic). It skips what the ROM already fixes and removes itself once the ROM has both. Based on Juan's (LumiROM) fix.
 - Built by `Najip@github`: shown in `/proc/version`, `uname -a` and About phone. The **uname tag** (default `-forkby-gh.Najip`) is added to `uname -r`.
 
@@ -69,6 +70,7 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 - [maxsteeel/nomount](https://github.com/maxsteeel/nomount) and [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader): NoMount LKM.
 - [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3): flashable ZIP.
 - Juan (LumiROM): the network fix (UDP GSO), the mzggr tuning (earlier builds), the BBR fix and the first JPEG fix.
+- [aartzz](https://github.com/samsung-mt6768-aosp/android_kernel_samsung_mt6768/tree/sm5714-fix): the SM5714 flashlight fixes.
 - SlamZDank also for the `mtk_mm` memory heap in Aigis and for finding the real cause of the blank JPEGs.
 
 ## License

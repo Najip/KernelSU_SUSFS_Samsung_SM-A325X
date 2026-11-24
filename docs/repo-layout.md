@@ -21,7 +21,7 @@
 | `patches/base/` | Turns Aigis into the BakaSU + SUSFS inline-hook layout, and the stock GPU option |
 | `patches/susfs/` | Small additions on top of JackA1ltman's SUSFS core files |
 | `patches/bakasu/` | Takes out the kernel's own SELinux hide hooks (BakaSU does them itself) |
-| `patches/kernel/` | Network fix (UDP GSO, by Juan from LumiROM) |
+| `patches/kernel/` | Network fix (UDP GSO, by Juan from LumiROM) and flashlight fixes (SM5714, by aartzz) |
 | `configs/a325x-bakasu-susfs.config` | Options the finished kernel config must have |
 | `configs/verified.json` | Commits pinned by the last successful `Promoted` build |
 | `scripts/resolve_commits.py` | Picks the commits for Latest, Verified and Promoted |

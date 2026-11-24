@@ -3,6 +3,11 @@
 >> Lines starting with ">>" are notes and are left out. scripts/xda_posts.py adds
 >> the title and the "newest stable release" line and puts it into XDA-posts-<tag>.txt.
 
+[B]2026-11-24: Flashlight fixes[/B]
+[LIST]
+[*]The torch (flashlight) no longer turns itself off after a few seconds, and the camera's flash fault check now gets an answer instead of an error. Thanks to aartzz for the fixes.
+[/LIST]
+
 [B]2026-11-23: Switched to BakaSU[/B]
 [LIST]
 [*]Root is now [URL='https://github.com/Baka-SU/BakaSU']BakaSU[/URL] (actively developed KernelSU fork, SUSFS inline hooks) on the Aigis kernel.
