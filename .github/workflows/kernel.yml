@@ -149,6 +149,7 @@ jobs:
         id: pick
         env:
           WANT_SELF_HOSTED: ${{ inputs.self_hosted }}
+          RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
         run: python3 scripts/pick_runner.py
       - name: Decide what to build
         id: plan
