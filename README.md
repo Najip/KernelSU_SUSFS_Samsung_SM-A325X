@@ -24,7 +24,7 @@ Details: [Kernel details](docs/kernels.md).
 This table is refreshed automatically each time a full Release is published.
 
 <!-- SOURCES:START -->
-Last release: [build-20261124-127](../../releases/tag/build-20261124-127)
+Last release: [build-20261125-133](../../releases/tag/build-20261125-133)
 
 | Part | Used by | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|---|
