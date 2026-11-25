@@ -9,6 +9,6 @@
               \_____________/
 ==========================================
  A32 4G (SM-A325F/M/N) | MT6768 | @KVER@
- @ROOT@ Inline + SUSFS @SUSFS@
+ @ROOT@ @ROOTVER@ | SUSFS @SUSFS@
  NoMount: @NOMOUNT@
 ==========================================

@@ -26,7 +26,7 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from xda_posts import gh_json, older_releases, ROOT, RELEASES  # noqa: E402
+from xda_posts import gh_json, older_releases, parse_versions, version_parts, ROOT, RELEASES  # noqa: E402
 
 LIMIT = 4096
 MAX_UPSTREAM = 8
@@ -91,13 +91,14 @@ def make_lines(md, tag, url, date):
     num = lambda t: tuple(int(x) for x in re.findall(r"-(\d{8})-(\d+)$", t)[0]) if re.search(r"-\d{8}-\d+$", t) else (0, 0)
     older = [(t, d) for t, d in older_releases(tag) if num(t) < num(tag)]
     since = max(older, key=lambda r: num(r[0]))[1] if older else ""
+    bakasu_p, susfs_p, nomount_p = version_parts(parse_versions(md))
     head = [
-        [T("KernelSU (BakaSU) + SUSFS 2.4.0 kernel", "b")],
+        [T(f"KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}", "b")],
         [T("Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)")],
         [],
         [T("Update: "), T(tag, "b", url, plain_url=False), T(f" ({date})")],
         [],
-        [T("Aigis kernel (SlamZDank) with BakaSU root, SUSFS v2.4.0 and NoMount, "
+        [T(f"Aigis kernel (SlamZDank) with {bakasu_p} root, {susfs_p} and {nomount_p}, "
            "for the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.")],
     ]
     news = my_news(since)

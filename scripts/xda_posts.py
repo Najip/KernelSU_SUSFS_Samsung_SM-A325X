@@ -47,12 +47,51 @@ def updates_text():
     return "\n".join(l for l in lines if not l.startswith(">>")).strip()
 
 
+def parse_versions(md):
+    """Extract BakaSU, SUSFS, and NoMount versions from release notes (notes.md)."""
+    bakasu = ""
+    m = re.search(r"^BakaSU:.*?\blatest tag\s+([^\s,)]+)", md, re.M)
+    if m and m.group(1).lower() not in ("none", "unknown"):
+        bakasu = m.group(1)
+    else:
+        m = re.search(r"^BakaSU:.*?\bKSU_VERSION\s+(\d+)", md, re.M)
+        if m:
+            bakasu = f"r{m.group(1)}"
+
+    susfs = ""
+    m = re.search(r"^SUSFS:\s*(v?\d[^\s]*)", md, re.M)
+    if m:
+        susfs = m.group(1)
+
+    nomount = ""
+    m = re.search(r"\bNoMount-(v?\d+(?:\.\d+)+[A-Za-z0-9._]*?)-(?:master|dev|main|lkm|[0-9a-f]{7,})", md)
+    if not m:
+        m = re.search(r"\bNoMount-(v?\d+(?:\.\d+)+)", md)
+    if m:
+        nomount = m.group(1)
+    elif re.search(r"^NoMount:\s*built into the kernel", md, re.M):
+        nomount = "built-in"
+
+    return {"bakasu": bakasu, "susfs": susfs, "nomount": nomount}
+
+
+def version_parts(v):
+    b = f"BakaSU {v['bakasu']}" if v.get("bakasu") else "BakaSU"
+    s = f"SUSFS {v['susfs']}" if v.get("susfs") else "SUSFS"
+    n = f"NoMount {v['nomount']}" if v.get("nomount") else "NoMount"
+    return b, s, n
+
+
 def make(md, tag, url, date):
+    v = parse_versions(md)
+    bakasu_p, susfs_p, nomount_p = version_parts(v)
+    xda_title = f"[KERNEL][A325F/M/N] KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}"
     post2 = [
         "[CENTER][SIZE=6][B]Changelog[/B][/SIZE][/CENTER]",
         f"Newest first. Full details for each version are on its [URL='{RELEASES}']GitHub release[/URL] page.",
         "",
         f"[SIZE=6][B]{tag}[/B][/SIZE] ({date})",
+        f"[B]Versions:[/B] {bakasu_p} | {susfs_p} | {nomount_p}",
         f"[B]Download:[/B] [URL='{url}']GitHub release {tag}[/URL]",
         "",
         convert(md),
@@ -65,14 +104,18 @@ def make(md, tag, url, date):
     post2 += ["", "[I]Built automatically with GitHub Actions.[/I]"]
     post3 = [
         "[CENTER][SIZE=6][B]Updates and announcements[/B][/SIZE][/CENTER]",
-        f"News, plans and known issues are posted here. Newest stable release: [URL='{url}']{tag}[/URL] ({date}).",
+        f"News, plans and known issues are posted here. Newest stable release: [URL='{url}']{tag}[/URL] ({date}) — {bakasu_p}, {susfs_p}, {nomount_p}.",
         "",
         updates_text(),
     ]
     return "\n".join([
-        f"XDA POSTS #2 AND #3 FOR {tag} (BBCode)",
+        f"XDA TITLE AND POSTS #2 / #3 FOR {tag} (BBCode)",
         "Lines starting with \">>\" are notes, do not paste them.",
-        "On XDA: edit post #2 and replace all of it, then the same for post #3.",
+        "On XDA: update the thread title if versions changed, then edit post #2 and post #3.",
+        "",
+        ">> ==================== THREAD TITLE ====================",
+        "",
+        xda_title,
         "",
         ">> ==================== POST #2: CHANGELOG ====================",
         "",

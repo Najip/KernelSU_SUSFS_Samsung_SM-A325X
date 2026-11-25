@@ -27,6 +27,15 @@ fi
 
 read_json() { python3 -c "import json,sys; d=json.load(open('$INFO_DIR/sources.json')); print(d$1)"; }
 susfs=$(read_json '["susfs"]["version"]')
+ksu_tag=$(read_json '["ksu"].get("tag", "")')
+ksu_ver=$(read_json '["ksu"].get("ksu_version", "")')
+if [[ -n "$ksu_tag" && "$ksu_tag" != none && "$ksu_tag" != unknown ]]; then
+  root_ver="$ksu_tag"
+elif [[ -n "$ksu_ver" ]]; then
+  root_ver="r${ksu_ver}"
+else
+  root_ver="Inline"
+fi
 kshort=$(read_json '["kernel"]["commit"][:8]')
 # Root module (BakaSU): its short commit, b<sha> in the name. (The sources.json
 # key "ksu" means the root module of the kernel, BakaSU.)
@@ -61,8 +70,8 @@ name="${KERNEL_LABEL}-${ROOT_NAME}-SUSFS-${susfs}-${date}-k${kshort}-${rletter}$
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} ${ROOT_NAME} SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 if [[ -f "$ROOT/anykernel/banner" ]]; then
-  sed -e "s|@KVER@|${release%%-*}|g" -e "s|@ROOT@|${ROOT_NAME}|g" -e "s|@SUSFS@|${susfs}|g" \
-    -e "s|@NOMOUNT@|${nomount_short}|g" \
+  sed -e "s|@KVER@|${release%%-*}|g" -e "s|@ROOT@|${ROOT_NAME}|g" -e "s|@ROOTVER@|${root_ver}|g" \
+    -e "s|@SUSFS@|${susfs}|g" -e "s|@NOMOUNT@|${nomount_short}|g" \
     "$ROOT/anykernel/banner" > "$ak3/banner"
 fi
 cp "$IMAGE" "$ak3/Image"
