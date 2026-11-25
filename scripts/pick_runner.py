@@ -6,10 +6,15 @@ $GITHUB_OUTPUT.
 
   WANT_SELF_HOSTED  "true" if the "Build on my own PC" box was ticked
   GH_TOKEN          token with actions:read
+  RUNNER_STATUS_TOKEN  optional fine-grained token with Administration: read
+                    on this repo, used to see if the PC's runner is online
   GITHUB_REPOSITORY, GITHUB_RUN_ID  set by GitHub Actions
 
 Rules:
 - Box unticked: GitHub runner.
+- Box ticked and the PC's runner is offline: GitHub runner. This needs the
+  RUNNER_STATUS_TOKEN secret; without it the online state can't be read and
+  the PC is assumed online (a build then waits in the queue if it is off).
 - Box ticked and the PC is idle: the PC.
 - Box ticked and the PC is busy (a job is running or queued on it, from any
   branch or workflow of this repo): wait for the PC only if that is expected to
@@ -31,9 +36,9 @@ SELF, GH = "self-hosted", "ubuntu-latest"
 DEFAULT_MIN = {SELF: 10.0, GH: 12.0}   # used until there is build history
 
 
-def api(path):
+def api(path, token=None):
     req = urllib.request.Request(API + path, headers={"Accept": "application/vnd.github+json"})
-    req.add_header("Authorization", "Bearer " + os.environ["GH_TOKEN"])
+    req.add_header("Authorization", "Bearer " + (token or os.environ["GH_TOKEN"]))
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
 
@@ -93,10 +98,31 @@ def busy_self_hosted_jobs():
     return busy
 
 
+def pc_online():
+    """True/False if the PC's runner is online, None if it can't be checked."""
+    token = os.environ.get("RUNNER_STATUS_TOKEN", "").strip()
+    if not token:
+        return None
+    try:
+        runners = api(f"repos/{REPO}/actions/runners?per_page=100", token).get("runners", [])
+    except Exception as err:  # bad or expired token: don't block the build
+        print(f"::warning::Couldn't read the runner list with RUNNER_STATUS_TOKEN ({err}). Assuming the PC is online.")
+        return None
+    online = [r["name"] for r in runners if r.get("status") == "online"
+              and any(l.get("name") == "self-hosted" for l in r.get("labels", []))]
+    print(f"Self-hosted runners online: {', '.join(online) or 'none'}")
+    return bool(online)
+
+
 def main():
     want = os.environ.get("WANT_SELF_HOSTED", "false") == "true"
     choice, why = GH, "the 'Build on my own PC' box is unticked"
-    if want:
+    online = pc_online() if want else None
+    if want and online is None:
+        print("::notice::No RUNNER_STATUS_TOKEN secret, so the PC's online state can't be checked. Assuming it is online.")
+    if want and online is False:
+        choice, why = GH, "the PC's runner is offline"
+    elif want:
         busy = busy_self_hosted_jobs()
         if not busy:
             choice, why = SELF, "the PC is idle"
