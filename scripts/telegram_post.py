@@ -88,7 +88,7 @@ def T(text, style="", url=None, plain_url=True):
 
 def make_lines(md, tag, url, date):
     # The full Release before this one (by tag: build-YYYYMMDD-<run number>).
-    num = lambda t: tuple(int(x) for x in t.split("-")[1:3])
+    num = lambda t: tuple(int(x) for x in re.findall(r"-(\d{8})-(\d+)$", t)[0]) if re.search(r"-\d{8}-\d+$", t) else (0, 0)
     older = [(t, d) for t, d in older_releases(tag) if num(t) < num(tag)]
     since = max(older, key=lambda r: num(r[0]))[1] if older else ""
     head = [
