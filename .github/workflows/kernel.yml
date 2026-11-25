@@ -803,7 +803,7 @@ jobs:
         continue-on-error: true
         env:
           NOTES_KEY: ${{ secrets.NOTES_KEY }}
-          NOTES_REPO: ${{ secrets.NOTES_REPO }}
+          NOTES_REPO: ${{ vars.NOTES_REPO }}
         run: |
           set -euo pipefail
           if [[ -z "${NOTES_KEY:-}" || -z "${NOTES_REPO:-}" ]]; then echo "Skipped."; exit 0; fi
@@ -822,7 +822,18 @@ jobs:
           git diff --cached --quiet && { echo "Nothing new."; exit 0; }
           git commit -q -m "$TAG"
           for attempt in 1 2 3; do
-            git push -q "git@github.com:$NOTES_REPO.git" HEAD:main 2>/dev/null && { echo "Done."; exit 0; }
+            if git push -q "git@github.com:$NOTES_REPO.git" HEAD:main 2>/dev/null; then
+              base="https://github.com/$NOTES_REPO/blob/$(git rev-parse HEAD)/$TAG"
+              {
+                echo "### Posts for $TAG"
+                for f in "$TAG"/*; do
+                  f=${f#"$TAG"/}
+                  case $f in *.tg.html) continue ;; esac
+                  echo "- [$f]($base/$f)"
+                done
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "Done."; exit 0
+            fi
             git pull -q --rebase "git@github.com:$NOTES_REPO.git" main 2>/dev/null || true
           done
           echo "::warning::Could not save the post texts."
@@ -942,7 +953,7 @@ jobs:
         continue-on-error: true
         env:
           NOTES_KEY: ${{ secrets.NOTES_KEY }}
-          NOTES_REPO: ${{ secrets.NOTES_REPO }}
+          NOTES_REPO: ${{ vars.NOTES_REPO }}
         run: |
           set -euo pipefail
           if [[ -z "${NOTES_KEY:-}" || -z "${NOTES_REPO:-}" ]]; then echo "Skipped."; exit 0; fi
@@ -961,7 +972,18 @@ jobs:
           git diff --cached --quiet && { echo "Nothing new."; exit 0; }
           git commit -q -m "$TAG"
           for attempt in 1 2 3; do
-            git push -q "git@github.com:$NOTES_REPO.git" HEAD:main 2>/dev/null && { echo "Done."; exit 0; }
+            if git push -q "git@github.com:$NOTES_REPO.git" HEAD:main 2>/dev/null; then
+              base="https://github.com/$NOTES_REPO/blob/$(git rev-parse HEAD)/$TAG"
+              {
+                echo "### Posts for $TAG"
+                for f in "$TAG"/*; do
+                  f=${f#"$TAG"/}
+                  case $f in *.tg.html) continue ;; esac
+                  echo "- [$f]($base/$f)"
+                done
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "Done."; exit 0
+            fi
             git pull -q --rebase "git@github.com:$NOTES_REPO.git" main 2>/dev/null || true
           done
           echo "::warning::Could not save the post texts."
