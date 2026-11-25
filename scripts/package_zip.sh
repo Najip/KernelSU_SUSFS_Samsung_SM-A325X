@@ -51,6 +51,10 @@ esac
 name="${KERNEL_LABEL}-${ROOT_NAME}-SUSFS-${susfs}-${date}-k${kshort}-${rletter}${xshort}${suffix}"
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} ${ROOT_NAME} SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
+if [[ -f "$ROOT/anykernel/banner" ]]; then
+  sed -e "s|@KVER@|${release%%-*}|g" -e "s|@ROOT@|${ROOT_NAME}|g" -e "s|@SUSFS@|${susfs}|g" \
+    "$ROOT/anykernel/banner" > "$ak3/banner"
+fi
 cp "$IMAGE" "$ak3/Image"
 
 # Flasher additions, run after the kernel is written:
@@ -129,6 +133,7 @@ unzip -p "$zip_path" Image | cmp - "$IMAGE"
 [[ -n "${AK3_FROM_TREE:-}" ]] || unzip -p "$zip_path" Image.gz | gzip -dc | cmp - "$IMAGE"
 unzip -l "$zip_path" | grep -q 'META-INF/com/google/android/update-binary'
 unzip -l "$zip_path" | grep -q 'tools/ak3-core.sh'
+unzip -l "$zip_path" | grep -q ' banner$'
 unzip -l "$zip_path" | grep -q 'jpeg-bbr/service.sh'
 
 # Valhall GPU: the ZIP is replaced by the bundle, the same kernel + the Valhall
