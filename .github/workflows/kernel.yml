@@ -738,10 +738,11 @@ jobs:
           scripts/release_body.sh release "$prefix" "${{ inputs.release_type }}" "$tag" notes.md
           # Full Release: also ready-to-paste XDA posts #2 (changelog) and #3 (updates), BBCode.
           if [[ "${{ inputs.release_type }}" == Release ]]; then
+            mkdir -p posts
             python3 scripts/xda_posts.py notes.md "$tag" \
-              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "release/XDA-posts-$tag.txt"
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "posts/XDA-posts-$tag.txt"
             python3 scripts/telegram_post.py notes.md "$tag" \
-              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "release/Telegram-post-$tag.txt"
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$tag" "posts/Telegram-post-$tag.txt"
           fi
 
       - name: Publish release
@@ -755,7 +756,7 @@ jobs:
           done
           [[ -n "$name" ]] || { echo "::error::No kernel ZIP in the release."; exit 1; }
           shopt -s nullglob
-          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-posts-*.txt release/Telegram-post-*.txt release/Telegram-post-*[0-9].html)
+          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt)
           # Create the tag first, then the release without --target. With --target,
           # GitHub wants the "workflows" permission (which this token cannot get)
           # when workflow files changed on the branch after this commit: HTTP 403
@@ -781,7 +782,7 @@ jobs:
           # Needs the repo secret TELEGRAM_BOT_TOKEN and the repo variable
           # TELEGRAM_CHAT_ID (my channel, e.g. @mychannel); see docs/commit-modes.md.
           if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
-            echo "Telegram bot not set up: skipped (post Telegram-post-$TAG.txt by hand)."; exit 0
+            echo "Telegram bot not set up: skipped."; exit 0
           fi
           # Bold and named links (Telegram HTML). With the repo variable
           # TELEGRAM_IMAGE_URL (a picture link), that picture shows above the text.
@@ -792,10 +793,39 @@ jobs:
           fi
           curl -fsS -o /dev/null "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
-            --data-urlencode "text@release/Telegram-post-$TAG.tg.html" \
+            --data-urlencode "text@posts/Telegram-post-$TAG.tg.html" \
             -d parse_mode=HTML \
             --data-urlencode "link_preview_options=$preview"
-          echo "Posted Telegram-post-$TAG.txt to $TELEGRAM_CHAT_ID."
+          echo "Posted to Telegram."
+
+      - name: Keep the post texts
+        if: ${{ always() && steps.publish.outcome == 'success' && inputs.release_type == 'Release' }}
+        continue-on-error: true
+        env:
+          NOTES_KEY: ${{ secrets.NOTES_KEY }}
+          NOTES_REPO: ${{ secrets.NOTES_REPO }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NOTES_KEY:-}" || -z "${NOTES_REPO:-}" ]]; then echo "Skipped."; exit 0; fi
+          key=$(mktemp); trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$NOTES_KEY" > "$key"; chmod 600 "$key"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          dir=$(mktemp -d)
+          git clone -q --depth 1 "git@github.com:$NOTES_REPO.git" "$dir" 2>/dev/null \
+            || { echo "::warning::Could not save the post texts."; exit 0; }
+          mkdir -p "$dir/$TAG"
+          cp posts/* "$dir/$TAG/"
+          cd "$dir"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && { echo "Nothing new."; exit 0; }
+          git commit -q -m "$TAG"
+          for attempt in 1 2 3; do
+            git push -q "git@github.com:$NOTES_REPO.git" HEAD:main 2>/dev/null && { echo "Done."; exit 0; }
+            git pull -q --rebase "git@github.com:$NOTES_REPO.git" main 2>/dev/null || true
+          done
+          echo "::warning::Could not save the post texts."
 
       - name: Update README sources table
         if: inputs.release_type == 'Release'
@@ -871,11 +901,11 @@ jobs:
           set -euo pipefail
           scripts/release_body.sh release "$PREFIX" Release "$TAG" notes.md
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest --notes-file notes.md
+          mkdir -p posts
           python3 scripts/xda_posts.py notes.md "$TAG" \
-            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "XDA-posts-$TAG.txt"
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "posts/XDA-posts-$TAG.txt"
           python3 scripts/telegram_post.py notes.md "$TAG" \
-            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "Telegram-post-$TAG.txt"
-          gh release upload "$TAG" "XDA-posts-$TAG.txt" "Telegram-post-$TAG.txt" "Telegram-post-$TAG.html" --repo "$GITHUB_REPOSITORY" --clobber
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "posts/Telegram-post-$TAG.txt"
           echo "### Published $TAG as the full Release" >> "$GITHUB_STEP_SUMMARY"
           echo "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 
@@ -891,7 +921,7 @@ jobs:
           # Needs the repo secret TELEGRAM_BOT_TOKEN and the repo variable
           # TELEGRAM_CHAT_ID (my channel, e.g. @mychannel); see docs/commit-modes.md.
           if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
-            echo "Telegram bot not set up: skipped (post Telegram-post-$TAG.txt by hand)."; exit 0
+            echo "Telegram bot not set up: skipped."; exit 0
           fi
           # Bold and named links (Telegram HTML). With the repo variable
           # TELEGRAM_IMAGE_URL (a picture link), that picture shows above the text.
@@ -902,10 +932,39 @@ jobs:
           fi
           curl -fsS -o /dev/null "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
-            --data-urlencode "text@Telegram-post-$TAG.tg.html" \
+            --data-urlencode "text@posts/Telegram-post-$TAG.tg.html" \
             -d parse_mode=HTML \
             --data-urlencode "link_preview_options=$preview"
-          echo "Posted Telegram-post-$TAG.txt to $TELEGRAM_CHAT_ID."
+          echo "Posted to Telegram."
+
+      - name: Keep the post texts
+        if: ${{ always() && steps.publish.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          NOTES_KEY: ${{ secrets.NOTES_KEY }}
+          NOTES_REPO: ${{ secrets.NOTES_REPO }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NOTES_KEY:-}" || -z "${NOTES_REPO:-}" ]]; then echo "Skipped."; exit 0; fi
+          key=$(mktemp); trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$NOTES_KEY" > "$key"; chmod 600 "$key"
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          dir=$(mktemp -d)
+          git clone -q --depth 1 "git@github.com:$NOTES_REPO.git" "$dir" 2>/dev/null \
+            || { echo "::warning::Could not save the post texts."; exit 0; }
+          mkdir -p "$dir/$TAG"
+          cp posts/* "$dir/$TAG/"
+          cd "$dir"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && { echo "Nothing new."; exit 0; }
+          git commit -q -m "$TAG"
+          for attempt in 1 2 3; do
+            git push -q "git@github.com:$NOTES_REPO.git" HEAD:main 2>/dev/null && { echo "Done."; exit 0; }
+            git pull -q --rebase "git@github.com:$NOTES_REPO.git" main 2>/dev/null || true
+          done
+          echo "::warning::Could not save the post texts."
 
       - name: Update README sources table
         run: |

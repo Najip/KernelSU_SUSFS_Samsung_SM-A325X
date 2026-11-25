@@ -37,18 +37,18 @@ With NoMount `lkm`, a `Pre-release` or `Release` attaches the module ZIP and `no
 
 ## XDA posts
 
-Every full Release (`Release`, or `Release from pre-release`) also gets `XDA-posts-<tag>.txt` (BBCode, made by `scripts/xda_posts.py`):
+Every full Release (`Release`, or `Release from pre-release`) also makes `XDA-posts-<tag>.txt` (BBCode, made by `scripts/xda_posts.py`, not attached to the release):
 
 - **Post #2, changelog**: this release in full (the long build info folded into a spoiler), then a list of the older full Releases with links.
 - **Post #3, updates**: the text of [`docs/xda-updates.txt`](xda-updates.txt) (news, known issues, recommended modules) plus a line with the newest stable release. I edit that file by hand when there is news.
 
-Download it from the release page, then on XDA edit post #2 and replace all of it, and the same for post #3. Pre-releases do not get it. For any release by hand: `python3 scripts/xda_posts.py --release <tag>`.
+On XDA, edit post #2 and replace all of it, and the same for post #3. Pre-releases do not get it. For any release by hand: `python3 scripts/xda_posts.py --release <tag>`.
 
 The thread title and post #1 are in [`docs/xda-thread.txt`](xda-thread.txt) and are pasted once by hand.
 
 ## Telegram post
 
-Every full Release also gets `Telegram-post-<tag>.txt` (one message, made by `scripts/telegram_post.py`): one line about the kernel, my news from [`docs/xda-updates.txt`](xda-updates.txt) dated since the previous full Release, the notable Aigis / BakaSU / SUSFS changes (version bumps and translations left out), and the download link. It also gets `Telegram-post-<tag>.html`: I open it in the phone browser, tap Copy post and paste it in Telegram, so the bold text and the named links (Download, XDA thread, All releases) stay. The `.txt` is the plain version with the links written out. For any release by hand: `python3 scripts/telegram_post.py --release <tag>`.
+Every full Release also makes `Telegram-post-<tag>.txt` (not attached to the release either) (one message, made by `scripts/telegram_post.py`): one line about the kernel, my news from [`docs/xda-updates.txt`](xda-updates.txt) dated since the previous full Release, the notable Aigis / BakaSU / SUSFS changes (version bumps and translations left out), and the download link. There is also `Telegram-post-<tag>.html`: I open it in the phone browser, tap Copy post and paste it in Telegram, so the bold text and the named links (Download, XDA thread, All releases) stay. The `.txt` is the plain version with the links written out. For any release by hand: `python3 scripts/telegram_post.py --release <tag>`.
 
 Automatic posting (optional, only to a channel or group of my own): the release also sends that text with a Telegram bot when two settings exist. Until then the step is skipped and nothing fails. The bot sends the formatted version. To show a picture above the post, also set `gh variable set TELEGRAM_IMAGE_URL -R Najip/KernelSU_SUSFS_Samsung_SM-A325X -b <picture link>`.
 
