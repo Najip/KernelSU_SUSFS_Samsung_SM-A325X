@@ -409,9 +409,30 @@ jobs:
 
       - name: Set up Zig (NoMount)
         if: env.BUILD_NOMOUNT == 'true'
-        uses: jetsung/setup-zig@v0.0.4
-        with:
-          version: master
+        run: |
+          set -euo pipefail
+          # Zig is only used as a C compiler (zig cc) for the NoMount tools.
+          # 1) Reuse the Zig already on this machine (the one the last good
+          #    build used): no download at all.
+          # 2) Else download a fixed stable version, with time limits so a
+          #    slow or unreachable server fails the step instead of hanging.
+          ZIG_VERSION=0.17.1
+          ZIG_SHA256=3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a
+          dir="$HOME/.local/zig"
+          if [[ -x "$dir/zig" ]] && timeout 30 "$dir/zig" version >/dev/null 2>&1; then
+            echo "Using the Zig already installed: $("$dir/zig" version)"
+          else
+            [[ "$(uname -m)" == x86_64 ]] || { echo "Only x86_64 runners are set up for the pinned Zig" >&2; exit 1; }
+            url="https://ziglang.org/download/$ZIG_VERSION/zig-x86_64-linux-$ZIG_VERSION.tar.xz"
+            tmp=$(mktemp)
+            curl -fL --connect-timeout 20 --max-time 600 --retry 3 --retry-delay 5 -o "$tmp" "$url"
+            echo "$ZIG_SHA256  $tmp" | sha256sum -c -
+            rm -rf "$dir"; mkdir -p "$dir"
+            tar xJf "$tmp" -C "$dir" --strip-components=1
+            rm -f "$tmp"
+            echo "Installed Zig $("$dir/zig" version)"
+          fi
+          echo "$dir" >> "$GITHUB_PATH"
 
       - name: Build the NoMount ${{ env.NOMOUNT_REF }} module
         if: env.BUILD_NOMOUNT == 'true'
