@@ -48,9 +48,9 @@ The thread title and post #1 are in [`docs/xda-thread.txt`](xda-thread.txt) and 
 
 ## Telegram post
 
-Every full Release also gets `Telegram-post-<tag>.txt` (plain text, one message, made by `scripts/telegram_post.py`): one line about the kernel, my news from [`docs/xda-updates.txt`](xda-updates.txt) dated since the previous full Release, the notable Aigis / BakaSU / SUSFS changes (version bumps and translations left out), and the download link. I copy it and post it by hand in the Telegram groups. For any release by hand: `python3 scripts/telegram_post.py --release <tag>`.
+Every full Release also gets `Telegram-post-<tag>.txt` (one message, made by `scripts/telegram_post.py`): one line about the kernel, my news from [`docs/xda-updates.txt`](xda-updates.txt) dated since the previous full Release, the notable Aigis / BakaSU / SUSFS changes (version bumps and translations left out), and the download link. It also gets `Telegram-post-<tag>.html`: I open it in the phone browser, tap Copy post and paste it in Telegram, so the bold text and the named links (Download, XDA thread, All releases) stay. The `.txt` is the plain version with the links written out. For any release by hand: `python3 scripts/telegram_post.py --release <tag>`.
 
-Automatic posting (optional, only to a channel or group of my own): the release also sends that text with a Telegram bot when two settings exist. Until then the step is skipped and nothing fails.
+Automatic posting (optional, only to a channel or group of my own): the release also sends that text with a Telegram bot when two settings exist. Until then the step is skipped and nothing fails. The bot sends the formatted version. To show a picture above the post, also set `gh variable set TELEGRAM_IMAGE_URL -R Najip/KernelSU_SUSFS_Samsung_SM-A325X -b <picture link>`.
 
 1. In Telegram, open @BotFather, send `/newbot` and copy the bot token.
 2. Add the bot to my channel as an admin (allowed to post messages).

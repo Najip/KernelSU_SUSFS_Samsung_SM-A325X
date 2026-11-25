@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make a short Telegram post for a full Release (plain text, copy and paste).
+"""Make a short Telegram post for a full Release.
 
   telegram_post.py <notes.md> <release-tag> <release-url> <out.txt>   (used by the workflow)
   telegram_post.py --release <tag> [out.txt]                          (by hand, needs gh)
@@ -11,9 +11,15 @@ The post has:
   - the notable upstream changes from the release notes (Aigis kernel and
     BakaSU; version bumps, translations and merge commits are left out),
   - the download link and how to flash.
-Plain text on purpose: links show up as links when pasted, and it fits in one
-Telegram message (4096 characters; the upstream list is cut when needed).
+It writes three files next to each other:
+  Telegram-post-<tag>.txt      plain text, links written out
+  Telegram-post-<tag>.html     open it in a browser, tap "Copy post" and paste
+                               in Telegram: bold and named links stay
+  Telegram-post-<tag>.tg.html  the same in Telegram's HTML, sent by the bot
+It fits in one Telegram message (4096 visible characters; the upstream list is
+cut when needed).
 """
+import html
 import os
 import re
 import sys
@@ -24,6 +30,7 @@ from xda_posts import gh_json, older_releases, ROOT, RELEASES  # noqa: E402
 
 LIMIT = 4096
 MAX_UPSTREAM = 8
+XDA = "https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs-2-4-0-samsung-a32-4g.4809753/"
 # Upstream commits that say nothing to a user.
 SKIP = re.compile(r"^(chore|ci|docs?|build\(deps\)|Merge |Revert \"chore)|bump |translations?|Weblate|README", re.I)
 # Release-notes sections worth listing, and how they are named in the post.
@@ -70,41 +77,120 @@ def upstream(md):
     return out
 
 
-def make(md, tag, url, date):
+# A post is a list of lines; a line is a list of parts (text, style, url).
+# style: "" or "b". url: None or a link. One source, three outputs: plain text,
+# a copy page (HTML, keeps bold and links when pasted) and the bot's HTML.
+def T(text, style="", url=None, plain_url=True):
+    """plain_url=False: the plain text shows only the words (the link is
+    already written out elsewhere in the post)."""
+    return (text, style, url if plain_url else None, url)
+
+
+def make_lines(md, tag, url, date):
     # The full Release before this one (by tag: build-YYYYMMDD-<run number>).
     num = lambda t: tuple(int(x) for x in t.split("-")[1:3])
     older = [(t, d) for t, d in older_releases(tag) if num(t) < num(tag)]
     since = max(older, key=lambda r: num(r[0]))[1] if older else ""
     head = [
-        "KernelSU (BakaSU) + SUSFS 2.4.0 kernel",
-        "Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)",
-        "",
-        f"Update: {tag} ({date})",
-        "",
-        "Aigis kernel (SlamZDank) with BakaSU root, SUSFS v2.4.0 and NoMount, "
-        "for the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.",
+        [T("KernelSU (BakaSU) + SUSFS 2.4.0 kernel", "b")],
+        [T("Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)")],
+        [],
+        [T("Update: "), T(tag, "b", url, plain_url=False), T(f" ({date})")],
+        [],
+        [T("Aigis kernel (SlamZDank) with BakaSU root, SUSFS v2.4.0 and NoMount, "
+           "for the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.")],
     ]
     news = my_news(since)
     if news:
-        head += ["", "From me:", *news]
+        head += [[], [T("From me:", "b")]]
+        head += [[T(n, "b")] if n.endswith(":") and not n.startswith("- ") else [T(n)] for n in news]
     tail = [
-        "",
-        f"Download (kernel ZIP + BakaSU manager): {url}",
-        "XDA thread: https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs-2-4-0-samsung-a32-4g.4809753/",
-        "Flash in TWRP or OrangeFox, back up boot first. The ZIP also installs the NoMount and JPEG fix modules.",
-        f"All releases: {RELEASES}",
+        [],
+        [T("Download (kernel ZIP + BakaSU manager)", "b", url)],
+        [T("XDA thread", "", XDA), T(" | "), T("All releases", "", RELEASES)],
+        [T("Flash in TWRP or OrangeFox, back up boot first. The ZIP also installs the NoMount and JPEG fix modules.")],
     ]
     ups = upstream(md)
     while True:
         body = list(head)
         if ups:
-            body += ["", "Upstream changes:", *ups[:MAX_UPSTREAM]]
+            body += [[], [T("Upstream changes:", "b")], *[[T(u)] for u in ups[:MAX_UPSTREAM]]]
             if len(ups) > MAX_UPSTREAM:
-                body.append(f"- ...and {len(ups) - MAX_UPSTREAM} more, see the release page")
-        text = "\n".join(body + tail)
-        if len(text) <= LIMIT or not ups:
-            return text
+                body.append([T(f"- ...and {len(ups) - MAX_UPSTREAM} more, see the "), T("release page", "", url, plain_url=False)])
+        lines = body + tail
+        # Telegram counts the visible text, not the link addresses.
+        if len(to_visible(lines)) <= LIMIT or not ups:
+            return lines
         ups = ups[:-1]
+
+
+def to_visible(lines):
+    return "\n".join("".join(p[0] for p in l) for l in lines)
+
+
+def to_text(lines):
+    """Plain text: links written out, for places without formatting."""
+    out = []
+    for l in lines:
+        s = ""
+        for t, _, u, _ in l:
+            s += f"{t}: {u}" if u and t != u else t
+        out.append(s.replace(" | ", "\n"))
+    return "\n".join(out)
+
+
+def to_tg_html(lines, sep="\n"):
+    """Telegram HTML (<b>, <a>): what the bot sends, and the copy page body."""
+    out = []
+    for l in lines:
+        s = ""
+        for t, st, _, u in l:
+            t = html.escape(t, quote=False)
+            if st == "b":
+                t = f"<b>{t}</b>"
+            if u:
+                t = f'<a href="{html.escape(u)}">{t}</a>'
+            s += t
+        out.append(s)
+    return sep.join(out)
+
+
+PAGE = """<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram post {tag}</title>
+<style>
+body {{ font: 16px/1.45 system-ui, sans-serif; margin: 16px; max-width: 640px; }}
+button {{ font-size: 18px; padding: 10px 18px; margin-bottom: 14px; }}
+#post {{ border: 1px solid #8884; border-radius: 8px; padding: 12px; }}
+#ok {{ margin-left: 10px; }}
+</style></head><body>
+<button id="copy">Copy post</button><span id="ok"></span>
+<div id="post">{body}</div>
+<script>
+document.getElementById("copy").onclick = async () => {{
+  const el = document.getElementById("post"), ok = document.getElementById("ok");
+  try {{
+    await navigator.clipboard.write([new ClipboardItem({{
+      "text/html": new Blob([el.innerHTML], {{type: "text/html"}}),
+      "text/plain": new Blob([el.innerText], {{type: "text/plain"}})}})]);
+  }} catch (e) {{
+    const r = document.createRange(); r.selectNodeContents(el);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    document.execCommand("copy"); s.removeAllRanges();
+  }}
+  ok.textContent = "Copied. Paste it in Telegram.";
+}};
+</script></body></html>
+"""
+
+
+def to_page(lines, tag):
+    return PAGE.format(tag=html.escape(tag), body=to_tg_html(lines, "<br>\n"))
+
+
+def make(md, tag, url, date):
+    return to_text(make_lines(md, tag, url, date))
 
 
 def main(argv):
@@ -120,9 +206,13 @@ def main(argv):
     else:
         sys.exit(__doc__)
     date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(make(md, tag, url, date) + "\n")
-    print(f"Telegram post: {out}")
+    lines = make_lines(md, tag, url, date)
+    base = out[:-4] if out.endswith(".txt") else out
+    for path, text in ((out, to_text(lines)), (base + ".html", to_page(lines, tag)),
+                       (base + ".tg.html", to_tg_html(lines))):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+        print(f"Telegram post: {path}")
 
 
 if __name__ == "__main__":

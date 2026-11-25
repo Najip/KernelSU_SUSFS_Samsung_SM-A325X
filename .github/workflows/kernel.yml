@@ -755,7 +755,7 @@ jobs:
           done
           [[ -n "$name" ]] || { echo "::error::No kernel ZIP in the release."; exit 1; }
           shopt -s nullglob
-          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-posts-*.txt release/Telegram-post-*.txt)
+          assets=(release/*.zip release/*.ko release/*.apk release/build-info*.txt release/sources*.json release/SHA256SUMS.txt release/XDA-posts-*.txt release/Telegram-post-*.txt release/Telegram-post-*[0-9].html)
           # Create the tag first, then the release without --target. With --target,
           # GitHub wants the "workflows" permission (which this token cannot get)
           # when workflow files changed on the branch after this commit: HTTP 403
@@ -775,6 +775,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+          TELEGRAM_IMAGE_URL: ${{ vars.TELEGRAM_IMAGE_URL }}
         run: |
           set -euo pipefail
           # Needs the repo secret TELEGRAM_BOT_TOKEN and the repo variable
@@ -782,10 +783,18 @@ jobs:
           if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
             echo "Telegram bot not set up: skipped (post Telegram-post-$TAG.txt by hand)."; exit 0
           fi
+          # Bold and named links (Telegram HTML). With the repo variable
+          # TELEGRAM_IMAGE_URL (a picture link), that picture shows above the text.
+          if [[ -n "${TELEGRAM_IMAGE_URL:-}" ]]; then
+            preview="{\"url\":\"$TELEGRAM_IMAGE_URL\",\"prefer_large_media\":true,\"show_above_text\":true}"
+          else
+            preview='{"is_disabled":true}'
+          fi
           curl -fsS -o /dev/null "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
-            --data-urlencode "text@release/Telegram-post-$TAG.txt" \
-            -d disable_web_page_preview=true
+            --data-urlencode "text@release/Telegram-post-$TAG.tg.html" \
+            -d parse_mode=HTML \
+            --data-urlencode "link_preview_options=$preview"
           echo "Posted Telegram-post-$TAG.txt to $TELEGRAM_CHAT_ID."
 
       - name: Update README sources table
@@ -866,7 +875,7 @@ jobs:
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "XDA-posts-$TAG.txt"
           python3 scripts/telegram_post.py notes.md "$TAG" \
             "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" "Telegram-post-$TAG.txt"
-          gh release upload "$TAG" "XDA-posts-$TAG.txt" "Telegram-post-$TAG.txt" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "XDA-posts-$TAG.txt" "Telegram-post-$TAG.txt" "Telegram-post-$TAG.html" --repo "$GITHUB_REPOSITORY" --clobber
           echo "### Published $TAG as the full Release" >> "$GITHUB_STEP_SUMMARY"
           echo "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
 
@@ -876,6 +885,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+          TELEGRAM_IMAGE_URL: ${{ vars.TELEGRAM_IMAGE_URL }}
         run: |
           set -euo pipefail
           # Needs the repo secret TELEGRAM_BOT_TOKEN and the repo variable
@@ -883,10 +893,18 @@ jobs:
           if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
             echo "Telegram bot not set up: skipped (post Telegram-post-$TAG.txt by hand)."; exit 0
           fi
+          # Bold and named links (Telegram HTML). With the repo variable
+          # TELEGRAM_IMAGE_URL (a picture link), that picture shows above the text.
+          if [[ -n "${TELEGRAM_IMAGE_URL:-}" ]]; then
+            preview="{\"url\":\"$TELEGRAM_IMAGE_URL\",\"prefer_large_media\":true,\"show_above_text\":true}"
+          else
+            preview='{"is_disabled":true}'
+          fi
           curl -fsS -o /dev/null "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
             --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
-            --data-urlencode "text@Telegram-post-$TAG.txt" \
-            -d disable_web_page_preview=true
+            --data-urlencode "text@Telegram-post-$TAG.tg.html" \
+            -d parse_mode=HTML \
+            --data-urlencode "link_preview_options=$preview"
           echo "Posted Telegram-post-$TAG.txt to $TELEGRAM_CHAT_ID."
 
       - name: Update README sources table
