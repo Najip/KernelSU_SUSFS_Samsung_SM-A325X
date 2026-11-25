@@ -44,15 +44,25 @@ suffix=
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in
-  integrate) nomount_line="built into the kernel ($(read_json '["nomount"]["branch"]') @ $(read_json '["nomount"]["commit"]'))" ;;
-  lkm) nomount_line="separate LKM (${NOMOUNT_REF:-master})" ;;
-  *) nomount_line="not included" ;;
+  integrate)
+    nomount_line="built into the kernel ($(read_json '["nomount"]["branch"]') @ $(read_json '["nomount"]["commit"]'))"
+    nomount_short="built-in ($(read_json '["nomount"]["branch"]') @ $(read_json '["nomount"]["commit"][:8]'))"
+    ;;
+  lkm)
+    nomount_line="separate LKM (${NOMOUNT_REF:-master})"
+    nomount_short="LKM (${NOMOUNT_REF:-master})"
+    ;;
+  *)
+    nomount_line="not included"
+    nomount_short="not included"
+    ;;
 esac
 name="${KERNEL_LABEL}-${ROOT_NAME}-SUSFS-${susfs}-${date}-k${kshort}-${rletter}${xshort}${suffix}"
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} ${ROOT_NAME} SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 if [[ -f "$ROOT/anykernel/banner" ]]; then
   sed -e "s|@KVER@|${release%%-*}|g" -e "s|@ROOT@|${ROOT_NAME}|g" -e "s|@SUSFS@|${susfs}|g" \
+    -e "s|@NOMOUNT@|${nomount_short}|g" \
     "$ROOT/anykernel/banner" > "$ak3/banner"
 fi
 cp "$IMAGE" "$ak3/Image"

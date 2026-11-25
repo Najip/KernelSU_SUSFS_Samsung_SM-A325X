@@ -36,7 +36,14 @@ echo "$line" >> "$work/build-info.txt"
 if unzip -l "$zip_path" | grep -q ' nomount/'; then
   zip -qd "$zip_path" 'nomount/*'
 fi
-(cd "$work" && zip -qr9 "$zip_path" nomount build-info.txt)
+extra_files=()
+if unzip -l "$zip_path" | grep -q ' banner$'; then
+  nm_ver=$(sed -n 's/^version=//p' "$work/nomount/module.prop" | tr -d '\r' | head -n1 | sed 's/, LKM [^)]*//')
+  [[ -n "$nm_ver" ]] || nm_ver=$(basename "$nm_zip" .zip)
+  unzip -p "$zip_path" banner | sed "s|^ NoMount:.*| NoMount: $nm_ver|" > "$work/banner"
+  extra_files+=(banner)
+fi
+(cd "$work" && zip -qr9 "$zip_path" nomount build-info.txt "${extra_files[@]}")
 unzip -tq "$zip_path"
 unzip -l "$zip_path" | grep -q 'nomount/lkm/nomount-4.14.ko'
 for info in "$@"; do
