@@ -12,7 +12,7 @@ The post has:
     BakaSU; version bumps, translations and merge commits are left out),
   - the download link and how to flash.
 It writes three files next to each other:
-  Telegram-post-<tag>.txt      plain text, links written out
+  Telegram-post-<tag>.txt      Telegram Markdown (**bold** and [text](url))
   Telegram-post-<tag>.html     open it in a browser, tap "Copy post" and paste
                                in Telegram: bold and named links stay
   Telegram-post-<tag>.tg.html  the same in Telegram's HTML, sent by the bot
@@ -130,13 +130,17 @@ def to_visible(lines):
 
 
 def to_text(lines):
-    """Plain text: links written out, for places without formatting."""
+    """Telegram Markdown (**bold** and [text](url))."""
     out = []
     for l in lines:
         s = ""
-        for t, _, u, _ in l:
-            s += f"{t}: {u}" if u and t != u else t
-        out.append(s.replace(" | ", "\n"))
+        for t, st, _, u in l:
+            if st == "b":
+                t = f"**{t}**"
+            if u:
+                t = f"[{t}]({u})"
+            s += t
+        out.append(s)
     return "\n".join(out)
 
 
