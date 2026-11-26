@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 
 API = "https://api.github.com/"
@@ -90,6 +91,22 @@ def drop_rebased(repo, old, new, data, commits):
     return kept, dropped, updated
 
 
+def since_date(repo, old, new):
+    """old is not in the history of new (built from another branch, or the
+    branch was rewritten), so GitHub cannot compare them (404 "No common
+    ancestor"). List the commits of new made after old instead."""
+    old_date = api(f"repos/{repo}/commits/{old}")["commit"]["committer"]["date"]
+    out, page = [], 1
+    while page <= 5:
+        batch = api(f"repos/{repo}/commits?sha={new}&since={old_date}&per_page=100&page={page}")
+        if not batch:
+            break
+        out.extend(c for c in batch if c["sha"] != old and c["commit"]["committer"]["date"] > old_date)
+        page += 1
+    note = f"- (The last release was built from `{old[:8]}`, which is not in this branch's history; these are the commits made after it.)"
+    return [note] + [line(repo, c) for c in out], len(out)
+
+
 def new_commits(repo, old, new, path=None):
     """Return (lines, total) of commits in old..new (newest first)."""
     if old == new:
@@ -109,7 +126,12 @@ def new_commits(repo, old, new, path=None):
         old_date = api(f"repos/{repo}/commits/{old}")["commit"]["committer"]["date"]
         out = [c for c in out if c["commit"]["committer"]["date"] > old_date]
         return [line(repo, x) for x in out], len(out)
-    data = api(f"repos/{repo}/compare/{old}...{new}")
+    try:
+        data = api(f"repos/{repo}/compare/{old}...{new}")
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+        return since_date(repo, old, new)
     commits = list(reversed(data.get("commits", [])))
     kept, dropped, updated = drop_rebased(repo, old, new, data, commits)
     if dropped:
