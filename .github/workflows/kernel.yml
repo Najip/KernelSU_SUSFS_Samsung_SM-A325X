@@ -113,6 +113,7 @@ jobs:
             scripts/pick_runner.py
             scripts/plan_build.py
             scripts/resolve_commits.py
+            scripts/xxksu_release.py
             scripts/promoted_source.py
             scripts/kernel_kit.py
             scripts/sources.conf
