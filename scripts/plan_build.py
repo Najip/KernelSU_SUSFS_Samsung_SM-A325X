@@ -28,6 +28,8 @@ Writes to $GITHUB_OUTPUT:
   sources       the kernels of this run: "aigis-bakasu"
   bakasu_ref, bakasu_branch  BakaSU commit / branch of Aigis BakaSU (empty
                 when it is not in this run): its manager APK must match it
+  xxksu_ref, xxksu_fallback_ref  xxKSU commit of a kernel built now and the
+                last good xxKSU used when it does not build (empty = none)
   source_run, source_url, checkout_sha  (Promoted)
   collect_sources, collect_runs  kernels whose files come from an earlier run
                 (Promoted, reuse) and that run per kernel (JSON)
@@ -214,6 +216,8 @@ def main():
                                               else "no kernel kit found, the kernel is compiled once to match it."))
             entries.append({
                 "source": src, **{k: refs.get(k, "") for k in REF_KEYS},
+                # xxKSU: its last good (stable) release, used when the newest does not build.
+                "ksu_fallback_ref": refs.get("ksu_fallback_ref", ""),
                 "ksu_hook": hook, "perf_tuning": "false",
                 "network_fix": e.get("NETWORK_FIX", "true"), "kernel_release": "",
                 "valhall_gpu": e.get("VALHALL_GPU", "false"),
@@ -235,6 +239,11 @@ def main():
     out["bakasu_ref"] = next((x["ksu_ref"] for x in entries if x["source"] == "aigis-bakasu"), "")
     out["bakasu_branch"] = next((x["ksu_branch"] for x in entries if x["source"] == "aigis-bakasu"), "")
     out["xxksu_manager"] = str(any(x["source"] == "aigis-xxksu" for x in entries)).lower()
+    # xxKSU commit of the build (empty for kept files: their manager is the latest release)
+    # and its fallback; the manager job gets the APK of both releases.
+    xx = next((x for x in entries if x["source"] == "aigis-xxksu"), {})
+    out["xxksu_ref"] = xx.get("ksu_ref", "") if xx.get("build_kernel") == "true" else ""
+    out["xxksu_fallback_ref"] = xx.get("ksu_fallback_ref", "") if out["xxksu_ref"] else ""
     out["matrix"] = json.dumps(matrix, separators=(",", ":"))
     out["build_any"] = str(bool(matrix)).lower()
     emit(out)

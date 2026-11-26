@@ -184,6 +184,8 @@ jobs:
       bakasu_ref: ${{ steps.plan.outputs.bakasu_ref }}
       bakasu_branch: ${{ steps.plan.outputs.bakasu_branch }}
       xxksu_manager: ${{ steps.plan.outputs.xxksu_manager }}
+      xxksu_ref: ${{ steps.plan.outputs.xxksu_ref }}
+      xxksu_fallback_ref: ${{ steps.plan.outputs.xxksu_fallback_ref }}
 
   manager:
     name: List manager APKs
@@ -191,6 +193,7 @@ jobs:
     outputs:
       bakasu_apk: ${{ steps.bakasu.outputs.apk }}
       xxksu_apk: ${{ steps.xxksu.outputs.apk }}
+      xxksu_fallback_apk: ${{ steps.xxksu.outputs.fallback_apk }}
     if: inputs.release_type != 'Release from pre-release'
     runs-on: ubuntu-latest
     defaults:
@@ -200,12 +203,14 @@ jobs:
       # BakaSU has no releases for its branch builds: its manager comes from BakaSU's own
       # "Build Manager" run of the same commit as the kernel (Manager-release
       # artifact, the arm64-v8a release APK, original name).
-      - name: Checkout (BakaSU manager script)
-        if: needs.pick.outputs.bakasu_ref != ''
+      - name: Checkout (manager scripts)
+        if: needs.pick.outputs.bakasu_ref != '' || needs.pick.outputs.xxksu_manager == 'true'
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
-          sparse-checkout: scripts/bakasu_manager.py
+          sparse-checkout: |
+            scripts/bakasu_manager.py
+            scripts/xxksu_release.py
           sparse-checkout-cone-mode: false
           path: repo
       - name: Get the BakaSU manager APK of the kernel's BakaSU commit
@@ -228,27 +233,47 @@ jobs:
           path: bakasu/manager-bakasu.json
           if-no-files-found: error
           retention-days: 30
-      - name: Get the xxKSU manager APK of the latest Najip/xxKSU release
+      # xxKSU: the APK of the xxKSU release the kernel is built with (its newest
+      # release) and of the last good one (used when the newest does not build).
+      # Kernels kept from an earlier run: the Latest release.
+      - name: Get the xxKSU manager APK of the kernel's xxKSU release
         id: xxksu
         if: needs.pick.outputs.xxksu_manager == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           MANAGER_REPO: Najip/xxKSU
+          XXKSU_REF: ${{ needs.pick.outputs.xxksu_ref }}
+          XXKSU_FALLBACK_REF: ${{ needs.pick.outputs.xxksu_fallback_ref }}
         run: |
           set -euo pipefail
-          rel=$(gh release view --repo "$MANAGER_REPO" --json tagName,url,publishedAt,assets)
-          tag=$(jq -r .tagName <<<"$rel")
-          apk=$(jq -r '[.assets[].name | select(endswith(".apk"))] | (map(select(endswith("-release.apk"))) + .)[0] // ""' <<<"$rel")
-          [[ -n "$apk" ]] || { echo "::error::The latest xxKSU release $tag has no .apk."; exit 1; }
-          mkdir -p xxksu
-          gh release download "$tag" --repo "$MANAGER_REPO" --pattern "$apk" --dir xxksu
-          unzip -l "xxksu/$apk" | grep -q AndroidManifest.xml || { echo "::error::$apk is not an Android app."; exit 1; }
-          sha=$(sha256sum "xxksu/$apk" | cut -d' ' -f1)
-          jq -n --arg repo "https://github.com/$MANAGER_REPO" --arg tag "$tag" --arg url "$(jq -r .url <<<"$rel")" \
-            --arg date "$(jq -r .publishedAt <<<"$rel")" --arg apk "$apk" --arg sha "$sha" \
-            '{repo: $repo, tag: $tag, url: $url, date: $date, apk: $apk, sha256: $sha}' > xxksu/manager-xxksu.json
-          cat xxksu/manager-xxksu.json
-          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+          # get <release JSON> <folder> <info file> <output name>
+          get() {
+            local rel=$1 dir=$2 info=$3 out=$4 tag apk sha
+            tag=$(jq -r .tag <<<"$rel"); apk=$(jq -r .apk <<<"$rel")
+            [[ -n "$tag" && "$tag" != null ]] || { echo "::error::No xxKSU release found ($rel)."; exit 1; }
+            [[ -n "$apk" ]] || { echo "::error::The xxKSU release $tag has no .apk."; exit 1; }
+            mkdir -p "$dir"
+            gh release download "$tag" --repo "$MANAGER_REPO" --pattern "$apk" --dir "$dir" --clobber
+            unzip -l "$dir/$apk" | grep -q AndroidManifest.xml || { echo "::error::$apk is not an Android app."; exit 1; }
+            sha=$(sha256sum "$dir/$apk" | cut -d' ' -f1)
+            jq --arg repo "https://github.com/$MANAGER_REPO" --arg sha "$sha" \
+              '{repo: $repo, tag, commit, url, date, apk, sha256: $sha}' <<<"$rel" > "$dir/$info"
+            cat "$dir/$info"
+            echo "$out=$apk" >> "$GITHUB_OUTPUT"
+          }
+          rel='{}'
+          [[ -z "$XXKSU_REF" ]] || rel=$(python3 repo/scripts/xxksu_release.py commit "$XXKSU_REF" "$MANAGER_REPO")
+          if [[ "$rel" != '{}' ]]; then
+            get "$rel" xxksu manager-xxksu.json apk
+          else
+            # A pinned (Verified) commit without its own release: the Latest release, as before.
+            [[ -z "$XXKSU_REF" ]] || echo "::warning::xxKSU ${XXKSU_REF:0:12} has no release; using the manager of the Latest release."
+            get "$(python3 repo/scripts/xxksu_release.py stable "$MANAGER_REPO")" xxksu manager-xxksu.json apk
+          fi
+          if [[ -n "$XXKSU_FALLBACK_REF" ]]; then
+            get "$(python3 repo/scripts/xxksu_release.py commit "$XXKSU_FALLBACK_REF" "$MANAGER_REPO")" \
+              xxksu-fallback manager-xxksu.json fallback_apk
+          fi
       - name: Upload ${{ steps.xxksu.outputs.apk }}
         if: steps.xxksu.outputs.apk != ''
         uses: actions/upload-artifact@v7
@@ -263,6 +288,14 @@ jobs:
         with:
           name: xxksu-manager-info
           path: xxksu/manager-xxksu.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload the last good xxKSU manager (used when the newest xxKSU does not build)
+        if: steps.xxksu.outputs.fallback_apk != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: xxksu-manager-fallback
+          path: xxksu-fallback/
           if-no-files-found: error
           retention-days: 30
 
@@ -292,6 +325,8 @@ jobs:
       KIT_ID: ${{ matrix.kit_id }}
       KERNEL_REF: ${{ matrix.kernel_ref }}
       KSU_REF: ${{ matrix.ksu_ref }}
+      # xxKSU: the last good release, used when the newest does not build.
+      KSU_FALLBACK_REF: ${{ matrix.ksu_fallback_ref }}
       SUSFS_REF: ${{ matrix.susfs_ref }}
       KERNEL_BRANCH: ${{ matrix.kernel_branch }}
       KSU_BRANCH: ${{ matrix.ksu_branch }}
@@ -389,18 +424,12 @@ jobs:
           NOMOUNT_MODE: ${{ env.BUILD_KERNEL == 'true' && env.NOMOUNT_MODE || 'lkm' }}
         run: |
           set -euo pipefail
-          bash scripts/prepare_sources.sh 2>&1 | tee "$BUILD_LOG"
-          python3 - <<'EOF'
-          import json, os, subprocess
-          p = os.path.join(os.environ["INFO_DIR"], "sources.json")
-          d = json.load(open(p))
-          d["build_repo"] = {
-              "repo": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}",
-              "ref": os.environ["GITHUB_REF_NAME"], "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-              "subject": subprocess.check_output(["git", "show", "-s", "--format=%s", "HEAD"], text=True).strip(),
-          }
-          json.dump(d, open(p, "w"), indent=2)
-          EOF
+          if ! bash scripts/prepare_sources.sh 2>&1 | tee "$BUILD_LOG"; then
+            # The newest xxKSU does not apply: use the last good one.
+            bash scripts/xxksu_fallback.sh prepare
+          else
+            python3 scripts/sources_extra.py
+          fi
 
       - name: Download the kernel kit
         if: env.KIT_ID != ''
@@ -413,7 +442,12 @@ jobs:
         if: env.KIT_ID == ''
         run: |
           set -euo pipefail
-          bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"
+          if ! bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"; then
+            # The newest xxKSU does not compile: prepare again with the last good one and build that.
+            [[ "$BUILD_KERNEL" == true ]] || exit 1
+            bash scripts/xxksu_fallback.sh compile || exit 1
+            bash scripts/build_kernel.sh 2>&1 | tee -a "$BUILD_LOG"
+          fi
 
       - name: Make flashable ZIP
         id: package
@@ -756,6 +790,13 @@ jobs:
           name: xxksu-manager-info
           path: release
 
+      - name: Download the last good xxKSU manager
+        if: needs.manager.outputs.xxksu_fallback_apk != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: xxksu-manager-fallback
+          path: xxksu-fallback
+
       - name: Put all files of every kernel together
         run: |
           set -euo pipefail
@@ -801,6 +842,19 @@ jobs:
           fi
           if [[ "${{ needs.pick.outputs.xxksu_manager }}" == true ]]; then
             apk="${{ needs.manager.outputs.xxksu_apk }}"
+            # The xxKSU kernel fell back to the last good xxKSU: ship that manager.
+            xs=release/sources-aigis-xxksu.json
+            [[ -f "$xs" ]] || xs=release/sources.json
+            if [[ "$(jq -r '.ksu.fallback_from.commit // ""' "$xs" 2>/dev/null)" != "" ]]; then
+              fapk="${{ needs.manager.outputs.xxksu_fallback_apk }}"
+              [[ -n "$fapk" && -f "xxksu-fallback/$fapk" ]] || { echo "::error::The xxKSU kernel fell back, but there is no fallback manager APK."; exit 1; }
+              [[ "$(jq -r .commit xxksu-fallback/manager-xxksu.json)" == "$(jq -r .ksu.commit "$xs")" ]] \
+                || { echo "::error::The fallback manager is not from the xxKSU commit of the kernel."; exit 1; }
+              echo "::warning::The xxKSU kernel uses the last good xxKSU: shipping its manager $fapk."
+              rm -f "release/$apk"
+              apk=$fapk
+              mv "xxksu-fallback/$apk" xxksu-fallback/manager-xxksu.json release/
+            fi
             [[ -n "$apk" && -f "release/$apk" ]] || { echo "::error::No xxKSU manager APK ($apk)."; exit 1; }
             [[ "$(sha256sum "release/$apk" | cut -d' ' -f1)" == "$(jq -r .sha256 release/manager-xxksu.json)" ]] \
               || { echo "::error::$apk does not match manager-xxksu.json."; exit 1; }

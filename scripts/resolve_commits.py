@@ -7,7 +7,11 @@
     commit_mode to $GITHUB_OUTPUT (and to stdout).
 
     KERNEL_SOURCE=aigis-bakasu (the default and only kernel; older pins: mzggr, aigis).
-    Latest and Promoted use the branch tips in scripts/sources.conf.
+    Latest and Promoted use the branch tips in scripts/sources.conf. xxKSU
+    (Najip/xxKSU) uses its newest release instead (scripts/xxksu_release.py),
+    so the manager APK of that release matches; ksu_fallback_ref = the commit
+    of its Latest (stable) release when that differs, used when the newest
+    does not build.
     Verified uses configs/verified.json and fails if a pin is missing: the
     "aigis-bakasu" entry ("ksu" there = the root module, BakaSU).
 
@@ -69,9 +73,9 @@ def load_conf(source=None):
     script = (
         'set -a; . "$1"; set +a; '
         'python3 -c "import json,os,sys; keys=sys.argv[1:]; '
-        'print(json.dumps({k: os.environ[k] for k in keys}))" '
+        'print(json.dumps({k: os.environ.get(k, \"\") for k in keys}))" '
         + " ".join(name for _, repo, ref, _, _ in SOURCES for name in (repo, ref))
-        + " SUSFS_PATCH"
+        + " SUSFS_PATCH XXKSU_STABLE_REF"
     )
     raw = subprocess.check_output(["bash", "-c", script, "bash", str(ROOT / "scripts/sources.conf")], text=True, env=env)
     return json.loads(raw)
@@ -150,8 +154,29 @@ def resolve():
         for _, repo_var, ref_var, ref_out, branch_out in SOURCES:
             branch = conf[ref_var]
             out[branch_out] = branch
+            if ref_out == "ksu_ref" and is_xxksu(conf[repo_var]) and not is_sha(branch):
+                newest, stable = xxksu_releases(conf[repo_var])
+                out[ref_out] = newest["commit"]
+                # A promoted release is on the stable branch, a pre-release on the staging branch.
+                if not newest.get("prerelease") and conf.get("XXKSU_STABLE_REF"):
+                    out[branch_out] = conf["XXKSU_STABLE_REF"]
+                print(f"xxKSU: newest release {newest['tag']} ({newest['commit'][:12]}), "
+                      f"stable {stable['tag']} ({stable['commit'][:12]})", file=sys.stderr)
+                if stable["commit"] and stable["commit"] != newest["commit"]:
+                    out["ksu_fallback_ref"] = stable["commit"]
+                continue
             out[ref_out] = tip(conf[repo_var], branch)
     emit(out)
+
+
+def is_xxksu(repo):
+    return repo.rstrip("/").removesuffix(".git").lower().endswith("/najip/xxksu")
+
+
+def xxksu_releases(repo):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import xxksu_release
+    return xxksu_release.release("newest", repo), xxksu_release.release("stable", repo)
 
 
 def pins(src, conf):

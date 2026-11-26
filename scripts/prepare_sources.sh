@@ -153,8 +153,10 @@ if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   ksu_tag=$(git -C KernelSU describe --abbrev=0 --tags 2>/dev/null || true)
 else
   ksu_version=$(grep -o 'KSU_VERSION=[0-9]*' KernelSU/kernel/Makefile | head -n1 | cut -d= -f2)
-  ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
+  # The xxKSU release of exactly this commit (its manager APK is shipped with
+  # the kernel); empty when the commit has no release.
+  ksu_tag=$(git ls-remote --tags "$KSU_REPO" 2>/dev/null \
+    | awk -v c="$ksu_sha" '$1 == c { t = $2; sub("refs/tags/", "", t); sub(/\^\{\}$/, "", t); print t; exit }' || true)
   log "Applying xxKSU patches"
   for p in "$ROOT"/patches/kernelsu/*.patch; do
     echo "  $(basename "$p")"
