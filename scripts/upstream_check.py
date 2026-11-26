@@ -79,6 +79,15 @@ def head(repo, ref, path=None):
     }
 
 
+def compare_status(repo, old, new):
+    """ahead / behind / identical / diverged, or "" when GitHub cannot compare
+    them (a rebased branch can share no history with the old commit)."""
+    try:
+        return api(f"repos/{repo}/compare/{old}...{new}").get("status", "")
+    except subprocess.CalledProcessError:
+        return ""
+
+
 def xxksu_newest(repo):
     """Commit of the newest xxKSU release that has an APK (as scripts/xxksu_release.py)."""
     rels = [r for r in api(f"repos/{repo}/releases?per_page=30")
@@ -256,7 +265,7 @@ def main(conf_path, state_path):
             continue
         if prev and prev.get("repo") == cur["repo"] and prev.get("branch") != ref and (
                 prev["commit"] == cur["commit"]
-                or api(f"repos/{repo}/compare/{prev['commit']}...{cur['commit']}").get("status") == "behind"):
+                or compare_status(repo, prev["commit"], cur["commit"]) == "behind"):
             # Another branch (or a release) of the same repo, nothing newer than what was built.
             print(f"{label}: now watching {repo}@{ref}, {cur['commit'][:12]} (not newer, no build)")
             continue
