@@ -232,7 +232,7 @@ jobs:
       run:
         shell: bash
     env:
-      MANAGER_REPO: backslashxx/KernelSU
+      MANAGER_REPO: Najip/xxKSU
     steps:
       - name: Get the xxKSU manager APK of the latest xxKSU release
         id: get
