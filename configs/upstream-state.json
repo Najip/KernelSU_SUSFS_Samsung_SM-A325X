@@ -1,6 +1,6 @@
 {
   "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
-  "checked": "2026-11-24T08:27:19Z",
+  "checked": "2026-11-26T06:55:12Z",
   "sources": {
     "aigis": {
       "commit": "b6dea3021a3f7baf62ee1173d1d5b8e3ceb0baa1",
@@ -17,6 +17,14 @@
       "name": "BakaSU",
       "repo": "https://github.com/Baka-SU/BakaSU",
       "branch": "main"
+    },
+    "xxksu": {
+      "commit": "cd37d3a108a26da0decbe18e6e285068f47bbdcc",
+      "date": "2026-11-26T04:09:13Z",
+      "subject": "Change KernelSU repository URL in setup script",
+      "name": "xxKSU",
+      "repo": "https://github.com/Najip/xxKSU",
+      "branch": "sync-mojito"
     },
     "susfs": {
       "commit": "26f2313be61f7a8603a50b2dcd12171495a79d27",
