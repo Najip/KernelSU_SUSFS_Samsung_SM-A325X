@@ -7,13 +7,14 @@ Lines starting with ">>" are notes for me, do not paste them.
 >> XDA-posts-<tag>.txt with both.
 
 >> TITLE (thread title box)
-[KERNEL][A325F/M/N][STABLE] KernelSU (BakaSU) + SUSFS 2.4.0 kernel
+[KERNEL][A325F/M/N][STABLE] KernelSU (BakaSU / xxKSU) + SUSFS 2.4.0 + NoMount
+>> Each full Release also has XDA-title-banner-<tag>.txt with this title and header with the exact versions.
 
 >> ==================== POST #1 (OP) ====================
 
 [CENTER][IMG]https://raw.githubusercontent.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/main/assets/banner-xda.png[/IMG]
 
-[SIZE=7][B]KernelSU (BakaSU) + SUSFS 2.4.0 kernel[/B][/SIZE]
+[SIZE=7][B]KernelSU (BakaSU / xxKSU) + SUSFS 2.4.0 + NoMount[/B][/SIZE]
 [SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]
 
 [SIZE=5][B]Disclaimer[/B][/SIZE]
@@ -27,7 +28,11 @@ You flash this at your own risk. Read this post before flashing.
 A non-GKI 4.14 kernel for the Galaxy A32 4G with root and hiding built in:
 [LIST]
 [*][B]Aigis kernel[/B] by SlamZDank, Linux 4.14.357: Valhall GPU with its drivers module, Aigis' own CPU/GPU tuning
+[*]Two root flavors, one kernel ZIP each (pick one):
+[LIST]
 [*][B]BakaSU[/B] (KernelSU fork for non-GKI kernels), SUSFS inline hooks
+[*][B]xxKSU[/B] by backslashxx (KernelSU fork for non-GKI kernels), manual hooks, kept up to date from his mojito kernel work
+[/LIST]
 [*][B]SUSFS v2.4.0[/B] by simonpunk, 4.14 port by JackA1ltman, all features on
 [*][B]NoMount[/B] by maxsteeel, installed by the kernel ZIP (or built in)
 [*]Network fix (UDP GSO) by Juan (LumiROM), no LTO
@@ -44,18 +49,18 @@ Every build runs on GitHub Actions from public sources, so anyone can check and 
 [/LIST]
 Each release has:
 [LIST]
-[*]Kernel ZIP: [ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]
-[*]NoMount module (already inside the kernel ZIP too): [ICODE]NoMount-...-aigis-bakasu-...zip[/ICODE]
-[*]BakaSU manager app: [ICODE]BakaSU_...apk[/ICODE]
+[*]BakaSU kernel ZIP: [ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE] and its manager app [ICODE]BakaSU_...apk[/ICODE]
+[*]xxKSU kernel ZIP: [ICODE]A325X-Aigis-xxKSU-SUSFS-...zip[/ICODE] and its manager app [ICODE]KernelSU_...apk[/ICODE]
+[*]NoMount module for each kernel (already inside the kernel ZIP too): [ICODE]NoMount-...-aigis-bakasu-...zip[/ICODE] / [ICODE]NoMount-...-aigis-xxksu-...zip[/ICODE]
 [/LIST]
 
 [SIZE=5][B]Installation[/B][/SIZE]
 [LIST=1]
 [*]Unlocked bootloader and TWRP or OrangeFox are required.
 [*][B]Back up your current boot partition[/B] in recovery (Backup > Boot). This is your way back.
-[*]Flash the kernel ZIP ([ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE]) in recovery. It also installs the matching NoMount module and the JPEG + BBR fix module.
-[*]Reboot and install the BakaSU manager app from the same release.
-[*]Uninstall any other KernelSU manager app, then check your modules and root apps in the BakaSU manager.
+[*]Flash [B]one[/B] kernel ZIP in recovery: [ICODE]A325X-Aigis-BakaSU-SUSFS-...zip[/ICODE] or [ICODE]A325X-Aigis-xxKSU-SUSFS-...zip[/ICODE]. It also installs the matching NoMount module and the JPEG + BBR fix module.
+[*]Reboot and install the manager app of that flavor from the same release (BakaSU_...apk or KernelSU_...apk for xxKSU).
+[*]Uninstall any other KernelSU manager app, then check your modules and root apps in the manager.
 [/LIST]
 Bootloop? Go back to recovery and restore the boot backup (or flash your stock boot.img).
 
@@ -66,16 +71,19 @@ The kernel with the Valhall GPU (default). It also installs the Valhall GPU driv
 [B]Do I need the NoMount module?[/B]
 Recommended, and the kernel ZIP already installs it. If you flash the separate NoMount ZIP, use the one from the same release.
 
+[B]BakaSU or xxKSU?[/B]
+Both are the same Aigis kernel with the same SUSFS and NoMount; only the root part and its manager differ. The kernel started with xxKSU, moved to BakaSU on 2026-11-23 and dropped xxKSU when backslashxx's own KernelSU repo was taken down. He kept updating xxKSU inside his mojito kernel tree, so since 2026-11-26 my fork [URL='https://github.com/Najip/xxKSU']Najip/xxKSU[/URL] follows those updates daily and xxKSU is back. Pick the one you like.
+
 [B]Can I use other KernelSU managers (official, Next, SukiSU)?[/B]
-No, use the BakaSU manager from the release. Other managers do not match this kernel.
+No, use the manager from the release that matches your kernel ZIP (BakaSU manager for BakaSU, xxKSU manager for xxKSU). Other managers do not match this kernel.
 
 [B]Which SUSFS modules should I use?[/B]
 [LIST]
 [*][B]BRENE[/B] ([URL='https://github.com/rrr333nnn333/BRENE']rrr333nnn333/BRENE[/URL]): the recommended SUSFS userspace module. It keeps up with simonpunk's SUSFS, so it matches the SUSFS in this kernel.
 [*][B]HMA-OSS[/B] ([URL='https://github.com/frknkrc44/HMA-OSS']frknkrc44/HMA-OSS[/URL]): needed for BRENE's app hiding. BRENE's "Hide third party apps" (on by default) and "Hide all apps with uid >= 10000" options give the kernel the apps to hide through the SUSFS priority UID filter; HMA-OSS does the userspace side (BRENE says so next to those options).
-[*][B]BakaSU's built-in SUSFS settings[/B]: usable on their own, but [B]turn them off when you use BRENE[/B], so the two do not conflict.
+[*][B]BakaSU's built-in SUSFS settings[/B] (BakaSU flavor): usable on their own, but [B]turn them off when you use BRENE[/B], so the two do not conflict.
 [/LIST]
-[COLOR=rgb(226, 80, 65)][B]Not recommended: sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not updated often and does not work with the latest SUSFS (neither simonpunk's nor JackA1ltman's 4.14 port). BRENE disables it (and other SUSFS modules) when you install BRENE; better remove it in the BakaSU manager.
+[COLOR=rgb(226, 80, 65)][B]Not recommended: sidex15's susfs4ksu-module[/B][/COLOR] ([ICODE]SUSFS-FOR-KERNELSU[/ICODE]). It is not updated often and does not work with the latest SUSFS (neither simonpunk's nor JackA1ltman's 4.14 port). BRENE disables it (and other SUSFS modules) when you install BRENE; better remove it in the manager.
 
 [B]Release or pre-release?[/B]
 Releases are tested by me on my phone. Pre-releases are built automatically when an upstream source changes and are not tested yet.
@@ -102,6 +110,7 @@ Termux (booted, rooted): run [ICODE]su -c sh /sdcard/Download/collect-logs.sh[/I
 [*]Build repo (patches, configs, build scripts): [URL='https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X']Najip/KernelSU_SUSFS_Samsung_SM-A325X[/URL]
 [*]Kernel tree: [URL='https://github.com/SlamZDank/Aigis-Kernel-A32']SlamZDank/Aigis-Kernel-A32[/URL]
 [*]BakaSU: [URL='https://github.com/Baka-SU/BakaSU']Baka-SU/BakaSU[/URL]
+[*]xxKSU: [URL='https://github.com/Najip/xxKSU']Najip/xxKSU[/URL] (sync-mojito), synced from backslashxx's [URL='https://github.com/ximi-mojito/android_kernel_xiaomi_mojito/tree/personal']ximi-mojito kernel tree[/URL]
 [*]SUSFS: [URL='https://gitlab.com/simonpunk/susfs4ksu']simonpunk/susfs4ksu[/URL], 4.14 port: [URL='https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd']JackA1ltman/NonGKI_Kernel_Build_2nd[/URL]
 [*]NoMount: [URL='https://github.com/maxsteeel/nomount']maxsteeel/nomount[/URL]
 [/LIST]
@@ -111,6 +120,7 @@ Every release lists the exact commits it was built from, so it can be rebuilt 1:
 [LIST]
 [*]SlamZDank for the Aigis kernel, its mtk_mm memory heap and finding the real cause of the blank JPEGs
 [*]The BakaSU developers for BakaSU
+[*]backslashxx for xxKSU
 [*]mzggr0914 for the A32 kernel tree (used in earlier builds), Samsung-MT6769-Devs for the SLM base
 [*]simonpunk for SUSFS, JackA1ltman for the non-GKI 4.14 port
 [*]maxsteeel for NoMount and lkmloader

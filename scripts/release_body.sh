@@ -3,8 +3,10 @@
 #
 #   release_body.sh <release folder> <tag prefix> <type> <this tag> <out.md>
 #
-# <release folder> has sources.json, build-info.txt (the kernel: Aigis with
-# BakaSU) and files named like the release ZIPs (only the names are used).
+# <release folder> has sources.json, build-info.txt (the first kernel, usually
+# Aigis with BakaSU), sources-<kernel>.json + build-info-<kernel>.txt for the
+# second root flavor (Aigis with xxKSU) when it was built, and files named
+# like the release ZIPs (only the names are used).
 # <type> Release: "what's new" since the previous full Release.
 # <type> Pre-release: since the previous release of any kind.
 # The previous release must use the same kernel repo, otherwise it is a first release.
@@ -37,6 +39,17 @@ info_of() {
   echo build-info.txt
 }
 python3 "$here/release_notes.py" notes "$dir/sources.json" "$prev_json" "$dir/build-info.txt" "$out"
+# Second root flavor (xxKSU): its own root section and build info, compared
+# with the same flavor in the previous release.
+for f in "$dir"/sources-*.json; do
+  [[ -f "$f" ]] || continue
+  b=$(basename "$f"); sfx=${b#sources}; sfx=${sfx%.json}
+  pf=-
+  if [[ "$prev_json" != - ]] && gh release download "$prev" --repo "$GITHUB_REPOSITORY" --pattern "$b" --dir "$tmp" 2>/dev/null; then
+    pf=$tmp/$b
+  fi
+  python3 "$here/release_notes.py" flavor "$f" "$pf" "$dir/build-info$sfx.txt" "$out"
+done
 shopt -s nullglob
 {
   echo

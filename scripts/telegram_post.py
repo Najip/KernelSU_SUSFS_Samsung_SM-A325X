@@ -9,7 +9,8 @@ The post has:
   - my news: the entries of docs/xda-updates.txt dated after the previous
     full Release (so old news is not repeated),
   - the notable upstream changes from the release notes (Aigis kernel and
-    BakaSU; version bumps, translations and merge commits are left out),
+    the root flavors BakaSU and xxKSU; version bumps, translations and merge
+    commits are left out),
   - the download link and how to flash.
 It writes three files next to each other:
   Telegram-post-<tag>.txt      Telegram Markdown (**bold** and [text](url))
@@ -34,7 +35,7 @@ XDA = "https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs
 # Upstream commits that say nothing to a user.
 SKIP = re.compile(r"^(chore|ci|docs?|build\(deps\)|Merge |Revert \"chore)|bump |translations?|Weblate|README", re.I)
 # Release-notes sections worth listing, and how they are named in the post.
-SECTIONS = {"Kernel source": "Aigis", "BakaSU": "BakaSU", "SUSFS patch": "SUSFS"}
+SECTIONS = {"Kernel source": "Aigis", "BakaSU": "BakaSU", "xxKSU": "xxKSU", "SUSFS patch": "SUSFS"}
 
 
 def bbcode_to_text(s):
@@ -91,15 +92,25 @@ def make_lines(md, tag, url, date):
     num = lambda t: tuple(int(x) for x in re.findall(r"-(\d{8})-(\d+)$", t)[0]) if re.search(r"-\d{8}-\d+$", t) else (0, 0)
     older = [(t, d) for t, d in older_releases(tag) if num(t) < num(tag)]
     since = max(older, key=lambda r: num(r[0]))[1] if older else ""
-    bakasu_p, susfs_p, nomount_p = version_parts(parse_versions(md))
+    v = parse_versions(md)
+    root_p, susfs_p, nomount_p = version_parts(v)
+    both = len(v["roots"]) > 1
+    if both:
+        about = (f"Aigis kernel (SlamZDank) in two root flavors, pick one: BakaSU {v['bakasu']} or "
+                 f"xxKSU {v['xxksu']} (backslashxx). Both have {susfs_p} and {nomount_p}. "
+                 "For the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.")
+        download = "Download (kernel ZIPs + BakaSU and xxKSU managers)"
+    else:
+        about = (f"Aigis kernel (SlamZDank) with {root_p} root, {susfs_p} and {nomount_p}, "
+                 "for the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.")
+        download = f"Download (kernel ZIP + {v['roots'][0]} manager)"
     head = [
-        [T(f"KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}", "b")],
+        [T(f"KernelSU ({root_p}) + {susfs_p} + {nomount_p}", "b")],
         [T("Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)")],
         [],
         [T("Update: "), T(tag, "b", url, plain_url=False), T(f" ({date})")],
         [],
-        [T(f"Aigis kernel (SlamZDank) with {bakasu_p} root, {susfs_p} and {nomount_p}, "
-           "for the Galaxy A32 4G (SM-A325F/M/N). Tested by me on A325F with LumiROM 9.")],
+        [T(about)],
     ]
     news = my_news(since)
     if news:
@@ -107,9 +118,11 @@ def make_lines(md, tag, url, date):
         head += [[T(n, "b")] if n.endswith(":") and not n.startswith("- ") else [T(n)] for n in news]
     tail = [
         [],
-        [T("Download (kernel ZIP + BakaSU manager)", "b", url)],
+        [T(download, "b", url)],
         [T("XDA thread", "", XDA), T(" | "), T("All releases", "", RELEASES)],
-        [T("Flash in TWRP or OrangeFox, back up boot first. The ZIP also installs the NoMount and JPEG fix modules.")],
+        [T(("Flash one kernel ZIP (BakaSU or xxKSU) in TWRP or OrangeFox, back up boot first, then install the matching manager. "
+            if both else "Flash in TWRP or OrangeFox, back up boot first. ")
+           + "The ZIP also installs the NoMount and JPEG fix modules.")],
     ]
     ups = upstream(md)
     while True:

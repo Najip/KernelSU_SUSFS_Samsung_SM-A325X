@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make XDA posts #2 (changelog) and #3 (updates) for a full Release, in BBCode.
+"""Make the XDA thread title and posts #2 (changelog) and #3 (updates) for a full Release, in BBCode.
 
   xda_posts.py <notes.md> <release-tag> <release-url> <out.txt>   (used by the workflow)
   xda_posts.py --release <tag> [out.txt]                          (by hand, needs gh)
@@ -48,16 +48,28 @@ def updates_text():
     return "\n".join(l for l in lines if not l.startswith(">>")).strip()
 
 
-def parse_versions(md):
-    """Extract BakaSU, SUSFS, and NoMount versions from release notes (notes.md)."""
-    bakasu = ""
-    m = re.search(r"^BakaSU:.*?\blatest tag\s+([^\s,)]+)", md, re.M)
+def short_tag(t):
+    """v3.3.1-mojito-20261124-a6e6d9b6 -> v3.3.1-mojito (date and commit dropped)."""
+    return re.sub(r"-\d{8}-[0-9a-f]{7,}$", "", t)
+
+
+def root_version(md, name):
+    """Version of a root flavor from its build-info line in the notes:
+    '<name>: <repo> @ <sha> (KSU_VERSION n, latest tag t)'."""
+    m = re.search(rf"^{name}:.*?\blatest tag\s+([^\s,)]+)", md, re.M)
     if m and m.group(1).lower() not in ("none", "unknown"):
-        bakasu = m.group(1)
-    else:
-        m = re.search(r"^BakaSU:.*?\bKSU_VERSION\s+(\d+)", md, re.M)
-        if m:
-            bakasu = f"r{m.group(1)}"
+        return short_tag(m.group(1))
+    m = re.search(rf"^{name}:.*?\bKSU_VERSION\s+(\d+)", md, re.M)
+    return f"r{m.group(1)}" if m else ""
+
+
+def parse_versions(md):
+    """Extract BakaSU, xxKSU, SUSFS, and NoMount versions from release notes (notes.md).
+    A root flavor that is not in the release is left empty."""
+    has = lambda name: re.search(rf"^{name}:", md, re.M) or re.search(rf"-Aigis-{name}-", md)
+    bakasu = root_version(md, "BakaSU") if has("BakaSU") else ""
+    xxksu = root_version(md, "xxKSU") if has("xxKSU") else ""
+    roots = [n for n in ("BakaSU", "xxKSU") if has(n)] or ["BakaSU"]
 
     susfs = ""
     m = re.search(r"^SUSFS:\s*(v?\d[^\s]*)", md, re.M)
@@ -73,26 +85,33 @@ def parse_versions(md):
     elif re.search(r"^NoMount:\s*built into the kernel", md, re.M):
         nomount = "built-in"
 
-    return {"bakasu": bakasu, "susfs": susfs, "nomount": nomount}
+    return {"roots": roots, "bakasu": bakasu, "xxksu": xxksu, "susfs": susfs, "nomount": nomount}
 
 
 def version_parts(v):
-    b = f"BakaSU {v['bakasu']}" if v.get("bakasu") else "BakaSU"
+    """(root, susfs, nomount) labels. root is e.g. 'BakaSU v4.2.0-rc3 / xxKSU v3.3.1-mojito'."""
+    roots = v.get("roots") or ["BakaSU"]
+    r = " / ".join(f"{n} {v.get(n.lower())}".strip() for n in roots)
     s = f"SUSFS {v['susfs']}" if v.get("susfs") else "SUSFS"
     n = f"NoMount {v['nomount']}" if v.get("nomount") else "NoMount"
-    return b, s, n
+    return r, s, n
+
+
+def xda_title(v):
+    root_p, susfs_p, nomount_p = version_parts(v)
+    return f"[KERNEL][A325F/M/N][STABLE] KernelSU ({root_p}) + {susfs_p} + {nomount_p}"
 
 
 def make(md, tag, url, date):
     v = parse_versions(md)
-    bakasu_p, susfs_p, nomount_p = version_parts(v)
-    xda_title = f"[KERNEL][A325F/M/N][STABLE] KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}"
+    root_p, susfs_p, nomount_p = version_parts(v)
+    title = xda_title(v)
     post2 = [
         "[CENTER][SIZE=6][B]Changelog[/B][/SIZE][/CENTER]",
         f"Newest first. Full details for each version are on its [URL='{RELEASES}']GitHub release[/URL] page.",
         "",
         f"[SIZE=6][B]{tag}[/B][/SIZE] ({date})",
-        f"[B]Versions:[/B] {bakasu_p} | {susfs_p} | {nomount_p}",
+        f"[B]Versions:[/B] {root_p} | {susfs_p} | {nomount_p}",
         f"[B]Download:[/B] [URL='{url}']GitHub release {tag}[/URL]",
         "",
         convert(md),
@@ -105,7 +124,7 @@ def make(md, tag, url, date):
     post2 += ["", "[I]Built automatically with GitHub Actions.[/I]"]
     post3 = [
         "[CENTER][SIZE=6][B]Updates and announcements[/B][/SIZE][/CENTER]",
-        f"News, plans and known issues are posted here. Newest stable release: [URL='{url}']{tag}[/URL] ({date}) — {bakasu_p}, {susfs_p}, {nomount_p}.",
+        f"News, plans and known issues are posted here. Newest stable release: [URL='{url}']{tag}[/URL] ({date}) — {root_p}, {susfs_p}, {nomount_p}.",
         "",
         updates_text(),
     ]
@@ -116,7 +135,7 @@ def make(md, tag, url, date):
         "",
         ">> ==================== THREAD TITLE ====================",
         "",
-        xda_title,
+        title,
         "",
         ">> ==================== POST #2: CHANGELOG ====================",
         "",
@@ -131,21 +150,21 @@ def make(md, tag, url, date):
 
 def make_title_banner(md, tag):
     v = parse_versions(md)
-    bakasu_p, susfs_p, nomount_p = version_parts(v)
-    xda_title = f"[KERNEL][A325F/M/N][STABLE] KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}"
+    root_p, susfs_p, nomount_p = version_parts(v)
+    title = xda_title(v)
     return "\n".join([
         f"XDA TITLE & OP BANNER FOR {tag} (BBCode)",
         'Lines starting with ">>" are notes, do not paste them.',
         "",
         ">> ==================== THREAD TITLE ====================",
         "",
-        xda_title,
+        title,
         "",
         ">> ==================== POST #1 (OP) BANNER & HEADER ====================",
         "",
         f"[CENTER][IMG]{XDA_BANNER}[/IMG]",
         "",
-        f"[SIZE=7][B]KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}[/B][/SIZE]",
+        f"[SIZE=7][B]KernelSU ({root_p}) + {susfs_p} + {nomount_p}[/B][/SIZE]",
         "[SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]",
         "",
     ])

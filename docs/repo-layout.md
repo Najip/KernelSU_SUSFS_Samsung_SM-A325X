@@ -18,11 +18,12 @@
 | `scripts/telegram_post.py` | Makes `Telegram-post-<tag>.txt`, `.html`, and `.tg.html` (Telegram Markdown and HTML) for every full Release |
 | `scripts/xda_changelog.py` | Turns the release notes into BBCode (used by `xda_posts.py`) |
 | `tools/extract_log.py` | Makes a short version of a GitHub Actions build log (opens a file picker) |
-| `patches/base/` | Turns Aigis into the BakaSU + SUSFS inline-hook layout, and the stock GPU option |
+| `patches/base/` | Turns Aigis into the BakaSU + SUSFS inline-hook layout or the xxKSU + SUSFS manual-hook layout, and the stock GPU option |
+| `patches/kernelsu/` | Small changes to xxKSU itself (native wrappers, SUSFS lifecycle calls) |
 | `patches/susfs/` | Small additions on top of JackA1ltman's SUSFS core files |
 | `patches/bakasu/` | Takes out the kernel's own SELinux hide hooks (BakaSU does them itself) |
 | `patches/kernel/` | Network fix (UDP GSO, by Juan from LumiROM) and flashlight fixes (SM5714, by aartzz) |
-| `configs/a325x-bakasu-susfs.config` | Options the finished kernel config must have |
+| `configs/a325x-bakasu-susfs.config`, `configs/a325x-xxksu-susfs.config` | Options the finished kernel config must have (BakaSU / xxKSU) |
 | `configs/verified.json` | Commits pinned by the last successful `Promoted` build |
 | `scripts/resolve_commits.py` | Picks the commits for Latest, Verified and Promoted |
 | `scripts/promoted_source.py` | Finds and collects the `Latest` run that `Promoted` takes its files from |
@@ -36,4 +37,4 @@
 | `configs/` | Config fragments merged after the tree's own fragments |
 | `docs/` | These pages (the README sources table is the only part updated automatically) |
 
-My older builds and their files are only in the [`xxksu` branch](../../../tree/xxksu).
+My older builds (before BakaSU) and their files are in the [`xxksu` branch](../../../tree/xxksu). xxKSU itself is built on `main` again since 2026-11-26.

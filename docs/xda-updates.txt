@@ -3,6 +3,13 @@
 >> Lines starting with ">>" are notes and are left out. scripts/xda_posts.py adds
 >> the title and the "newest stable release" line and puts it into XDA-posts-<tag>.txt.
 
+[B]2026-11-26: xxKSU is back, next to BakaSU[/B]
+[LIST]
+[*]Starting with the next release, every release has two kernel ZIPs: one with BakaSU and one with [URL='https://github.com/Najip/xxKSU']xxKSU[/URL] by backslashxx. Same Aigis kernel, SUSFS and NoMount; only the root part differs. Flash one and install its manager (both are in the release).
+[*]What happened: this kernel started with xxKSU, moved to BakaSU on 2026-11-23 and dropped xxKSU when backslashxx's own KernelSU repo was taken down. That was too quick. He kept updating xxKSU's kernel side inside his mojito kernel tree, so my fork Najip/xxKSU (sync-mojito branch) now follows those updates every day and builds the matching manager. If his own repo comes back, it switches back to it automatically.
+[*]New xxKSU updates start a kernel test build right away (pre-release). Thanks to backslashxx for xxKSU.
+[/LIST]
+
 [B]2026-11-24: Flashlight fixes[/B]
 [LIST]
 [*]The torch (flashlight) no longer turns itself off after a few seconds, and the camera's flash fault check now gets an answer instead of an error. Thanks to aartzz for the fixes.
@@ -31,7 +38,7 @@
 
 [B]Recommended modules[/B]
 [LIST]
-[*]SUSFS userspace: [URL='https://github.com/rrr333nnn333/BRENE']BRENE[/URL]. Turn off BakaSU's built-in SUSFS settings when you use it.
+[*]SUSFS userspace: [URL='https://github.com/rrr333nnn333/BRENE']BRENE[/URL]. On BakaSU, turn off its built-in SUSFS settings when you use it.
 [*][URL='https://github.com/frknkrc44/HMA-OSS']HMA-OSS[/URL]: needed for BRENE's app hiding (BRENE sets the SUSFS priority UID filter, HMA-OSS does the userspace side).
 [*]NoMount: installed by the kernel ZIP; the separate NoMount ZIP is in the same release.
 [*]Not recommended: sidex15's susfs4ksu-module (not updated often, does not work with the latest SUSFS).

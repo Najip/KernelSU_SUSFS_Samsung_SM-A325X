@@ -2,6 +2,8 @@
 """Release helper: writes release notes and refreshes the README sources table.
 
   release_notes.py notes  <sources.json> <previous-sources.json|-> <build-info.txt> <out.md>
+  release_notes.py flavor <sources-<kernel>.json> <previous-sources-<kernel>.json|-> <build-info-<kernel>.txt> <out.md>
+                 (adds a second root flavor, e.g. xxKSU, to notes written by "notes")
   release_notes.py readme <README.md> <release-tag> <sources.json>...
 
 "What's new" lists, for every upstream source, the commits added since the
@@ -10,6 +12,7 @@ commits that touched the 4.14 patch file are listed.
 """
 import json
 import os
+import re
 import sys
 import urllib.request
 
@@ -124,6 +127,36 @@ SOURCES = [
 ]
 
 
+def section(cur, prev, key, title, path_key):
+    """The "### <part>: <commit>" block of one source, with what changed since prev."""
+    s = cur[key]
+    repo = slug(s["repo"])
+    md = [f"### {title}: [`{s['commit'][:8]}`](https://github.com/{repo}/commit/{s['commit']})"]
+    old = prev.get(key, {}).get("commit") if prev else None
+    old_repo = slug(prev.get(key, {}).get("repo", "")) if prev else ""
+    if old and old_repo and old_repo != repo:
+        md.append(f"- Source changed from [{old_repo}](https://github.com/{old_repo}) to this repo.")
+        old = None
+    if not old:
+        detail = s.get("subject") or (f"patch last changed {s['patch_date'][:10]}" if s.get("patch_date") else "")
+        md.append(f"- Current commit{': ' + detail if detail else '.'}")
+    elif old == s["commit"]:
+        md.append("- No new commits.")
+    else:
+        try:
+            lines, total = new_commits(repo, old, s["commit"], s.get(path_key) if path_key else None)
+        except Exception as exc:  # network / force-push: still publish
+            lines, total = [f"- Could not list commits ({exc})."], 0
+        if not lines and total == 0:
+            lines = ["- No new commits that change the SUSFS 4.14 patch." if path_key else "- No new commits."]
+        md.extend(lines[:MAX_LIST])
+        if total > MAX_LIST:
+            md.append(f"- ...and {total - MAX_LIST} more: "
+                      f"https://github.com/{repo}/compare/{old[:12]}...{s['commit'][:12]}")
+    md.append("")
+    return md
+
+
 def notes(cur_path, prev_path, info_path, out_path):
     cur = load(cur_path)
     prev = load(prev_path) if prev_path != "-" and os.path.exists(prev_path) else None
@@ -131,37 +164,33 @@ def notes(cur_path, prev_path, info_path, out_path):
     for key, title, path_key in SOURCES:
         if key not in cur:
             continue
-        s = cur[key]
-        repo = slug(s["repo"])
         if key == "ksu":
             title = cur.get("root") or title  # the root module (BakaSU)
-        head = f"### {title}: [`{s['commit'][:8]}`](https://github.com/{repo}/commit/{s['commit']})"
-        md.append(head)
-        old = prev.get(key, {}).get("commit") if prev else None
-        old_repo = slug(prev.get(key, {}).get("repo", "")) if prev else ""
-        if old and old_repo and old_repo != repo:
-            md.append(f"- Source changed from [{old_repo}](https://github.com/{old_repo}) to this repo.")
-            old = None
-        if not old:
-            detail = s.get("subject") or (f"patch last changed {s['patch_date'][:10]}" if s.get("patch_date") else "")
-            md.append(f"- Current commit{': ' + detail if detail else '.'}")
-        elif old == s["commit"]:
-            md.append("- No new commits.")
-        else:
-            try:
-                lines, total = new_commits(repo, old, s["commit"], s.get(path_key) if path_key else None)
-            except Exception as exc:  # network / force-push: still publish
-                lines, total = [f"- Could not list commits ({exc})."], 0
-            if not lines and total == 0:
-                lines = ["- No new commits that change the SUSFS 4.14 patch." if path_key else "- No new commits."]
-            md.extend(lines[:MAX_LIST])
-            if total > MAX_LIST:
-                md.append(f"- ...and {total - MAX_LIST} more: "
-                          f"https://github.com/{repo}/compare/{old[:12]}...{s['commit'][:12]}")
-        md.append("")
+        md += section(cur, prev, key, title, path_key)
     md += ["## Build info", "", "```", open(info_path).read().strip(), "```", ""]
     open(out_path, "w").write("\n".join(md))
     print("\n".join(md))
+
+
+def flavor(cur_path, prev_path, info_path, out_path):
+    """Add a second root flavor (for example xxKSU) to notes written by notes():
+    its root section goes after the first root's section (the kernel and SUSFS
+    are the same for both), and its build info gets its own block at the end.
+    The first build-info block is renamed after its root."""
+    cur = load(cur_path)
+    prev = load(prev_path) if prev_path != "-" and os.path.exists(prev_path) else None
+    root = cur.get("root") or "Root"
+    text = open(out_path).read()
+    first_root = re.search(r"^(\S+): https://\S+ @ ", text.split("## Build info", 1)[-1], re.M)
+    if first_root and "\n## Build info\n" in text:
+        text = text.replace("\n## Build info\n", f"\n## Build info ({first_root.group(1)} kernel)\n", 1)
+    block = "\n".join(section(cur, prev, "ksu", root, None))
+    anchor = re.search(r"^### SUSFS patch", text, re.M) or re.search(r"^## Build info", text, re.M)
+    text = text[:anchor.start()] + block + "\n" + text[anchor.start():]
+    text = text.rstrip("\n") + "\n\n" + "\n".join(
+        [f"## Build info ({root} kernel)", "", "```", open(info_path).read().strip(), "```", ""])
+    open(out_path, "w").write(text)
+    print(block)
 
 
 def kernel_of(src):
@@ -171,10 +200,13 @@ def kernel_of(src):
     return "aigis" if "aigis" in src["kernel"]["repo"].lower() else "mzggr"
 
 
-# How the kernel is named in the README: Aigis with BakaSU, the only kernel.
+# How the kernels are named in the README: Aigis with BakaSU, and Aigis with xxKSU.
 KERNEL_ROLES = [
-    ("aigis-bakasu", "Main kernel: Aigis (BakaSU)"),
+    ("aigis-bakasu", "Aigis (BakaSU)"),
+    ("aigis-xxksu", "Aigis (xxKSU)"),
 ]
+# Root flavor of each kernel: (README part name, manager json).
+ROOTS = {"aigis-bakasu": ("BakaSU", "manager-bakasu.json"), "aigis-xxksu": ("xxKSU", "manager-xxksu.json")}
 
 
 def readme(readme_path, tag, *paths):
@@ -198,43 +230,47 @@ def readme(readme_path, tag, *paths):
         cur = load(path)
         found[kernel_of(cur)] = cur
     present = [(key, title) for key, title in KERNEL_ROLES if key in found]
-    for key, title in KERNEL_ROLES:
-        if key in found:
-            k = found[key]["kernel"]
-            row("Kernel", title, k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
+
     def used_by(group):
         if len(group) == 1:
             return group[0][1]
         return "Both kernels" if len(group) == 2 else "All kernels"
 
+    # The kernel tree is the same for both flavors: one row when the commit matches.
+    kcommits = {found[key]["kernel"]["commit"] for key, _ in present}
+    if len(kcommits) == 1 and present:
+        k = found[present[0][0]]["kernel"]
+        row("Kernel", used_by(present), k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
+    else:
+        for key, title in present:
+            k = found[key]["kernel"]
+            row("Kernel", title, k, f"`{ref_of(k)}`, Linux {k.get('version', '')}")
     root_version = lambda x: f"`{ref_of(x)}`, KSU_VERSION {x.get('ksu_version', '')}, tag {x.get('tag', '')}"
-    # Root module: BakaSU.
-    groups = [("BakaSU (root)", present, "bakasu")]
-    shared = [(part, group, "ksu", root_version) for part, group, _ in groups if group]
-    shared.append(("SUSFS patch", present, "susfs", lambda f: f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`"))
-    for part, group, name, version in shared:
-        commits = {found[key][name]["commit"] for key, _ in group}
-        if len(commits) == 1:
-            s = found[group[0][0]][name]
-            row(part, used_by(group), s, version(s))
-        else:
-            for key, title in group:
-                row(part, title, found[key][name], version(found[key][name]))
+    # Root: one row per flavor.
+    for key, title in present:
+        row(f"{ROOTS[key][0]} (root)", title, found[key]["ksu"], root_version(found[key]["ksu"]))
+    # SUSFS patch: shared.
+    commits = {found[key]["susfs"]["commit"] for key, _ in present}
+    susfs_version = lambda f: f"`{ref_of(f)}`, SUSFS {f.get('version', '')}, `{f['path']}`"
+    if len(commits) == 1 and present:
+        s = found[present[0][0]]["susfs"]
+        row("SUSFS patch", used_by(present), s, susfs_version(s))
+    else:
+        for key, title in present:
+            row("SUSFS patch", title, found[key]["susfs"], susfs_version(found[key]["susfs"]))
+    # Manager apps: manager-*.json sit next to the first sources.json.
     folder = os.path.dirname(paths[0])
-    for part, group, flavor in groups:
-        if not group:
-            continue
-        # manager-bakasu.json sits next to the first sources.json.
-        manager = os.path.join(folder, "manager-bakasu.json")
+    for key, title in present:
+        name, mfile = ROOTS[key]
+        manager = os.path.join(folder, mfile)
         if not os.path.exists(manager):
             continue
         m = json.load(open(manager))
         repo = slug(m["repo"])
-        name = part.replace(" (root)", "")
-        kind = "Actions build"
+        kind = "Actions build" if "actions/runs" in m.get("url", "") else "Release"
         commit = m.get("commit") or ""
         commit_cell = f"[`{commit[:12]}`](https://github.com/{repo}/commit/{commit})" if commit else "-"
-        rows.append(f"| {name} manager app | {used_by(group)} | [{repo}](https://github.com/{repo}) | "
+        rows.append(f"| {name} manager app | {title} | [{repo}](https://github.com/{repo}) | "
                     f"{kind} [{m['tag']}]({m['url']}), `{m['apk']}` | {commit_cell} | {m.get('date', '')[:10]} |")
     block = ["<!-- SOURCES:START -->",
              f"Last release: [{tag}](../../releases/tag/{tag})", ""] + rows + ["<!-- SOURCES:END -->"]
@@ -247,6 +283,8 @@ def readme(readme_path, tag, *paths):
 if __name__ == "__main__":
     if sys.argv[1] == "notes":
         notes(*sys.argv[2:6])
+    elif sys.argv[1] == "flavor":
+        flavor(*sys.argv[2:6])
     elif sys.argv[1] == "readme":
         readme(*sys.argv[2:])
     else:

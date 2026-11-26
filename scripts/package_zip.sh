@@ -30,15 +30,16 @@ susfs=$(read_json '["susfs"]["version"]')
 ksu_tag=$(read_json '["ksu"].get("tag", "")')
 ksu_ver=$(read_json '["ksu"].get("ksu_version", "")')
 if [[ -n "$ksu_tag" && "$ksu_tag" != none && "$ksu_tag" != unknown ]]; then
-  root_ver="$ksu_tag"
+  # v3.3.1-mojito-20261124-a6e6d9b6 -> v3.3.1-mojito, so the banner fits 42 columns.
+  root_ver=$(sed -E 's/-[0-9]{8}-[0-9a-f]{7,}$//' <<<"$ksu_tag")
 elif [[ -n "$ksu_ver" ]]; then
   root_ver="r${ksu_ver}"
 else
   root_ver="Inline"
 fi
 kshort=$(read_json '["kernel"]["commit"][:8]')
-# Root module (BakaSU): its short commit, b<sha> in the name. (The sources.json
-# key "ksu" means the root module of the kernel, BakaSU.)
+# Root module (BakaSU or xxKSU): its short commit, b<sha> / x<sha> in the name.
+# (The sources.json key "ksu" means the root module of the kernel.)
 xshort=$(read_json '["ksu"]["commit"][:8]')
 if [[ "$ROOT_FLAVOR" == xxksu ]]; then rletter=x; else rletter=b; fi
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
@@ -70,7 +71,8 @@ name="${KERNEL_LABEL}-${ROOT_NAME}-SUSFS-${susfs}-${date}-k${kshort}-${rletter}$
 
 sed -i "s|^kernel\.string=.*|kernel.string=${KERNEL_LABEL} ${release} ${ROOT_NAME} SUSFS ${susfs}${suffix}|" "$ak3/anykernel.sh"
 if [[ -f "$ROOT/anykernel/banner" ]]; then
-  sed -e "s|@KVER@|${release%%-*}|g" -e "s|@ROOT@|${ROOT_NAME}|g" -e "s|@ROOTVER@|${root_ver}|g" \
+  kver=${release%% *}
+  sed -e "s|@KVER@|${kver}|g" -e "s|@ROOT@|${ROOT_NAME}|g" -e "s|@ROOTVER@|${root_ver}|g" \
     -e "s|@SUSFS@|${susfs}|g" -e "s|@NOMOUNT@|${nomount_short}|g" \
     "$ROOT/anykernel/banner" > "$ak3/banner"
 fi

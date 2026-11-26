@@ -8,6 +8,7 @@
 2. Pick **Build Kernel** on the left, then press **Run workflow**.
 3. Choose the options and press the green **Run workflow** button:
    - **Prefer my own PC (self-hosted)**: ticked by default. If the PC is already busy with another build (any branch or workflow), the run checks the average build times and uses a free GitHub runner when that would finish sooner than waiting. Untick to always use a GitHub runner.
+   - **Root flavor**: `Both (BakaSU + xxKSU)` by default, or only `BakaSU` or only `xxKSU`. A full `Release` always builds both. Each flavor gives its own kernel ZIP, NoMount module and manager APK (the files below with `bakasu` in the name have an `xxksu` twin).
    - **BakaSU branch**: `main` by default. The run stops if Baka-SU/BakaSU has no such branch.
    - **Valhall GPU** and **Compiler**: see [Kernel details](kernels.md).
    - **uname tag**: `-forkby-gh.Najip` by default, added to the end of `uname -r`. Letters, digits, space and `. _ + -` only (no `/`, the release name is also a folder name). Clear it for the kernel's own name. `bpfloader`, `netbpfload` and `netd` still see the fixed fake version, so networking is not affected. A NoMount module must be built with the same tag.
@@ -22,6 +23,7 @@
    - `A325X-Aigis-BakaSU-SUSFS-....zip`: the flashable kernel ZIP (downloaded as-is, not a ZIP inside a ZIP). It carries the NoMount module.
    - `build-info-aigis-bakasu.txt`: what was built (also inside the ZIP).
    - `NoMount-...-aigis-bakasu-....zip` and `nomount-4.14-aigis-bakasu.ko`: the same NoMount module as separate files, with NoMount `lkm`. The ZIP can be flashed as a module in the BakaSU manager.
+   - The xxKSU manager APK (`KernelSU_...apk`) from the newest [Najip/xxKSU release](https://github.com/Najip/xxKSU/releases), when xxKSU is built (`xxksu-manager-info` says which release).
    - The BakaSU manager APK under its own name, for example `BakaSU_v4.2.0-rc3_35284-arm64-v8a-release.apk`, from the BakaSU Build Manager run of the same commit (the **List manager APK** job). `bakasu-manager-info` says which run. Releases attach the same `.apk`.
 
 No Actions secret is needed. The workflows use the built-in `GITHUB_TOKEN`.
