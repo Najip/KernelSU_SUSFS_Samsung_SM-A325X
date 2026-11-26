@@ -67,7 +67,8 @@ Upstream repos and branches are set in `scripts/sources.conf`.
 ## Credits
 
 - [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32): the kernel tree (Aigis).
-- [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU): root (kernel part and manager app).
+- [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU): root on `main` (kernel part and manager app).
+- backslashxx / [xxKSU](https://github.com/Najip/xxKSU) (kernel-side updates synced from [ximi-mojito/android_kernel_xiaomi_mojito](https://github.com/ximi-mojito/android_kernel_xiaomi_mojito/tree/personal)): KernelSU fork that powered the earlier A32 builds and remains supported on the [`abandoned-ksu`](../../tree/abandoned-ksu) branch.
 - [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu): SUSFS, and [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) for the non-GKI 4.14 port.
 - [maxsteeel/nomount](https://github.com/maxsteeel/nomount) and [maxsteeel/lkmloader](https://github.com/maxsteeel/lkmloader): NoMount LKM.
 - [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3): flashable ZIP.
