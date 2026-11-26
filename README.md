@@ -40,14 +40,16 @@ Which one to pick: both use the same Aigis kernel, SUSFS and NoMount; only the r
 This table is refreshed automatically each time a full Release is published.
 
 <!-- SOURCES:START -->
-Last release: [build-20261125-133](../../releases/tag/build-20261125-133)
+Last release: [build-20261126-143](../../releases/tag/build-20261126-143)
 
 | Part | Used by | Source | Branch / version | Commit | Commit date |
 |---|---|---|---|---|---|
-| Kernel | Main kernel: Aigis (BakaSU) | [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32) | `bpf-5.15-legion`, Linux 4.14.357 | [`b6dea3021a3f`](https://github.com/SlamZDank/Aigis-Kernel-A32/commit/b6dea3021a3f7baf62ee1173d1d5b8e3ceb0baa1) | 2026-11-23 |
-| BakaSU (root) | Main kernel: Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | `main`, KSU_VERSION 35285, tag v4.2.0-rc3 | [`57b2db6076f4`](https://github.com/Baka-SU/BakaSU/commit/57b2db6076f439cfd489f14576444e8f0f2f0a25) | 2026-11-24 |
-| SUSFS patch | Main kernel: Aigis (BakaSU) | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`ec069a4e34f9`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/ec069a4e34f992d602a6b40d2e211df2516e2865) | 2026-11-18 |
-| BakaSU manager app | Main kernel: Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | Actions build [Build Manager #3786](https://github.com/Baka-SU/BakaSU/actions/runs/45221593387), `BakaSU_v4.2.0-rc3_35285-arm64-v8a-release.apk` | [`57b2db6076f4`](https://github.com/Baka-SU/BakaSU/commit/57b2db6076f439cfd489f14576444e8f0f2f0a25) | 2026-11-23 |
+| Kernel | Both kernels | [SlamZDank/Aigis-Kernel-A32](https://github.com/SlamZDank/Aigis-Kernel-A32) | `bpf-5.15-legion`, Linux 4.14.357 | [`b6dea3021a3f`](https://github.com/SlamZDank/Aigis-Kernel-A32/commit/b6dea3021a3f7baf62ee1173d1d5b8e3ceb0baa1) | 2026-11-23 |
+| BakaSU (root) | Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | `main`, KSU_VERSION 35285, tag v4.2.0-rc3 | [`57b2db6076f4`](https://github.com/Baka-SU/BakaSU/commit/57b2db6076f439cfd489f14576444e8f0f2f0a25) | 2026-11-24 |
+| xxKSU (root) | Aigis (xxKSU) | [Najip/xxKSU](https://github.com/Najip/xxKSU) | `sync-mojito`, KSU_VERSION 32733, tag v3.3.1-mojito-20261124-a6e6d9b6 | [`be651a0cf118`](https://github.com/Najip/xxKSU/commit/be651a0cf1182e168cb4eb1c59a08a96a8c4adf2) | 2026-11-26 |
+| SUSFS patch | Both kernels | [JackA1ltman/NonGKI_Kernel_Build_2nd](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd) | `mainline`, SUSFS v2.4.0, `Patches/Patch/susfs_patch_to_4.14.patch` | [`ec069a4e34f9`](https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd/commit/ec069a4e34f992d602a6b40d2e211df2516e2865) | 2026-11-18 |
+| BakaSU manager app | Aigis (BakaSU) | [Baka-SU/BakaSU](https://github.com/Baka-SU/BakaSU) | Actions build [Build Manager #3786](https://github.com/Baka-SU/BakaSU/actions/runs/45221593387), `BakaSU_v4.2.0-rc3_35285-arm64-v8a-release.apk` | [`57b2db6076f4`](https://github.com/Baka-SU/BakaSU/commit/57b2db6076f439cfd489f14576444e8f0f2f0a25) | 2026-11-23 |
+| xxKSU manager app | Aigis (xxKSU) | [Najip/xxKSU](https://github.com/Najip/xxKSU) | Release [v3.3.1-mojito-20261124-a6e6d9b6](https://github.com/Najip/xxKSU/releases/tag/v3.3.1-mojito-20261124-a6e6d9b6), `KernelSU_fb38a3ac_32739-release.apk` | - | 2026-11-26 |
 <!-- SOURCES:END -->
 
 Other parts (pinned in this repo):
