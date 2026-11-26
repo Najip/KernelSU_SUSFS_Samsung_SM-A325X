@@ -122,6 +122,11 @@ fi
   echo "uname tag: ${KERNEL_TAG:-none}"
   echo "Kernel source: $(read_json '["kernel"]["repo"]') @ $(read_json '["kernel"]["commit"]') ($(read_json '["kernel"]["ref"]'))"
   echo "$ROOT_NAME: $(read_json '["ksu"]["repo"]') @ $(read_json '["ksu"]["commit"]') (KSU_VERSION $(read_json '["ksu"]["ksu_version"]'), latest tag $(read_json '["ksu"]["tag"]'))"
+  fb=$(read_json '["ksu"].get("fallback_from", {}).get("commit", "")')
+  if [[ -n "$fb" ]]; then
+    fbtag=$(read_json '["ksu"]["fallback_from"].get("tag", "")')
+    echo "$ROOT_NAME fallback: the newest $ROOT_NAME ${fbtag:-$fb} did not build, this kernel uses the last good $ROOT_NAME (above)"
+  fi
   echo "SUSFS: $susfs from $(read_json '["susfs"]["repo"]') @ $(read_json '["susfs"]["commit"]') ($(read_json '["susfs"]["path"]'))"
   echo "Build repo commit: $repo_sha"
   if [[ "${KERNEL_TOOLCHAIN:-aosp}" == zyc ]]; then

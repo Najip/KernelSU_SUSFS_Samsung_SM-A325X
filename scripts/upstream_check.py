@@ -11,6 +11,9 @@ Watched (Aigis with BakaSU is the only kernel):
                 (README, *.md, docs/, .github/) are ignored: the build fetches
                 BakaSU itself and builds NoMount itself.
   bakasu        BakaSU (KSU_REPO / KSU_REF, the BAKASU_BRANCH of sources.conf, main)
+  xxksu         xxKSU (Najip/xxKSU): the commit of its newest release with a
+                manager APK (pre-releases too), not the branch tip, so a build
+                starts only when that release and its APK exist
   susfs         SUSFS_REPO / SUSFS_REF, only commits that touched SUSFS_PATCH
                 (the 4.14 patch the build uses)
   nomount       NOMOUNT_REPO, master branch only. Commits that only touch docs
@@ -74,6 +77,19 @@ def head(repo, ref, path=None):
         "date": c["commit"]["committer"]["date"],
         "subject": c["commit"]["message"].splitlines()[0],
     }
+
+
+def xxksu_newest(repo):
+    """Commit of the newest xxKSU release that has an APK (as scripts/xxksu_release.py)."""
+    rels = [r for r in api(f"repos/{repo}/releases?per_page=30")
+            if not r.get("draft") and any(a["name"].endswith(".apk") for a in r.get("assets", []))]
+    if not rels:
+        return None
+    tag = max(rels, key=lambda r: r.get("published_at") or "")["tag_name"]
+    out = subprocess.check_output(["git", "ls-remote", "--tags", f"https://github.com/{repo}",
+                                   f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"], text=True).split("\n")
+    shas = {line.split("\t")[1]: line.split("\t")[0] for line in out if line}
+    return shas.get(f"refs/tags/{tag}^{{}}") or shas.get(f"refs/tags/{tag}")
 
 
 def patch_digest(repo, sha):
@@ -214,6 +230,13 @@ def main(conf_path, state_path):
         # NoMount: master only.
         "nomount": ("NoMount", slug(bk["NOMOUNT_REPO"]), "master", None),
     }
+    # xxKSU: watch its newest release, not the branch tip (its APK must exist).
+    pin = {}
+    if slug(xk["KSU_REPO"]).lower() == "najip/xxksu" and not re.fullmatch(r"[0-9a-f]{40}", xk["KSU_REF"]):
+        newest = xxksu_newest(slug(xk["KSU_REPO"]))
+        if newest:
+            pin["xxksu"] = newest
+            print(f"xxKSU: newest release is {newest[:12]}")
     state_file = Path(state_path)
     state = json.loads(state_file.read_text()) if state_file.exists() else {}
     old = state.get("sources", {})
@@ -221,7 +244,7 @@ def main(conf_path, state_path):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     sources, report, changed, ignored_report = {}, [], [], []
     for key, (label, repo, ref, path) in watched.items():
-        cur = head(repo, ref, path)
+        cur = head(repo, pin.get(key, ref), path)
         cur.update({"name": label, "repo": f"https://github.com/{repo}", "branch": ref})
         if path:
             cur["path"] = path
@@ -230,6 +253,12 @@ def main(conf_path, state_path):
         if prev is None and not first:
             # A source watched for the first time: save it, nothing to compare yet.
             print(f"{label}: {repo}@{ref} {cur['commit'][:12]} (now watched, saved)")
+            continue
+        if prev and prev.get("repo") == cur["repo"] and prev.get("branch") != ref and (
+                prev["commit"] == cur["commit"]
+                or api(f"repos/{repo}/compare/{prev['commit']}...{cur['commit']}").get("status") == "behind"):
+            # Another branch (or a release) of the same repo, nothing newer than what was built.
+            print(f"{label}: now watching {repo}@{ref}, {cur['commit'][:12]} (not newer, no build)")
             continue
         if prev and (prev.get("repo") != cur["repo"] or prev.get("branch") != ref):
             prev = None  # the build now uses another repo or branch: start over for it
