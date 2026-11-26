@@ -85,7 +85,7 @@ def version_parts(v):
 def make(md, tag, url, date):
     v = parse_versions(md)
     bakasu_p, susfs_p, nomount_p = version_parts(v)
-    xda_title = f"[KERNEL][A325F/M/N] KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}"
+    xda_title = f"[KERNEL][A325F/M/N][STABLE] KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}"
     post2 = [
         "[CENTER][SIZE=6][B]Changelog[/B][/SIZE][/CENTER]",
         f"Newest first. Full details for each version are on its [URL='{RELEASES}']GitHub release[/URL] page.",

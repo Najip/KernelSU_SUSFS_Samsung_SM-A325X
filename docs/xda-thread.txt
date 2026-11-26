@@ -7,7 +7,7 @@ Lines starting with ">>" are notes for me, do not paste them.
 >> XDA-posts-<tag>.txt with both.
 
 >> TITLE (thread title box)
-[KERNEL][A325F/M/N] KernelSU (BakaSU) + SUSFS 2.4.0 kernel
+[KERNEL][A325F/M/N][STABLE] KernelSU (BakaSU) + SUSFS 2.4.0 kernel
 
 >> ==================== POST #1 (OP) ====================
 
