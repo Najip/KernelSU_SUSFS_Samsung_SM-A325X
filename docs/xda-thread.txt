@@ -11,7 +11,9 @@ Lines starting with ">>" are notes for me, do not paste them.
 
 >> ==================== POST #1 (OP) ====================
 
-[CENTER][SIZE=7][B]KernelSU (BakaSU) + SUSFS 2.4.0 kernel[/B][/SIZE]
+[CENTER][IMG]https://raw.githubusercontent.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/main/assets/banner-xda.png[/IMG]
+
+[SIZE=7][B]KernelSU (BakaSU) + SUSFS 2.4.0 kernel[/B][/SIZE]
 [SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]
 
 [SIZE=5][B]Disclaimer[/B][/SIZE]

@@ -23,6 +23,7 @@ from xda_changelog import convert  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.environ.get("GITHUB_REPOSITORY", "Najip/KernelSU_SUSFS_Samsung_SM-A325X")
 RELEASES = f"https://github.com/{REPO}/releases"
+XDA_BANNER = f"https://raw.githubusercontent.com/{REPO}/main/assets/banner-xda.png"
 TAG_RE = re.compile(r"^build-\d{8}-\d+$")
 
 
@@ -128,6 +129,28 @@ def make(md, tag, url, date):
     ])
 
 
+def make_title_banner(md, tag):
+    v = parse_versions(md)
+    bakasu_p, susfs_p, nomount_p = version_parts(v)
+    xda_title = f"[KERNEL][A325F/M/N][STABLE] KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}"
+    return "\n".join([
+        f"XDA TITLE & OP BANNER FOR {tag} (BBCode)",
+        'Lines starting with ">>" are notes, do not paste them.',
+        "",
+        ">> ==================== THREAD TITLE ====================",
+        "",
+        xda_title,
+        "",
+        ">> ==================== POST #1 (OP) BANNER & HEADER ====================",
+        "",
+        f"[CENTER][IMG]{XDA_BANNER}[/IMG]",
+        "",
+        f"[SIZE=7][B]KernelSU ({bakasu_p}) + {susfs_p} + {nomount_p}[/B][/SIZE]",
+        "[SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]",
+        "",
+    ])
+
+
 def main(argv):
     if len(argv) >= 2 and argv[0] == "--release":
         tag = argv[1]
@@ -143,6 +166,10 @@ def main(argv):
     with open(out, "w", encoding="utf-8") as f:
         f.write(make(md, tag, url, date or datetime.now(timezone.utc).strftime("%Y-%m-%d")))
     print(f"XDA posts #2 and #3: {out}")
+    banner_out = os.path.join(os.path.dirname(out), f"XDA-title-banner-{tag}.txt")
+    with open(banner_out, "w", encoding="utf-8") as f:
+        f.write(make_title_banner(md, tag))
+    print(f"XDA title & banner: {banner_out}")
 
 
 if __name__ == "__main__":
