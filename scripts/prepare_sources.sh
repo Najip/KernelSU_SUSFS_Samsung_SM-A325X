@@ -103,7 +103,7 @@ git apply --whitespace=nowarn "$ROOT/patches/susfs/0002-sdcardfs-sus-path.patch"
 applied+=("susfs/0002-sdcardfs-sus-path.patch")
 
 log "$ROOT_NAME: $KSU_REPO ($KSU_REF)"
-{
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
   # BakaSU's version code is its commit count (30000 + count + 700), the same
   # number its manager shows, so it needs the full history and tags. Always a
   # fresh copy: a reused one may hold the history of another BakaSU branch.
@@ -142,24 +142,43 @@ log "$ROOT_NAME: $KSU_REPO ($KSU_REF)"
   else
     git -C KernelSU checkout -q -f --detach "origin/$bakasu_branch"
   fi
-}
+else
+  fetch "$KSU_REPO" "$KSU_REF" KernelSU
+fi
 ksu_sha=$(git -C KernelSU rev-parse HEAD)
 ksu_date=$(git -C KernelSU show -s --format=%cI HEAD)
 ksu_subject=$(git -C KernelSU show -s --format=%s HEAD)
-ksu_version=$((30000 + $(git -C KernelSU rev-list --count HEAD) + 700))
-ksu_tag=$(git -C KernelSU describe --abbrev=0 --tags 2>/dev/null || true)
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+  ksu_version=$((30000 + $(git -C KernelSU rev-list --count HEAD) + 700))
+  ksu_tag=$(git -C KernelSU describe --abbrev=0 --tags 2>/dev/null || true)
+else
+  ksu_version=$(grep -o 'KSU_VERSION=[0-9]*' KernelSU/kernel/Makefile | head -n1 | cut -d= -f2)
+  ksu_tag=$(api "repos/${KSU_REPO#https://github.com/}/releases/latest" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
+  log "Applying xxKSU patches"
+  for p in "$ROOT"/patches/kernelsu/*.patch; do
+    echo "  $(basename "$p")"
+    git -C KernelSU apply --whitespace=nowarn "$p"
+    applied+=("kernelsu/$(basename "$p")")
+  done
+fi
 ln -sfn ../KernelSU/kernel drivers/kernelsu
 
-log "Hook style: BakaSU SUSFS inline hooks"
-applied+=("hook style: BakaSU SUSFS inline (kernel calls BakaSU directly, next to the SUSFS hooks)")
-# BakaSU (since 2b558ca5, 16 Nov 2026) no longer has the my_* SELinux hide
-# functions the kernel's own hooks called. On 4.14 BakaSU hooks those
-# places itself ("auto" mode), so take the kernel's hooks out.
-for p in "$ROOT"/patches/bakasu/*.patch; do
-  echo "  bakasu/$(basename "$p")"
-  git apply --whitespace=nowarn "$p"
-  applied+=("bakasu/$(basename "$p")")
-done
+if [[ "$ROOT_FLAVOR" == bakasu ]]; then
+  log "Hook style: BakaSU SUSFS inline hooks"
+  applied+=("hook style: BakaSU SUSFS inline (kernel calls BakaSU directly, next to the SUSFS hooks)")
+  # BakaSU (since 2b558ca5, 16 Nov 2026) no longer has the my_* SELinux hide
+  # functions the kernel's own hooks called. On 4.14 BakaSU hooks those
+  # places itself ("auto" mode), so take the kernel's hooks out.
+  for p in "$ROOT"/patches/bakasu/*.patch; do
+    echo "  bakasu/$(basename "$p")"
+    git apply --whitespace=nowarn "$p"
+    applied+=("bakasu/$(basename "$p")")
+  done
+else
+  log "Hook style: xxKSU manual hooks"
+  applied+=("hook style: xxKSU manual (kernel calls xxKSU directly, next to the SUSFS hooks)")
+fi
 
 log "Applying kernel patches"
 netfix="$ROOT/patches/kernel/0001-network-udp-gso.patch"

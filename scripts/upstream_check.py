@@ -205,9 +205,11 @@ def emit(pairs):
 
 def main(conf_path, state_path):
     bk = conf(conf_path, "aigis-bakasu")
+    xk = conf(conf_path, "aigis-xxksu")
     watched = {
         "aigis": ("Aigis kernel", slug(bk["KERNEL_REPO"]), bk["KERNEL_REF"], None),
         "bakasu": ("BakaSU", slug(bk["KSU_REPO"]), bk["KSU_REF"], None),
+        "xxksu": ("xxKSU", slug(xk["KSU_REPO"]), xk["KSU_REF"], None),
         "susfs": ("Jack's SUSFS (4.14 patch)", slug(bk["SUSFS_REPO"]), bk["SUSFS_REF"], bk["SUSFS_PATCH"]),
         # NoMount: master only.
         "nomount": ("NoMount", slug(bk["NOMOUNT_REPO"]), "master", None),
@@ -286,13 +288,20 @@ def main(conf_path, state_path):
           "moved": str(moved).lower(), "plan": json.dumps(plan, separators=(",", ":"))})
 
 
-KERNELS = ("aigis-bakasu",)
+KERNELS = ("aigis-bakasu", "aigis-xxksu")
 
 
 def build_plan(changed):
     """Per kernel: kernel (build), nomount (keep the kernel, build NoMount) or reuse."""
     c = set(changed)
-    full = {"aigis-bakasu"} if c & {"aigis", "bakasu", "susfs"} else set()
+    full = set()
+    if c & {"aigis", "susfs"}:
+        full = set(KERNELS)
+    else:
+        if "bakasu" in c:
+            full.add("aigis-bakasu")
+        if "xxksu" in c:
+            full.add("aigis-xxksu")
     if not full and "nomount" not in changed:
         return {}
     return {k: "kernel" if k in full else ("nomount" if "nomount" in changed else "reuse") for k in KERNELS}
@@ -300,13 +309,16 @@ def build_plan(changed):
 
 FILE_NAMES = {
     "aigis-bakasu-kernel": "Kernel ZIP (Aigis with BakaSU)",
-    "aigis-bakasu-nomount": "NoMount module for it",
+    "aigis-bakasu-nomount": "NoMount module (BakaSU)",
+    "aigis-xxksu-kernel": "Kernel ZIP (Aigis with xxKSU)",
+    "aigis-xxksu-nomount": "NoMount module (xxKSU)",
 }
 
 
 def title_ok(title):
     """Is this run-name the Build Kernel run the upstream check starts?"""
-    return (title.startswith("A325X BakaSU + SUSFS kernel (Aigis)") and "(Latest) (upstream)" in title
+    return (title.startswith("A325X ") and "+ SUSFS kernel (Aigis)" in title
+            and "(Latest) (upstream)" in title
             and "NoMount lkm-master" in title and "+ Pre-release" in title)
 
 

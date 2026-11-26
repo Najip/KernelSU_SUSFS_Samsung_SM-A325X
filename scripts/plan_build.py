@@ -116,7 +116,13 @@ def parse_reuse(text, sources, repo):
 
 def main():
     e = os.environ
-    sources = ["aigis-bakasu"]
+    flavor = e.get("ROOT_FLAVOR", "Both (BakaSU + xxKSU)")
+    if e.get("RELEASE_TYPE") == "Release" or flavor.startswith("Both"):
+        sources = ["aigis-bakasu", "aigis-xxksu"]
+    elif flavor == "xxKSU":
+        sources = ["aigis-xxksu"]
+    else:
+        sources = ["aigis-bakasu"]
     mode = e.get("COMMIT_MODE", "Latest")
     nm_only = e.get("NM_ONLY") == "true"
     nomount_mode = e.get("NOMOUNT_MODE", "lkm")
@@ -195,8 +201,9 @@ def main():
                 continue
             refs = run(["resolve_commits.py", "resolve"], KERNEL_SOURCE=src)
             kit = ""
+            hook = "inline" if src == "aigis-bakasu" else "manual"
             if nm_only:
-                key_env = dict(KERNEL_SOURCE=src, NOMOUNT_PART="separate", KSU_HOOK="inline",
+                key_env = dict(KERNEL_SOURCE=src, NOMOUNT_PART="separate", KSU_HOOK=hook,
                                KERNEL_REF=refs["kernel_ref"], KSU_REF=refs["ksu_ref"], SUSFS_REF=refs["susfs_ref"])
                 full = dict(os.environ, **key_env)
                 k = subprocess.check_output([sys.executable, str(SCRIPTS / "kernel_kit.py"), "key"],
@@ -207,8 +214,7 @@ def main():
                                               else "no kernel kit found, the kernel is compiled once to match it."))
             entries.append({
                 "source": src, **{k: refs.get(k, "") for k in REF_KEYS},
-                # BakaSU always uses its SUSFS inline hooks ("inline").
-                "ksu_hook": "inline", "perf_tuning": "false",
+                "ksu_hook": hook, "perf_tuning": "false",
                 "network_fix": e.get("NETWORK_FIX", "true"), "kernel_release": "",
                 "valhall_gpu": e.get("VALHALL_GPU", "false"),
                 "kernel_tag": e.get("KERNEL_TAG", ""),
@@ -219,16 +225,16 @@ def main():
             out.update(collect_sources=" ".join(kept), collect_runs=json.dumps(kept, separators=(",", ":")))
 
     for x in entries:
-        if x["source"] == "aigis-bakasu":
-            x["ksu_hook"] = "inline"  # BakaSU: always its SUSFS inline hooks
+        x["ksu_hook"] = "inline" if x["source"] == "aigis-bakasu" else "manual"
     matrix = [x for x in entries if x["build_kernel"] == "true" or x["build_nomount"] == "true"]
     for i, x in enumerate(matrix):
         x["first"] = "true" if i == 0 else "false"
         print(f"{x['source']}: kernel ZIP {x['build_kernel']}, NoMount LKM build {x['build_nomount']}, "
               f"kernel kit {x['kit_id'] or 'none'}")
-    # Manager app of this run: BakaSU, from the BakaSU build of the same commit.
+    # Manager apps of this run: BakaSU (from same commit) and/or xxKSU (from Najip/xxKSU latest release).
     out["bakasu_ref"] = next((x["ksu_ref"] for x in entries if x["source"] == "aigis-bakasu"), "")
     out["bakasu_branch"] = next((x["ksu_branch"] for x in entries if x["source"] == "aigis-bakasu"), "")
+    out["xxksu_manager"] = str(any(x["source"] == "aigis-xxksu" for x in entries)).lower()
     out["matrix"] = json.dumps(matrix, separators=(",", ":"))
     out["build_any"] = str(bool(matrix)).lower()
     emit(out)

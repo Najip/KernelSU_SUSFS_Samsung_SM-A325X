@@ -113,7 +113,11 @@ fi
 cd "$KERNEL_DIR"
 base=()
 for f in $KERNEL_FRAGMENTS; do base+=("arch/arm64/configs/$f"); done
-fragments=("$ROOT/configs/a325x-bakasu-susfs.config")
+if [[ "$ROOT_FLAVOR" == xxksu ]]; then
+  fragments=("$ROOT/configs/a325x-xxksu-susfs.config" "$ROOT/configs/hooks/manual.config")
+else
+  fragments=("$ROOT/configs/a325x-bakasu-susfs.config")
+fi
 [[ "${NOMOUNT_MODE:-lkm}" == integrate ]] && fragments+=("$ROOT/configs/nomount-integrate.config")
 
 if [[ -n "${KERNEL_KIT:-}" ]]; then

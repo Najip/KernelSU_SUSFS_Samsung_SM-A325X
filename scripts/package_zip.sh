@@ -40,7 +40,7 @@ kshort=$(read_json '["kernel"]["commit"][:8]')
 # Root module (BakaSU): its short commit, b<sha> in the name. (The sources.json
 # key "ksu" means the root module of the kernel, BakaSU.)
 xshort=$(read_json '["ksu"]["commit"][:8]')
-rletter=b
+if [[ "$ROOT_FLAVOR" == xxksu ]]; then rletter=x; else rletter=b; fi
 repo_sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 release=$(cat "$OUT_DIR/include/config/kernel.release")
 # Kernel ID: the same for every build of this exact kernel; the NoMount module
@@ -49,7 +49,7 @@ kernel_id=$(bash "$ROOT/scripts/kernel_id.sh" "$OUT_DIR")
 date=$(date -u +%Y%m%d)
 suffix=
 [[ "${VALHALL_GPU:-false}" == true ]] && suffix=$suffix-vgpu
-[[ "${KERNEL_SOURCE%-bakasu}" == aigis && "$KERNEL_TOOLCHAIN" == aosp ]] && suffix=$suffix-aospclang
+[[ "${KERNEL_SOURCE%-*}" == aigis && "$KERNEL_TOOLCHAIN" == aosp ]] && suffix=$suffix-aospclang
 NOMOUNT_MODE=${NOMOUNT_MODE:-lkm}
 [[ "$NOMOUNT_MODE" == integrate ]] && suffix=$suffix-nm
 case "$NOMOUNT_MODE" in

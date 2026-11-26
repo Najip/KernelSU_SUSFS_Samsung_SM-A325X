@@ -1,12 +1,19 @@
 name: Build Kernel
-run-name: ${{ inputs.release_type == 'Release from pre-release' && format('A325X publish {0} as Release', inputs.pre_release != '' && inputs.pre_release || 'the newest pre-release') || '' }}${{ inputs.release_type != 'Release from pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || 'A325X BakaSU + SUSFS kernel')) || '' }} (Aigis)${{ inputs.bakasu_branch != '' && inputs.bakasu_branch != 'main' && format(' (BakaSU {0})', inputs.bakasu_branch) || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ startsWith(inputs.reuse, '{') && ' (upstream)' || '' }}${{ inputs.reuse != '' && !startsWith(inputs.reuse, '{') && ' (reused run)' || '' }}${{ format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
+run-name: ${{ inputs.release_type == 'Release from pre-release' && format('A325X publish {0} as Release', inputs.pre_release != '' && inputs.pre_release || 'the newest pre-release') || '' }}${{ inputs.release_type != 'Release from pre-release' && (inputs.commit_mode == 'Promoted' && 'A325X promote the newest default Latest build' || (inputs.nomount_only && format('A325X NoMount {0} LKM only', inputs.nomount_branch) || format('A325X {0} + SUSFS kernel', inputs.release_type == 'Release' && 'BakaSU + xxKSU' || (inputs.root_flavor == 'xxKSU' && 'xxKSU' || (inputs.root_flavor == 'BakaSU' && 'BakaSU' || 'BakaSU + xxKSU'))))) || '' }} (Aigis)${{ inputs.bakasu_branch != '' && inputs.bakasu_branch != 'main' && format(' (BakaSU {0})', inputs.bakasu_branch) || '' }}${{ inputs.commit_mode != 'Promoted' && !inputs.network_fix && ' (no network fix)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.valhall_gpu && ' (Valhall GPU)' || '' }}${{ inputs.commit_mode != 'Promoted' && inputs.compiler == 'main' && ' (main compiler)' || '' }} (${{ inputs.commit_mode }})${{ startsWith(inputs.reuse, '{') && ' (upstream)' || '' }}${{ inputs.reuse != '' && !startsWith(inputs.reuse, '{') && ' (reused run)' || '' }}${{ format(' NoMount {0}-{1}', inputs.nomount, inputs.nomount_branch) }}${{ inputs.release_type != 'CI' && inputs.release_type != 'Release from pre-release' && format(' + {0}', inputs.release_type) || '' }}${{ github.ref_name != 'main' && format(' [{0}]', github.ref_name) || '' }}
 
 # Run it: Actions -> Build Kernel -> Run workflow.
-# Every source (Aigis kernel, BakaSU, SUSFS patch, NoMount) is downloaded fresh during the run.
-# Only the main kernel (Aigis) with BakaSU is built here.
+# Every source (Aigis kernel, BakaSU, xxKSU, SUSFS patch, NoMount) is downloaded fresh during the run.
 on:
   workflow_dispatch:
     inputs:
+      root_flavor:
+        description: 'Root flavor to build. Full Release always builds both BakaSU and xxKSU'
+        type: choice
+        options:
+          - 'Both (BakaSU + xxKSU)'
+          - BakaSU
+          - xxKSU
+        default: 'Both (BakaSU + xxKSU)'
       bakasu_branch:
         description: 'BakaSU branch. main = default'
         type: string
@@ -155,6 +162,8 @@ jobs:
         id: plan
         if: inputs.release_type != 'Release from pre-release'
         env:
+          ROOT_FLAVOR: ${{ inputs.root_flavor }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
           COMMIT_MODE: ${{ inputs.commit_mode }}
           NM_ONLY: ${{ inputs.nomount_only }}
           REUSE: ${{ inputs.reuse }}
@@ -174,12 +183,14 @@ jobs:
       collect_sources: ${{ steps.plan.outputs.collect_sources }}
       bakasu_ref: ${{ steps.plan.outputs.bakasu_ref }}
       bakasu_branch: ${{ steps.plan.outputs.bakasu_branch }}
+      xxksu_manager: ${{ steps.plan.outputs.xxksu_manager }}
 
   manager:
-    name: List manager APK
+    name: List manager APKs
     needs: pick
     outputs:
       bakasu_apk: ${{ steps.bakasu.outputs.apk }}
+      xxksu_apk: ${{ steps.xxksu.outputs.apk }}
     if: inputs.release_type != 'Release from pre-release'
     runs-on: ubuntu-latest
     defaults:
@@ -217,9 +228,46 @@ jobs:
           path: bakasu/manager-bakasu.json
           if-no-files-found: error
           retention-days: 30
+      - name: Get the xxKSU manager APK of the latest Najip/xxKSU release
+        id: xxksu
+        if: needs.pick.outputs.xxksu_manager == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANAGER_REPO: Najip/xxKSU
+        run: |
+          set -euo pipefail
+          rel=$(gh release view --repo "$MANAGER_REPO" --json tagName,url,publishedAt,assets)
+          tag=$(jq -r .tagName <<<"$rel")
+          apk=$(jq -r '[.assets[].name | select(endswith(".apk"))] | (map(select(endswith("-release.apk"))) + .)[0] // ""' <<<"$rel")
+          [[ -n "$apk" ]] || { echo "::error::The latest xxKSU release $tag has no .apk."; exit 1; }
+          mkdir -p xxksu
+          gh release download "$tag" --repo "$MANAGER_REPO" --pattern "$apk" --dir xxksu
+          unzip -l "xxksu/$apk" | grep -q AndroidManifest.xml || { echo "::error::$apk is not an Android app."; exit 1; }
+          sha=$(sha256sum "xxksu/$apk" | cut -d' ' -f1)
+          jq -n --arg repo "https://github.com/$MANAGER_REPO" --arg tag "$tag" --arg url "$(jq -r .url <<<"$rel")" \
+            --arg date "$(jq -r .publishedAt <<<"$rel")" --arg apk "$apk" --arg sha "$sha" \
+            '{repo: $repo, tag: $tag, url: $url, date: $date, apk: $apk, sha256: $sha}' > xxksu/manager-xxksu.json
+          cat xxksu/manager-xxksu.json
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+      - name: Upload ${{ steps.xxksu.outputs.apk }}
+        if: steps.xxksu.outputs.apk != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: xxksu/${{ steps.xxksu.outputs.apk }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload manager-xxksu.json (where the xxKSU APK comes from)
+        if: steps.xxksu.outputs.apk != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: xxksu-manager-info
+          path: xxksu/manager-xxksu.json
+          if-no-files-found: error
+          retention-days: 30
 
   build:
-    name: ${{ matrix.source }} - ${{ matrix.build_kernel == 'true' && 'Build BakaSU + SUSFS kernel' || 'Build the NoMount module' }}
+    name: ${{ matrix.source }} - ${{ matrix.build_kernel == 'true' && 'Build kernel' || 'Build the NoMount module' }}
     needs: pick
     if: needs.pick.outputs.build_any == 'true'
     runs-on: ${{ needs.pick.outputs.runner }}
@@ -658,13 +706,19 @@ jobs:
           set -euo pipefail
           echo "Publishing a ${{ inputs.release_type }} from commit mode ${{ inputs.commit_mode }}."
 
-      - name: Download release files
+      - name: Download release files (BakaSU)
+        if: contains(needs.pick.outputs.sources, 'aigis-bakasu')
         uses: actions/download-artifact@v8
         with:
-          # One kernel: by name, into its own folder (a pattern that matches only
-          # one artifact puts its files straight into the path, without a folder).
           name: release-files-aigis-bakasu
           path: files/release-files-aigis-bakasu
+
+      - name: Download release files (xxKSU)
+        if: contains(needs.pick.outputs.sources, 'aigis-xxksu')
+        uses: actions/download-artifact@v8
+        with:
+          name: release-files-aigis-xxksu
+          path: files/release-files-aigis-xxksu
 
       - name: Download ${{ needs.manager.outputs.bakasu_apk }}
         if: needs.manager.outputs.bakasu_apk != ''
@@ -678,6 +732,20 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: bakasu-manager-info
+          path: release
+
+      - name: Download ${{ needs.manager.outputs.xxksu_apk }}
+        if: needs.manager.outputs.xxksu_apk != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.manager.outputs.xxksu_apk }}
+          path: release
+
+      - name: Download manager-xxksu.json
+        if: needs.manager.outputs.xxksu_apk != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: xxksu-manager-info
           path: release
 
       - name: Put all files of every kernel together
@@ -722,6 +790,12 @@ jobs:
             [[ -n "$apk" && -f "release/$apk" ]] || { echo "::error::No BakaSU manager APK ($apk)."; exit 1; }
             [[ "$(sha256sum "release/$apk" | cut -d' ' -f1)" == "$(jq -r .sha256 release/manager-bakasu.json)" ]] \
               || { echo "::error::$apk does not match manager-bakasu.json."; exit 1; }
+          fi
+          if [[ "${{ needs.pick.outputs.xxksu_manager }}" == true ]]; then
+            apk="${{ needs.manager.outputs.xxksu_apk }}"
+            [[ -n "$apk" && -f "release/$apk" ]] || { echo "::error::No xxKSU manager APK ($apk)."; exit 1; }
+            [[ "$(sha256sum "release/$apk" | cut -d' ' -f1)" == "$(jq -r .sha256 release/manager-xxksu.json)" ]] \
+              || { echo "::error::$apk does not match manager-xxksu.json."; exit 1; }
           fi
           (cd release && sha256sum -- *.zip *.ko *.apk > SHA256SUMS.txt)
           ls -l release
