@@ -24,6 +24,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.environ.get("GITHUB_REPOSITORY", "Najip/KernelSU_SUSFS_Samsung_SM-A325X")
 RELEASES = f"https://github.com/{REPO}/releases"
 XDA_BANNER = f"https://raw.githubusercontent.com/{REPO}/main/assets/banner-xda.png"
+
+
+def banner_url():
+    """XDA keeps its own copy of every image link, so a changed banner under
+    the same link still shows the old picture. ?v=<file hash> changes the link
+    whenever assets/banner-xda.png changes."""
+    import hashlib
+    try:
+        with open(os.path.join(ROOT, "assets", "banner-xda.png"), "rb") as f:
+            return f"{XDA_BANNER}?v={hashlib.sha256(f.read()).hexdigest()[:10]}"
+    except OSError:
+        return XDA_BANNER
 TAG_RE = re.compile(r"^build-\d{8}-\d+$")
 
 
@@ -162,7 +174,7 @@ def make_title_banner(md, tag):
         "",
         ">> ==================== POST #1 (OP) BANNER & HEADER ====================",
         "",
-        f"[CENTER][IMG]{XDA_BANNER}[/IMG]",
+        f"[CENTER][IMG]{banner_url()}[/IMG]",
         "",
         f"[SIZE=7][B]KernelSU ({root_p}) + {susfs_p} + {nomount_p}[/B][/SIZE]",
         "[SIZE=5]Samsung Galaxy A32 4G (SM-A325F / A325M / A325N, MT6768)[/SIZE][/CENTER]",
