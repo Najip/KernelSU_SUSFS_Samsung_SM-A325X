@@ -5,15 +5,15 @@
     Finds the most recent successful "Build Kernel" run with commit mode
     Latest and the default kernel options (NoMount not built in, not a
     NoMount-only run, compiler aigis) on $BRANCH that built every kernel in
-    $SOURCES ("aigis-bakasu"; older runs: "mzggr", "aigis") and whose
+    $SOURCES ("aigis-bakasu aigis-xxksu"; older runs: "mzggr", "aigis") and whose
     files have not expired yet. Runner, release type, the Aigis GPU
     (Valhall or stock) and whether the NoMount LKM was built do not matter. Writes
     source_run, source_url and source_sha to $GITHUB_OUTPUT.
 
   promoted_source.py download <run id> <artifacts folder>
-    Downloads the release-files (mzggr) and release-files-aigis artifacts of
-    that run into <folder>/mzggr and <folder>/aigis (only the kernels in $ONLY
-    when it is set).
+    Downloads the release-files-<kernel> artifacts of that run (aigis-bakasu,
+    aigis-xxksu; older runs: mzggr, aigis) into <folder>/<kernel> (only the
+    kernels in $ONLY when it is set).
 
   promoted_source.py inspect <artifacts folder>/<source>
     Reads the downloaded files of one kernel of that run. Writes the commits
@@ -35,11 +35,16 @@ from pathlib import Path
 WORKFLOW = "kernel.yml"
 # Artifact with the release files of each kernel.
 ARTIFACT = {"mzggr": "release-files", "aigis": "release-files-aigis",
-            "aigis-bakasu": "release-files-aigis-bakasu"}
+            "aigis-bakasu": "release-files-aigis-bakasu", "aigis-xxksu": "release-files-aigis-xxksu"}
 
 
 def built_sources(title):
     """Kernels a Build Kernel run built, from its run-name (older runs: mzggr)."""
+    # Runs since 26 Nov 2026: BakaSU and/or xxKSU on Aigis.
+    if title.startswith("A325X BakaSU + xxKSU + SUSFS kernel (Aigis)"):
+        return {"aigis-bakasu", "aigis-xxksu"}
+    if title.startswith("A325X xxKSU + SUSFS kernel (Aigis)"):
+        return {"aigis-xxksu"}
     # Runs since 23 Nov 2026 build Aigis BakaSU only.
     if title.startswith("A325X BakaSU + SUSFS kernel (Aigis)"):
         return {"aigis-bakasu"}

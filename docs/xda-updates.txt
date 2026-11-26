@@ -5,7 +5,7 @@
 
 [B]2026-11-26: xxKSU is back, next to BakaSU[/B]
 [LIST]
-[*]Starting with the next release, every release has two kernel ZIPs: one with BakaSU and one with [URL='https://github.com/Najip/xxKSU']xxKSU[/URL] by backslashxx. Same Aigis kernel, SUSFS and NoMount; only the root part differs. Flash one and install its manager (both are in the release).
+[*]From this release on, every release has two kernel ZIPs: one with BakaSU and one with [URL='https://github.com/Najip/xxKSU']xxKSU[/URL] by backslashxx. Same Aigis kernel, SUSFS and NoMount; only the root part differs. Flash one and install its manager (both are in the release).
 [*]What happened: this kernel started with xxKSU, moved to BakaSU on 2026-11-23 and dropped xxKSU when backslashxx's own KernelSU repo was taken down. That was too quick. He kept updating xxKSU's kernel side inside his mojito kernel tree, so my fork Najip/xxKSU (sync-mojito branch) now follows those updates every day and builds the matching manager. If his own repo comes back, it switches back to it automatically.
 [*]New xxKSU updates start a kernel test build right away (pre-release). Thanks to backslashxx for xxKSU.
 [/LIST]

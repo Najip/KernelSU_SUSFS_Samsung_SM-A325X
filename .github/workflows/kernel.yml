@@ -677,6 +677,14 @@ jobs:
           path: release/aigis-bakasu/
           if-no-files-found: error
           retention-days: 30
+      - name: Keep the Aigis xxKSU files for the release job
+        if: contains(format(' {0} ', needs.pick.outputs.collect_sources), ' aigis-xxksu ')
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files-aigis-xxksu
+          path: release/aigis-xxksu/
+          if-no-files-found: error
+          retention-days: 30
 
   release:
     name: Publish release and update README
@@ -1093,13 +1101,21 @@ jobs:
           ref: ${{ github.ref_name }}
           fetch-depth: 1
 
-      - name: Download the promoted sources
+      # By name, each into its own folder (a pattern that matches only one
+      # artifact puts its files straight into the path, without a folder).
+      - name: Download the promoted sources (BakaSU)
+        if: contains(needs.pick.outputs.sources, 'aigis-bakasu')
         uses: actions/download-artifact@v8
         with:
-          # One kernel: by name, into its own folder (a pattern that matches only
-          # one artifact puts its files straight into the path, without a folder).
           name: release-files-aigis-bakasu
           path: files/release-files-aigis-bakasu
+
+      - name: Download the promoted sources (xxKSU)
+        if: contains(needs.pick.outputs.sources, 'aigis-xxksu')
+        uses: actions/download-artifact@v8
+        with:
+          name: release-files-aigis-xxksu
+          path: files/release-files-aigis-xxksu
 
       - name: Pin the commits that built
         run: |

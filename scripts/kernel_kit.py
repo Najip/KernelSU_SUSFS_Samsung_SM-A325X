@@ -71,7 +71,7 @@ def key():
     if e.get("KERNEL_TAG"):
         parts.append(f"tag={e['KERNEL_TAG']}")
     src = c.get("KERNEL_SOURCE")
-    aigis = src in ("aigis", "aigis-bakasu")
+    aigis = src in ("aigis", "aigis-bakasu", "aigis-xxksu")
     if aigis:
         parts.append(f"source={src}")
         if c.get("VALHALL_GPU") == "true":
@@ -107,10 +107,14 @@ def in_run(run_id):
     arts = api(f"repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100").get("artifacts", [])
     src = os.environ.get("KERNEL_SOURCE", "aigis-bakasu")
     bakasu = lambda n: n.startswith("kernel-kit-aigis-bakasu-")
+    xxksu = lambda n: n.startswith("kernel-kit-aigis-xxksu-")
     if src == "aigis-bakasu":
         pick(arts, bakasu)
+    elif src == "aigis-xxksu":
+        # Runs before 26 Nov 2026 named the xxKSU kit kernel-kit-<digest>.
+        pick(arts, lambda n: xxksu(n) or (n.startswith("kernel-kit-") and not n.startswith("kernel-kit-aigis-")))
     elif src == "aigis":
-        pick(arts, lambda n: n.startswith("kernel-kit-aigis-") and not bakasu(n))
+        pick(arts, lambda n: n.startswith("kernel-kit-aigis-") and not bakasu(n) and not xxksu(n))
     else:
         pick(arts, lambda n: n.startswith("kernel-kit-") and not n.startswith("kernel-kit-aigis-"))
 

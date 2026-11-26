@@ -35,7 +35,7 @@ SOURCES = (
 
 
 # Kernels whose pins are a nested entry of verified.json (mzggr = top level).
-NESTED = {"aigis": "Aigis", "aigis-bakasu": "Aigis BakaSU"}
+NESTED = {"aigis": "Aigis", "aigis-bakasu": "Aigis BakaSU", "aigis-xxksu": "Aigis xxKSU"}
 
 
 def load_sources(path):

@@ -31,7 +31,7 @@ from xda_posts import gh_json, older_releases, parse_versions, version_parts, RO
 
 LIMIT = 4096
 MAX_UPSTREAM = 8
-XDA = "https://xdaforums.com/t/kernel-a325f-m-n-stable-ish-kernelsu-bakasu-susfs-2-4-0-samsung-a32-4g.4809753/"
+XDA = "https://xdaforums.com/t/kernel-a325f-m-n-stable-kernelsu-bakasu-v4-2-0-rc3-xxksu-v3-3-1-mojito-susfs-v2-4-0-nomount-v2-3-1.4809753/"
 # Upstream commits that say nothing to a user.
 SKIP = re.compile(r"^(chore|ci|docs?|build\(deps\)|Merge |Revert \"chore)|bump |translations?|Weblate|README", re.I)
 # Release-notes sections worth listing, and how they are named in the post.
