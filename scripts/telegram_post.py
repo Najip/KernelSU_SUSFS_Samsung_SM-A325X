@@ -47,14 +47,18 @@ def bbcode_to_text(s):
 def my_news(since):
     """Entries of docs/xda-updates.txt dated after `since` (YYYY-MM-DD)."""
     text = open(os.path.join(ROOT, "docs", "xda-updates.txt"), encoding="utf-8").read()
-    lines = [l for l in text.splitlines() if not l.startswith(">>")]
+    lines = text.splitlines()
     out, keep = [], False
-    for l in lines:
+    for i, l in enumerate(lines):
         m = re.match(r"\[B\](\d{4}-\d{2}-\d{2}): (.*)\[/B\]", l)
         if m:
-            keep = not since or m.group(1) >= since
+            # ">> not in Telegram" on the line under the title: XDA only.
+            xda_only = i + 1 < len(lines) and lines[i + 1].strip().lower() == ">> not in telegram"
+            keep = (not since or m.group(1) >= since) and not xda_only
             if keep:
                 out.append(f"{m.group(2)} ({m.group(1)}):")
+            continue
+        if l.startswith(">>"):
             continue
         if l.startswith("[B]"):  # Known issues, Recommended modules: not news
             keep = False

@@ -2,8 +2,11 @@
 >> keep "Known issues" and "Recommended modules" up to date.
 >> Lines starting with ">>" are notes and are left out. scripts/xda_posts.py adds
 >> the title and the "newest stable release" line and puts it into XDA-posts-<tag>.txt.
+>> Put ">> not in Telegram" on the line under an entry's title to keep it out of
+>> the Telegram post (it stays in XDA post #3).
 
 [B]2026-11-26: xxKSU is back, next to BakaSU[/B]
+>> not in Telegram
 [LIST]
 [*]From this release on, every release has two kernel ZIPs: one with BakaSU and one with [URL='https://github.com/Najip/xxKSU']xxKSU[/URL] by backslashxx. Same Aigis kernel, SUSFS and NoMount; only the root part differs. Flash one and install its manager (both are in the release).
 [*]What happened: this kernel started with xxKSU, moved to BakaSU on 2026-11-23 and dropped xxKSU when backslashxx's own KernelSU repo was taken down. That was too quick. He kept updating xxKSU's kernel side inside his mojito kernel tree, so my fork Najip/xxKSU (sync-mojito branch) now follows those updates every day and builds the matching manager. If his own repo comes back, it switches back to it automatically.
