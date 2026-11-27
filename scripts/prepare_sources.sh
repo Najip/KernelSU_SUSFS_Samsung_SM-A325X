@@ -97,10 +97,8 @@ git apply --whitespace=nowarn "$INFO_DIR/susfs-core.patch"
 sed -i 's/[ \t]*$//' "${core_files[@]}"
 git apply --whitespace=nowarn "$ROOT/patches/susfs/0001-jack-core-local-additions.patch"
 applied+=("susfs_patch_to_4.14.patch@${susfs_sha:0:12} (core files)" "susfs/0001-jack-core-local-additions.patch")
-# A32 storage: /sdcard/Android/data and obb go through sdcardfs, which the
-# SUSFS core does not know. Small addition on top of Jack's core (sus_path only).
-git apply --whitespace=nowarn "$ROOT/patches/susfs/0002-sdcardfs-sus-path.patch"
-applied+=("susfs/0002-sdcardfs-sus-path.patch")
+# sdcardfs sus_path (/sdcard/Android/data and obb) is part of Jack's core
+# since ef537d74 (PR #227), so no extra patch is needed here.
 
 log "$ROOT_NAME: $KSU_REPO ($KSU_REF)"
 if [[ "$ROOT_FLAVOR" == bakasu ]]; then
