@@ -1,11 +1,11 @@
 {
   "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
-  "checked": "2026-11-26T18:08:02Z",
+  "checked": "2026-11-27T06:47:26Z",
   "sources": {
     "aigis": {
-      "commit": "b6dea3021a3f7baf62ee1173d1d5b8e3ceb0baa1",
-      "date": "2026-11-23T23:17:46Z",
-      "subject": "chore: bump KernelSU to 57b2db60 [skip ci]",
+      "commit": "1686865632439c3f39350a0b1da7a18afa023fb0",
+      "date": "2026-11-26T20:51:35Z",
+      "subject": "chore: bump KernelSU to cac1e793 [skip ci]",
       "name": "Aigis kernel",
       "repo": "https://github.com/SlamZDank/Aigis-Kernel-A32",
       "branch": "bpf-5.15-legion"
