@@ -1,6 +1,6 @@
 {
   "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
-  "checked": "2026-11-27T06:47:26Z",
+  "checked": "2026-11-27T15:07:01Z",
   "sources": {
     "aigis": {
       "commit": "1686865632439c3f39350a0b1da7a18afa023fb0",
@@ -27,9 +27,9 @@
       "branch": "tiann-rebase"
     },
     "susfs": {
-      "commit": "26f2313be61f7a8603a50b2dcd12171495a79d27",
-      "date": "2026-11-18T10:31:45Z",
-      "subject": "Merge pull request #221 from sakuya-izayoi-c/fix/sus-path-i-state",
+      "commit": "ef537d74c6966c2a76d258a4108ec1b40fdd8d1f",
+      "date": "2026-11-27T14:43:02Z",
+      "subject": "susfs_patches: fix: incorrect path under sdcardfs",
       "name": "Jack's SUSFS (4.14 patch)",
       "repo": "https://github.com/JackA1ltman/NonGKI_Kernel_Build_2nd",
       "branch": "mainline",
@@ -45,6 +45,26 @@
     }
   },
   "history": [
+    {
+      "found": "2026-11-27T15:07:01Z",
+      "changed": [
+        "susfs"
+      ],
+      "commits": {
+        "susfs": "ef537d74c6966c2a76d258a4108ec1b40fdd8d1f"
+      },
+      "build": {
+        "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46022000843",
+        "plan": {
+          "aigis-bakasu": {
+            "mode": "kernel"
+          },
+          "aigis-xxksu": {
+            "mode": "kernel"
+          }
+        }
+      }
+    },
     {
       "found": "2026-11-26T18:08:02Z",
       "changed": [
@@ -125,25 +145,25 @@
   ],
   "files": {
     "aigis-bakasu-kernel": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45873468834",
-      "date": "2026-11-26T18:08:05Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46022000843",
+      "date": "2026-11-27T15:07:04Z"
     },
     "aigis-bakasu-nomount": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45873468834",
-      "date": "2026-11-26T18:08:05Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46022000843",
+      "date": "2026-11-27T15:07:04Z"
     },
     "aigis-xxksu-nomount": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45873468834",
-      "date": "2026-11-26T18:08:05Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46022000843",
+      "date": "2026-11-27T15:07:04Z"
     },
     "aigis-xxksu-kernel": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45873468834",
-      "date": "2026-11-26T18:08:05Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46022000843",
+      "date": "2026-11-27T15:07:04Z"
     }
   },
   "last_build": {
-    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/45873468834",
-    "date": "2026-11-26T18:08:05Z",
+    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46022000843",
+    "date": "2026-11-27T15:07:04Z",
     "plan": {
       "aigis-bakasu": {
         "mode": "kernel"
