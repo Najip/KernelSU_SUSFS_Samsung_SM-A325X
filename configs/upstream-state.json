@@ -1,6 +1,6 @@
 {
   "note": "Saved by the Upstream check workflow. Newest commit seen of each watched source.",
-  "checked": "2026-11-28T06:21:59Z",
+  "checked": "2026-11-28T08:37:24Z",
   "sources": {
     "aigis": {
       "commit": "214d329618ba744df22611468adb8f2cca79e88e",
@@ -11,16 +11,16 @@
       "branch": "bpf-5.15-legion"
     },
     "bakasu": {
-      "commit": "361fff862e600b5c4fa54b55d03e04ced50c1a7f",
-      "date": "2026-11-28T04:15:56Z",
-      "subject": "deps: Update cargo group in ksuinit (#645)",
+      "commit": "99ff0a27ca5477180da6d70e7387b91b0a9aa5b7",
+      "date": "2026-11-28T06:27:47Z",
+      "subject": "manager: fix dead telegram link",
       "name": "BakaSU",
       "repo": "https://github.com/Baka-SU/BakaSU",
       "branch": "main"
     },
     "xxksu": {
-      "commit": "316ec43c73f64bf58910b593b12ac9610eaa1999",
-      "date": "2026-11-26T13:21:00Z",
+      "commit": "a48116fd57e31b6726b41b63bb8415611fa1ab80",
+      "date": "2026-11-28T08:32:19Z",
       "subject": "ci: start the A32 upstream check after a pre-release",
       "name": "xxKSU",
       "repo": "https://github.com/Najip/xxKSU",
@@ -45,6 +45,28 @@
     }
   },
   "history": [
+    {
+      "found": "2026-11-28T08:37:24Z",
+      "changed": [
+        "bakasu",
+        "xxksu"
+      ],
+      "commits": {
+        "bakasu": "99ff0a27ca5477180da6d70e7387b91b0a9aa5b7",
+        "xxksu": "a48116fd57e31b6726b41b63bb8415611fa1ab80"
+      },
+      "build": {
+        "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46126771548",
+        "plan": {
+          "aigis-bakasu": {
+            "mode": "kernel"
+          },
+          "aigis-xxksu": {
+            "mode": "kernel"
+          }
+        }
+      }
+    },
     {
       "found": "2026-11-28T06:21:59Z",
       "changed": [
@@ -186,32 +208,31 @@
   ],
   "files": {
     "aigis-bakasu-kernel": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46116271422",
-      "date": "2026-11-28T06:22:02Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46126771548",
+      "date": "2026-11-28T08:38:33Z"
     },
     "aigis-bakasu-nomount": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46116271422",
-      "date": "2026-11-28T06:22:02Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46126771548",
+      "date": "2026-11-28T08:38:33Z"
     },
     "aigis-xxksu-nomount": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46074907244",
-      "date": "2026-11-27T22:09:48Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46126771548",
+      "date": "2026-11-28T08:38:33Z"
     },
     "aigis-xxksu-kernel": {
-      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46074907244",
-      "date": "2026-11-27T22:09:48Z"
+      "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46126771548",
+      "date": "2026-11-28T08:38:33Z"
     }
   },
   "last_build": {
-    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46116271422",
-    "date": "2026-11-28T06:22:02Z",
+    "run": "https://github.com/Najip/KernelSU_SUSFS_Samsung_SM-A325X/actions/runs/46126771548",
+    "date": "2026-11-28T08:38:33Z",
     "plan": {
       "aigis-bakasu": {
         "mode": "kernel"
       },
       "aigis-xxksu": {
-        "mode": "reuse",
-        "run": "46074907244"
+        "mode": "kernel"
       }
     }
   }
